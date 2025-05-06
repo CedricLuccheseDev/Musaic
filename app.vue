@@ -1,7 +1,7 @@
 <template>
   <NuxtLayout>
     <UApp>
-      <NuxtPage class="h-screen w-screen bg-red-500" />
+      <NuxtPage class="bg-slate-900" />
     </UApp>
   </NuxtLayout>
 </template>
