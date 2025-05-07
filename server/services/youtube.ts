@@ -14,7 +14,8 @@ export function downloadYoutube(
       audioQuality: 0,
       output: "-",
       ffmpegLocation: ffmpegPath!,
-
+      addMetadata: true,
+      postprocessorArgs: "-c:a libmp3lame -b:a 320kbps -ac 2 -ar 44100",
       // dumpSingleJson: true,
     },
     { stdio: ["ignore", "pipe", "inherit"] },

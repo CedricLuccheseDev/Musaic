@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
     return { error: "Missing url param" };
   }
 
-  console.log("[/api/search: Searching for", entry);
+  console.log("/api/search: Searching for", entry);
   const results: Results[] = await searchYoutube(entry, 5);
   return results;
 });

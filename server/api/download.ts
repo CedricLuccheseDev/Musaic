@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
     return { error: "Missing url param" };
   }
 
-  console.log("[/api/download: Downloading", url);
+  console.log("/api/download: Downloading", url);
 
   const { title } = await getYoutubeMeta(url);
 
