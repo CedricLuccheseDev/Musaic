@@ -158,6 +158,7 @@ async function downloadEntry(idx: number) {
     <div
       class="flex min-h-screen w-full max-w-[1280px] flex-col items-center justify-center gap-4 p-16"
     >
+      <h1 class="text-info text-center text-4xl font-bold">Musaic</h1>
       <UProgress
         v-if="isDownloading || status === 'success'"
         v-model="progress"
