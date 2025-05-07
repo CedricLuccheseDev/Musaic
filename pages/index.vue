@@ -16,6 +16,7 @@ const isValidEntry = (entry: string) => {
   return pattern.test(entry);
 };
 const entries = ref<ResultWithStatus[]>([]);
+const progress = ref(0)
 
 watch(entry, (newEntry) => {
   if (newEntry) {
@@ -67,12 +68,17 @@ async function download(entry: string) {
 
   try {
     const resp = await fetch(`/api/download?url=${encodeURIComponent(entry)}`);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
 
     const contentType = resp.headers.get("Content-Type") || "";
 
     // Check if it's not a research
     if (contentType.includes("application/json")) return;
+
+    const total = Number(resp.headers.get('Content-Length')) || 0
+    const reader = resp.body.getReader()
+    const chunks: Uint8Array[] = []
+    let loaded = 0
 
     const rawTitle = resp.headers.get("X-Track-Title") || "track";
     const title = decodeURIComponent(rawTitle);

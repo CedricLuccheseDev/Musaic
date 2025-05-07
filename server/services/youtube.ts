@@ -1,27 +1,33 @@
 import type { ChildProcessWithoutNullStreams } from "child_process";
+import { spawn } from "child_process";
 import ffmpegPath from "ffmpeg-static";
+import type { Readable } from "stream";
 import youtubedl from "youtube-dl-exec";
+import ytdl from "ytdl-core";
 import type { Results } from "~/shared/types/types";
 
-export function downloadYoutube(
-  youtubeUrl: string,
-): ChildProcessWithoutNullStreams {
-  const proc = youtubedl.exec(
-    youtubeUrl,
-    {
-      extractAudio: true,
-      audioFormat: "mp3",
-      audioQuality: 0,
-      output: "-",
-      ffmpegLocation: ffmpegPath!,
-      addMetadata: true,
-      postprocessorArgs: "-c:a libmp3lame -b:a 320kbps -ac 2 -ar 44100",
-      // dumpSingleJson: true,
-    },
-    { stdio: ["ignore", "pipe", "inherit"] },
-  ) as unknown as ChildProcessWithoutNullStreams;
+export function downloadYoutubeMp3(youtubeUrl: string): Readable {
+  const ytStream = ytdl(youtubeUrl, { filter: "audioonly" });
 
-  return proc;
+  const ffmpeg = spawn(
+    ffmpegPath!,
+    [
+      "-i",
+      "pipe:0",
+      "-vn",
+      "-c:a",
+      "libmp3lame",
+      "-b:a",
+      "320k",
+      "-f",
+      "mp3",
+      "-",
+    ],
+    { stdio: ["pipe", "pipe", "inherit"] },
+  );
+
+  ytStream.pipe(ffmpeg.stdin!);
+  return ffmpeg.stdout!;
 }
 
 export async function getYoutubeMeta(
@@ -33,6 +39,7 @@ export async function getYoutubeMeta(
       dumpSingleJson: true,
       noWarnings: true,
       noCheckCertificates: true,
+      cookies: "/cookies.txt",
     },
     { stdio: ["ignore", "pipe", "inherit"] },
   ) as unknown as ChildProcessWithoutNullStreams;
