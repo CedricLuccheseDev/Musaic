@@ -3,15 +3,28 @@ import { spawn } from "child_process";
 import ffmpegPath from "ffmpeg-static";
 import type { Readable } from "stream";
 import youtubedl from "youtube-dl-exec";
+import type { VideoFormat } from "ytdl-core";
 import ytdl from "ytdl-core";
 import type { Results } from "~/shared/types/types";
+import { logError, logInfo, logSuccess } from "~/utils/logger";
 
 export function downloadYoutubeMp3(youtubeUrl: string): Readable {
-  const ytStream = ytdl(youtubeUrl, { filter: "audioonly" });
+  logInfo(
+    "services/youtube:downloadYoutubeMp3: Downloading MP3 from URL:",
+    youtubeUrl,
+  );
+  const ytStream = ytdl(youtubeUrl, {
+    filter: "audioonly",
+    quality: "highestaudio",
+  });
+
+  // ytStream.on("error", (err) => logError("YT stream error", err));
 
   const ffmpeg = spawn(
     ffmpegPath!,
     [
+      "-fflags",
+      "+genpts",
       "-i",
       "pipe:0",
       "-vn",
@@ -21,10 +34,29 @@ export function downloadYoutubeMp3(youtubeUrl: string): Readable {
       "320k",
       "-f",
       "mp3",
-      "-",
+      "pipe:1",
     ],
     { stdio: ["pipe", "pipe", "inherit"] },
   );
+
+  logInfo(
+    "services/youtube:downloadYoutubeMp3: Spawning ffmpeg process with path:",
+    ffmpegPath,
+  );
+
+  ffmpeg.on("error", (err) => {
+    logError(
+      "services/youtube:downloadYoutubeMp3: Error spawning ffmpeg process:",
+      err,
+    );
+  });
+
+  ffmpeg.on("close", (code) => {
+    logInfo(
+      "services/youtube:downloadYoutubeMp3: ffmpeg process exited with code:",
+      code,
+    );
+  });
 
   ytStream.pipe(ffmpeg.stdin!);
   return ffmpeg.stdout!;
@@ -33,32 +65,31 @@ export function downloadYoutubeMp3(youtubeUrl: string): Readable {
 export async function getYoutubeMeta(
   youtubeUrl: string,
 ): Promise<{ title: string; filesize?: number }> {
-  const proc = youtubedl.exec(
+  logInfo(
+    "services/youtube:getYoutubeMeta: Fetching metadata for URL:",
     youtubeUrl,
-    {
-      dumpSingleJson: true,
-      noWarnings: true,
-      noCheckCertificates: true,
-      cookies: "/cookies.txt",
-    },
-    { stdio: ["ignore", "pipe", "inherit"] },
-  ) as unknown as ChildProcessWithoutNullStreams;
+  );
+  const info = await ytdl.getInfo(youtubeUrl);
 
-  let json = "";
-  for await (const chunk of proc.stdout!) {
-    json += chunk.toString();
-  }
-  // wait for the process to exit
-  await new Promise<void>((res, rej) => {
-    proc.on("close", res);
-    proc.on("error", rej);
-  });
+  const audioFormats = ytdl.filterFormats(
+    info.formats,
+    "audioonly",
+  ) as VideoFormat[];
+  const chosen = audioFormats.find((f) => f.contentLength) || audioFormats[0];
+  const filesize = chosen.contentLength
+    ? parseInt(chosen.contentLength, 10)
+    : undefined;
 
-  const meta = JSON.parse(json);
+  logSuccess(
+    "services/youtube:getYoutubeMeta: Metadata fetched successfully:",
+    info.videoDetails.title,
+    " - ",
+    filesize,
+  );
+
   return {
-    title: meta.title as string,
-    filesize:
-      parseInt(meta.filesize || meta.filesize_approx || "0", 10) || undefined,
+    title: info.videoDetails.title as string,
+    filesize: filesize,
   };
 }
 

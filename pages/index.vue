@@ -16,7 +16,8 @@ const isValidEntry = (entry: string) => {
   return pattern.test(entry);
 };
 const entries = ref<ResultWithStatus[]>([]);
-const progress = ref(0)
+const progress = ref(0);
+const isDownloading = ref(false);
 
 watch(entry, (newEntry) => {
   if (newEntry) {
@@ -66,23 +67,32 @@ async function download(entry: string) {
   // Set state to pending
   status.value = "pending";
 
+  isDownloading.value = true;
+  progress.value = 0;
+
   try {
+    logInfo("Downloading", entry);
     const resp = await fetch(`/api/download?url=${encodeURIComponent(entry)}`);
     if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
 
-    const contentType = resp.headers.get("Content-Type") || "";
+    const total = Number(resp.headers.get("Content-Length")) || 0;
+    const reader = resp.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let received = 0;
 
-    // Check if it's not a research
-    if (contentType.includes("application/json")) return;
-
-    const total = Number(resp.headers.get('Content-Length')) || 0
-    const reader = resp.body.getReader()
-    const chunks: Uint8Array[] = []
-    let loaded = 0
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value!);
+      received += value!.length;
+      if (total) {
+        progress.value = (received / total) * 100;
+      }
+    }
 
     const rawTitle = resp.headers.get("X-Track-Title") || "track";
     const title = decodeURIComponent(rawTitle);
-    const blob = await resp.blob();
+    const blob = new Blob(chunks, { type: "audio/mpeg" });
     const downloadUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = downloadUrl;
@@ -91,10 +101,14 @@ async function download(entry: string) {
     a.click();
     a.remove();
     URL.revokeObjectURL(downloadUrl);
+    logSuccess("Download complete:", title);
+    isDownloading.value = false;
     status.value = "success";
   } catch (err) {
-    console.error("Download failed", err);
+    logError("Download failed", err);
     status.value = "error";
+    isDownloading.value = false;
+    progress.value = 0;
   }
 }
 
@@ -106,10 +120,13 @@ async function downloadEntry(idx: number) {
   item.status = "pending";
 
   try {
+    console.log("Downloading", item.link);
     const resp = await fetch(
       `/api/download?url=${encodeURIComponent(item.link)}`,
     );
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+    console.log(resp);
 
     const contentType = resp.headers.get("Content-Type") || "";
 
@@ -127,6 +144,7 @@ async function downloadEntry(idx: number) {
     a.click();
     a.remove();
     URL.revokeObjectURL(downloadUrl);
+    isDownloading.value = false;
     item.status = "success";
   } catch (err) {
     console.error("Download failed", err);
@@ -138,8 +156,15 @@ async function downloadEntry(idx: number) {
 <template>
   <div class="flex min-h-screen min-w-screen items-center justify-center">
     <div
-      class="flex min-h-screen w-full max-w-[1280px] flex-col items-center justify-center gap-8 p-16"
+      class="flex min-h-screen w-full max-w-[1280px] flex-col items-center justify-center gap-4 p-16"
     >
+      <UProgress
+        v-if="isDownloading || status === 'success'"
+        v-model="progress"
+        class="w-full"
+        size="md"
+        :color="progress === 100 ? 'success' : 'info'"
+      />
       <div class="flex h-full w-full flex-row gap-4">
         <UInput
           v-model="entry"

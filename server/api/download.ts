@@ -1,6 +1,7 @@
 // server/api/download.ts
 import { defineEventHandler, getQuery } from "h3";
 import type { Readable } from "stream";
+import { logInfo } from "~/utils/logger";
 import { downloadYoutubeMp3, getYoutubeMeta } from "../services/youtube";
 
 export default defineEventHandler(async (event) => {
@@ -9,6 +10,8 @@ export default defineEventHandler(async (event) => {
     event.node.res.statusCode = 400;
     return event.node.res.end("Missing url parameter");
   }
+
+  logInfo("server/api/download.ts: Downloading MP3 from URL:", url);
 
   const { title, filesize } = await getYoutubeMeta(url);
 
@@ -21,6 +24,8 @@ export default defineEventHandler(async (event) => {
   // Pipe the MP3 stream directly to the HTTP response
   const mp3Stream: Readable = downloadYoutubeMp3(url);
   mp3Stream.pipe(res);
+
+  logInfo("server/api/download.ts: MP3 stream piped to response");
 
   // Keep the connection open until the stream ends
   await new Promise<void>((resolve, reject) => {
