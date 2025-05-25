@@ -6,7 +6,7 @@ import youtubedl from "youtube-dl-exec";
 import type { VideoFormat } from "ytdl-core";
 import ytdl from "ytdl-core";
 import type { Results } from "~/shared/types/types";
-import { logError, logInfo, logSuccess } from "~/utils/logger";
+import { logInfo, logSuccess } from "~/utils/logger";
 
 export function downloadYoutubeMp3(youtubeUrl: string): Readable {
   logInfo(
@@ -16,9 +16,8 @@ export function downloadYoutubeMp3(youtubeUrl: string): Readable {
   const ytStream = ytdl(youtubeUrl, {
     filter: "audioonly",
     quality: "highestaudio",
+    highWaterMark: 1 << 25,
   });
-
-  // ytStream.on("error", (err) => logError("YT stream error", err));
 
   const ffmpeg = spawn(
     ffmpegPath!,
@@ -43,20 +42,6 @@ export function downloadYoutubeMp3(youtubeUrl: string): Readable {
     "services/youtube:downloadYoutubeMp3: Spawning ffmpeg process with path:",
     ffmpegPath,
   );
-
-  ffmpeg.on("error", (err) => {
-    logError(
-      "services/youtube:downloadYoutubeMp3: Error spawning ffmpeg process:",
-      err,
-    );
-  });
-
-  ffmpeg.on("close", (code) => {
-    logInfo(
-      "services/youtube:downloadYoutubeMp3: ffmpeg process exited with code:",
-      code,
-    );
-  });
 
   ytStream.pipe(ffmpeg.stdin!);
   return ffmpeg.stdout!;

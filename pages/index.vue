@@ -71,11 +71,16 @@ async function download(entry: string) {
   progress.value = 0;
 
   try {
-    logInfo("Downloading", entry);
+    logInfo("Downloading...", entry);
+    const metaResp = await fetch(
+      `/api/download?url=${encodeURIComponent(entry)}&metaOnly=true`,
+    );
+    if (!metaResp.ok)
+      throw new Error(`HTTP ${metaResp.status} lors de metaOnly`);
+    const { filesize } = await metaResp.json();
+
     const resp = await fetch(`/api/download?url=${encodeURIComponent(entry)}`);
     if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
-
-    const total = Number(resp.headers.get("Content-Length")) || 0;
     const reader = resp.body.getReader();
     const chunks: Uint8Array[] = [];
     let received = 0;
@@ -85,9 +90,7 @@ async function download(entry: string) {
       if (done) break;
       chunks.push(value!);
       received += value!.length;
-      if (total) {
-        progress.value = (received / total) * 100;
-      }
+      progress.value = Math.min(100, (received / filesize) * 100);
     }
 
     const rawTitle = resp.headers.get("X-Track-Title") || "track";
