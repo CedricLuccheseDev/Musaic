@@ -33,6 +33,7 @@ async function downloadWithYtDlp(youtubeUrl: string): Promise<Readable> {
     "--no-warnings",             // Suppress warnings
     "--quiet",                   // Minimal output
     "--no-check-certificate",    // Ignore SSL certificate errors
+    "--extractor-args", "youtube:player_client=ios", // Use iOS client to bypass bot detection
     "-o", "-",                   // Output to stdout
     youtubeUrl,
   ], {
@@ -247,6 +248,7 @@ export async function getYoutubeMeta(
       "--print", "%(title)s",  // Print only the title
       "--no-playlist",
       "--no-warnings",
+      "--extractor-args", "youtube:player_client=ios", // Use iOS client to bypass bot detection
       youtubeUrl,
     ], {
       env: { ...process.env, PATH: `${process.env.PATH}:${process.env.HOME}/.local/bin` }
