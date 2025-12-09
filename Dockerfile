@@ -34,7 +34,7 @@ WORKDIR /app
 # Install FFmpeg and yt-dlp for audio processing and download
 # yt-dlp is installed via Python pip (lightweight, no Python dependencies needed at runtime)
 RUN apk add --no-cache ffmpeg python3 py3-pip && \
-    pip3 install --no-cache-dir yt-dlp && \
+    pip3 install --break-system-packages --no-cache-dir yt-dlp && \
     apk del py3-pip
 
 ENV NODE_ENV=production
