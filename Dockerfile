@@ -31,8 +31,11 @@ RUN \
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Install FFmpeg for video processing (required by ytdl-core)
-RUN apk add --no-cache ffmpeg
+# Install FFmpeg and yt-dlp for audio processing and download
+# yt-dlp is installed via Python pip (lightweight, no Python dependencies needed at runtime)
+RUN apk add --no-cache ffmpeg python3 py3-pip && \
+    pip3 install --no-cache-dir yt-dlp && \
+    apk del py3-pip
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
