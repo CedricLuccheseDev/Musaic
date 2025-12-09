@@ -21,10 +21,10 @@ const INVIDIOUS_INSTANCES = [
 async function downloadWithYtDlp(youtubeUrl: string): Promise<Readable> {
   logInfo("Starting yt-dlp download...");
 
-  // Find yt-dlp in common locations
-  const ytdlpPath = process.env.HOME
-    ? `${process.env.HOME}/.local/bin/yt-dlp`
-    : "yt-dlp";
+  // Try to find yt-dlp - in Docker it's in /usr/bin, locally in ~/.local/bin
+  const ytdlpPath = process.env.DOCKER_ENV
+    ? "yt-dlp"  // In Docker, yt-dlp is in PATH
+    : (process.env.HOME ? `${process.env.HOME}/.local/bin/yt-dlp` : "yt-dlp");
 
   // Spawn yt-dlp process to download best audio and output to stdout
   const ytdlp = spawn(ytdlpPath, [
@@ -239,9 +239,9 @@ export async function getYoutubeMeta(
 
   return new Promise((resolve, reject) => {
     // Use yt-dlp to get video metadata (faster and more reliable than Invidious)
-    const ytdlpPath = process.env.HOME
-      ? `${process.env.HOME}/.local/bin/yt-dlp`
-      : "yt-dlp";
+    const ytdlpPath = process.env.DOCKER_ENV
+      ? "yt-dlp"  // In Docker, yt-dlp is in PATH
+      : (process.env.HOME ? `${process.env.HOME}/.local/bin/yt-dlp` : "yt-dlp");
 
     const ytdlp = spawn(ytdlpPath, [
       "--print", "%(title)s",  // Print only the title

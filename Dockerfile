@@ -40,6 +40,7 @@ RUN apk add --no-cache ffmpeg python3 py3-pip && \
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000
+ENV DOCKER_ENV=true
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
