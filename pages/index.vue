@@ -16,8 +16,8 @@ function search() {
 
 <template>
   <div class="relative flex min-h-screen flex-col bg-linear-to-b from-neutral-950 to-neutral-900">
-    <BackgroundHome />
-    <HeaderHome />
+    <HomeBackground />
+    <HomeHeader />
     <div class="relative flex flex-1 flex-col items-center justify-center px-4">
       <!-- Logo -->
       <div class="mb-3 md:mb-4">
