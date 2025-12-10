@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { DownloadStatus, type TrackEntry } from '~/types/track'
 
+const { t } = useI18n()
+
 type FilterType = 'all' | 'free' | 'paid'
 
 const route = useRoute()
@@ -118,9 +120,9 @@ function search() {
 </script>
 
 <template>
-  <div class="relative min-h-screen bg-neutral-950">
-    <Background />
-    <Header v-model="searchInput" v-model:search-artist="searchArtist" @search="search" />
+  <div class="relative min-h-screen bg-neutral-950 lg:p-8">
+    <BackgroundSearch />
+    <SearchHeader v-model="searchInput" v-model:search-artist="searchArtist" @search="search" />
 
     <!-- Results -->
     <main class="relative mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-10">
@@ -136,16 +138,16 @@ function search() {
           <div class="mb-4 md:mb-6">
             <h1 class="text-xl font-bold text-white md:text-2xl">
               <template v-if="isArtistSearch">
-                Tracks de <span class="text-violet-400">{{ query }}</span>
+                {{ t.tracksBy }} <span class="text-violet-400">{{ query }}</span>
               </template>
               <template v-else>
-                Résultats pour "<span class="text-violet-400">{{ query }}</span>"
+                {{ t.resultsFor }} "<span class="text-violet-400">{{ query }}</span>"
               </template>
             </h1>
             <p class="mt-1 text-xs text-neutral-500 md:text-sm">
-              {{ filteredResults.length }} résultat{{ filteredResults.length > 1 ? 's' : '' }}
+              {{ filteredResults.length }} {{ filteredResults.length > 1 ? t.results : t.result }}
               <span v-if="activeFilter !== 'all'">
-                ({{ allResults.length }} au total)
+                ({{ allResults.length }} {{ t.total }})
               </span>
             </p>
           </div>
@@ -159,7 +161,7 @@ function search() {
                 : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white'"
               @click="activeFilter = 'all'"
             >
-              Tous
+              {{ t.all }}
             </button>
             <button
               class="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 md:rounded-xl md:px-4 md:py-2 md:text-sm"
@@ -170,7 +172,7 @@ function search() {
             >
               <span class="flex items-center gap-1 md:gap-1.5">
                 <UIcon name="i-heroicons-arrow-down-tray" class="h-3.5 w-3.5 md:h-4 md:w-4" />
-                Gratuit
+                {{ t.free }}
               </span>
             </button>
             <button
@@ -182,7 +184,7 @@ function search() {
             >
               <span class="flex items-center gap-1 md:gap-1.5">
                 <UIcon name="i-heroicons-shopping-cart" class="h-3.5 w-3.5 md:h-4 md:w-4" />
-                Payant
+                {{ t.paid }}
               </span>
             </button>
           </div>
@@ -194,7 +196,7 @@ function search() {
 
           <!-- No results after filter -->
           <div v-if="!visibleResults.length" class="py-12 text-center">
-            <p class="text-neutral-500">Aucun résultat avec ce filtre</p>
+            <p class="text-neutral-500">{{ t.noFilterResults }}</p>
           </div>
 
           <!-- Load more indicator -->
@@ -204,13 +206,13 @@ function search() {
 
           <!-- End of results -->
           <div v-else class="py-8 text-center text-sm text-neutral-500">
-            Fin des résultats
+            {{ t.endOfResults }}
           </div>
         </template>
 
         <!-- Empty state -->
         <div v-else-if="query" class="py-12 text-center">
-          <p class="text-muted">Aucun résultat pour "{{ query }}"</p>
+          <p class="text-muted">{{ t.noResults }} "{{ query }}"</p>
         </div>
 
         <!-- Fallback on server -->
@@ -221,5 +223,6 @@ function search() {
         </template>
       </ClientOnly>
     </main>
+    <Footer />
   </div>
 </template>

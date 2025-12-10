@@ -5,6 +5,8 @@ const props = withDefaults(defineProps<{
   size: 'default'
 })
 
+const { t } = useI18n()
+
 const searchInput = defineModel<string>('modelValue', { default: '' })
 const searchArtist = defineModel<boolean>('searchArtist', { default: false })
 
@@ -40,7 +42,7 @@ const inputText = computed(() => props.size === 'large' ? 'text-lg' : 'text-base
       <input
         v-model="searchInput"
         type="text"
-        :placeholder="searchArtist ? 'Artiste...' : 'Titre...'"
+        :placeholder="searchArtist ? t.searchPlaceholderArtist : t.searchPlaceholderTitle"
         class="min-w-0 flex-1 bg-transparent px-2 text-white placeholder-neutral-500 outline-none md:px-3"
         :class="[inputHeight, inputText]"
         @keyup.enter="onSearch"
@@ -49,25 +51,25 @@ const inputText = computed(() => props.size === 'large' ? 'text-lg' : 'text-base
       <!-- Artist toggle button -->
       <button
         type="button"
-        class="mx-1 flex shrink-0 cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all duration-200 md:mx-2 md:gap-1.5 md:rounded-xl md:px-3 md:text-sm"
+        class="mx-1 flex shrink-0 cursor-pointer items-center justify-center rounded-lg p-2 text-xs font-medium transition-all duration-200 lg:mx-2 lg:gap-1.5 lg:rounded-xl lg:px-3 lg:py-1.5 lg:text-sm"
         :class="searchArtist
           ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/25'
           : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white'"
         @click="toggleArtistSearch"
       >
-        <UIcon name="i-heroicons-user" class="h-3.5 w-3.5 md:h-4 md:w-4" />
-        <span class="hidden sm:inline">Artiste</span>
+        <UIcon name="i-heroicons-user" class="h-4 w-4" />
+        <span class="hidden lg:inline">{{ t.artist }}</span>
       </button>
 
       <!-- Search button inside -->
       <button
         type="button"
-        class="m-1 flex shrink-0 cursor-pointer items-center justify-center rounded-lg bg-violet-600 p-2 font-medium text-white transition-all duration-200 hover:bg-violet-500 md:m-1.5 md:gap-2 md:rounded-xl md:px-4 md:py-2"
-        :class="size === 'large' ? 'md:px-6 md:py-3' : 'md:px-4 md:py-2'"
+        class="m-1 flex shrink-0 cursor-pointer items-center justify-center rounded-lg bg-violet-600 p-2 font-medium text-white transition-all duration-200 hover:bg-violet-500 lg:m-1.5 lg:gap-2 lg:rounded-xl lg:px-4 lg:py-2"
+        :class="size === 'large' ? 'lg:px-6 lg:py-3' : 'lg:px-4 lg:py-2'"
         @click="onSearch"
       >
-        <UIcon name="i-heroicons-magnifying-glass" class="h-4 w-4 md:hidden" />
-        <span class="hidden md:inline">Rechercher</span>
+        <UIcon name="i-heroicons-magnifying-glass" class="h-4 w-4 lg:hidden" />
+        <span class="hidden lg:inline">{{ t.search }}</span>
       </button>
     </div>
   </div>

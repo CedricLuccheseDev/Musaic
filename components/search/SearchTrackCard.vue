@@ -6,6 +6,8 @@ const props = defineProps<{
   index?: number
 }>()
 
+const { t } = useI18n()
+
 const isVisible = ref(false)
 
 onMounted(() => {
@@ -106,7 +108,7 @@ function formatDuration(ms: number): string {
         @click.stop
       >
         <UIcon name="i-heroicons-arrow-down-tray" class="h-4 w-4" />
-        <span class="hidden text-sm sm:inline">Télécharger</span>
+        <span class="hidden text-sm sm:inline">{{ t.download }}</span>
       </a>
 
       <!-- Free External Link -->
@@ -119,7 +121,7 @@ function formatDuration(ms: number): string {
         @click.stop
       >
         <UIcon name="i-heroicons-arrow-top-right-on-square" class="h-4 w-4" />
-        <span class="hidden text-sm sm:inline">Lien gratuit</span>
+        <span class="hidden text-sm sm:inline">{{ t.freeLink }}</span>
       </a>
 
       <!-- Buy button -->
@@ -132,7 +134,7 @@ function formatDuration(ms: number): string {
         @click.stop
       >
         <UIcon name="i-heroicons-shopping-cart" class="h-4 w-4" />
-        <span class="hidden text-sm sm:inline">Acheter</span>
+        <span class="hidden text-sm sm:inline">{{ t.buy }}</span>
       </a>
 
       <!-- SoundCloud link for non-downloadable -->
