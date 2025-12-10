@@ -41,13 +41,9 @@ function onSearch() {
       <div v-else />
 
       <!-- Profile - Right -->
-      <div class="flex justify-end">
-        <button
-          type="button"
-          class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl bg-neutral-800 text-neutral-400 transition-all duration-200 hover:bg-neutral-700 hover:text-white"
-        >
-          <UIcon name="i-heroicons-user" class="h-5 w-5" />
-        </button>
+      <div class="flex items-center justify-end gap-3">
+        <LangSwitch />
+        <ProfileButtons />
       </div>
     </div>
 
@@ -58,12 +54,10 @@ function onSearch() {
         <NuxtLink to="/">
           <Logo size="sm" />
         </NuxtLink>
-        <button
-          type="button"
-          class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg bg-neutral-800 text-neutral-400"
-        >
-          <UIcon name="i-heroicons-user" class="h-4 w-4" />
-        </button>
+        <div class="flex items-center gap-2">
+          <LangSwitch size="sm" />
+          <ProfileButtons size="sm" />
+        </div>
       </div>
 
       <!-- Search bar -->

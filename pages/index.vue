@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const { t } = useI18n()
+
 const query = ref('')
 const searchArtist = ref(false)
 
@@ -13,9 +15,10 @@ function search() {
 </script>
 
 <template>
-  <div class="relative min-h-screen bg-linear-to-b from-neutral-950 to-neutral-900">
+  <div class="relative flex min-h-screen flex-col bg-linear-to-b from-neutral-950 to-neutral-900">
     <BackgroundHome />
-    <div class="relative flex min-h-screen flex-col items-center justify-center px-4">
+    <HeaderHome />
+    <div class="relative flex flex-1 flex-col items-center justify-center px-4">
       <!-- Logo -->
       <div class="mb-3 md:mb-4">
         <Logo size="lg" />
@@ -23,7 +26,7 @@ function search() {
 
       <!-- Tagline -->
       <p class="mb-8 text-center text-base text-neutral-400 md:mb-12 md:text-lg">
-        Trouve où télécharger tes tracks
+        {{ t.tagline }}
       </p>
 
       <!-- Search -->
@@ -36,5 +39,6 @@ function search() {
         />
       </div>
     </div>
+    <Footer />
   </div>
 </template>
