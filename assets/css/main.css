@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
+/* Logo font */
+.font-logo {
+  font-family: "Righteous", sans-serif;
+}
+
 /* Animated waves */
 @keyframes wave-slow {
   0%, 100% {
