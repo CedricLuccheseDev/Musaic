@@ -121,7 +121,7 @@ function search() {
 
 <template>
   <div class="relative min-h-screen bg-neutral-950 lg:p-8">
-    <BackgroundSearch />
+    <SearchBackground />
     <SearchHeader v-model="searchInput" v-model:search-artist="searchArtist" @search="search" />
 
     <!-- Results -->
@@ -191,7 +191,7 @@ function search() {
 
           <!-- Track list -->
           <div class="space-y-2 md:space-y-3">
-            <TrackCard v-for="(track, index) in visibleResults" :key="track.id" :track="track" :index="index" />
+            <SearchTrackCard v-for="(track, index) in visibleResults" :key="track.id" :track="track" :index="index" />
           </div>
 
           <!-- No results after filter -->
