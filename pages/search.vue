@@ -118,12 +118,12 @@ function search() {
 </script>
 
 <template>
-  <div class="relative min-h-screen bg-neutral-950 p-8">
+  <div class="relative min-h-screen bg-neutral-950">
     <Background />
     <Header v-model="searchInput" v-model:search-artist="searchArtist" @search="search" />
 
     <!-- Results -->
-    <main class="relative mx-auto max-w-4xl px-6 py-10">
+    <main class="relative mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-10">
       <ClientOnly>
         <!-- Loading -->
         <div v-if="isLoading" class="flex justify-center py-12">
@@ -133,8 +133,8 @@ function search() {
         <!-- Results list -->
         <template v-else-if="allResults?.length">
           <!-- Search header -->
-          <div class="mb-6">
-            <h1 class="text-2xl font-bold text-white">
+          <div class="mb-4 md:mb-6">
+            <h1 class="text-xl font-bold text-white md:text-2xl">
               <template v-if="isArtistSearch">
                 Tracks de <span class="text-violet-400">{{ query }}</span>
               </template>
@@ -142,7 +142,7 @@ function search() {
                 Résultats pour "<span class="text-violet-400">{{ query }}</span>"
               </template>
             </h1>
-            <p class="mt-1 text-sm text-neutral-500">
+            <p class="mt-1 text-xs text-neutral-500 md:text-sm">
               {{ filteredResults.length }} résultat{{ filteredResults.length > 1 ? 's' : '' }}
               <span v-if="activeFilter !== 'all'">
                 ({{ allResults.length }} au total)
@@ -151,9 +151,9 @@ function search() {
           </div>
 
           <!-- Filters -->
-          <div class="mb-6 flex items-center gap-2">
+          <div class="mb-4 flex flex-wrap items-center gap-2 md:mb-6">
             <button
-              class="cursor-pointer rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200"
+              class="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 md:rounded-xl md:px-4 md:py-2 md:text-sm"
               :class="activeFilter === 'all'
                 ? 'bg-violet-600 text-white'
                 : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white'"
@@ -162,33 +162,33 @@ function search() {
               Tous
             </button>
             <button
-              class="cursor-pointer rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200"
+              class="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 md:rounded-xl md:px-4 md:py-2 md:text-sm"
               :class="activeFilter === 'free'
                 ? 'bg-emerald-600 text-white'
                 : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white'"
               @click="activeFilter = 'free'"
             >
-              <span class="flex items-center gap-1.5">
-                <UIcon name="i-heroicons-arrow-down-tray" class="h-4 w-4" />
+              <span class="flex items-center gap-1 md:gap-1.5">
+                <UIcon name="i-heroicons-arrow-down-tray" class="h-3.5 w-3.5 md:h-4 md:w-4" />
                 Gratuit
               </span>
             </button>
             <button
-              class="cursor-pointer rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200"
+              class="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 md:rounded-xl md:px-4 md:py-2 md:text-sm"
               :class="activeFilter === 'paid'
                 ? 'bg-orange-600 text-white'
                 : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white'"
               @click="activeFilter = 'paid'"
             >
-              <span class="flex items-center gap-1.5">
-                <UIcon name="i-heroicons-shopping-cart" class="h-4 w-4" />
+              <span class="flex items-center gap-1 md:gap-1.5">
+                <UIcon name="i-heroicons-shopping-cart" class="h-3.5 w-3.5 md:h-4 md:w-4" />
                 Payant
               </span>
             </button>
           </div>
 
           <!-- Track list -->
-          <div class="space-y-3">
+          <div class="space-y-2 md:space-y-3">
             <TrackCard v-for="(track, index) in visibleResults" :key="track.id" :track="track" :index="index" />
           </div>
 

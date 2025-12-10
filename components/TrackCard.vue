@@ -46,7 +46,7 @@ function formatDuration(ms: number): string {
 
 <template>
   <div
-    class="group relative overflow-hidden rounded-2xl border backdrop-blur-sm transition-all duration-500"
+    class="group relative overflow-hidden rounded-xl border backdrop-blur-sm transition-all duration-500 md:rounded-2xl"
     :class="[cardClass, isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0']"
   >
     <!-- Main clickable area -->
@@ -54,7 +54,7 @@ function formatDuration(ms: number): string {
       :href="track.permalink_url"
       target="_blank"
       rel="noopener"
-      class="flex cursor-pointer items-center gap-4 p-4"
+      class="flex cursor-pointer items-center gap-3 p-3 md:gap-4 md:p-4"
     >
       <!-- Artwork with play overlay -->
       <div class="relative shrink-0">
@@ -62,33 +62,33 @@ function formatDuration(ms: number): string {
           v-if="track.artwork"
           :src="track.artwork"
           :alt="track.title"
-          class="h-16 w-16 rounded-xl object-cover shadow-lg transition-transform duration-300 group-hover:scale-105"
+          class="h-12 w-12 rounded-lg object-cover shadow-lg transition-transform duration-300 group-hover:scale-105 md:h-16 md:w-16 md:rounded-xl"
         >
-        <div v-else class="flex h-16 w-16 items-center justify-center rounded-xl bg-neutral-800 shadow-lg">
-          <UIcon name="i-heroicons-musical-note" class="h-6 w-6 text-neutral-500" />
+        <div v-else class="flex h-12 w-12 items-center justify-center rounded-lg bg-neutral-800 shadow-lg md:h-16 md:w-16 md:rounded-xl">
+          <UIcon name="i-heroicons-musical-note" class="h-5 w-5 text-neutral-500 md:h-6 md:w-6" />
         </div>
         <!-- Play icon overlay -->
-        <div class="absolute inset-0 flex items-center justify-center rounded-xl bg-black/40 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-          <UIcon name="i-heroicons-play-solid" class="h-6 w-6 text-white" />
+        <div class="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40 opacity-0 transition-opacity duration-300 group-hover:opacity-100 md:rounded-xl">
+          <UIcon name="i-heroicons-play-solid" class="h-5 w-5 text-white md:h-6 md:w-6" />
         </div>
       </div>
 
       <!-- Info -->
-      <div class="min-w-0 flex-1">
-        <p class="truncate text-base font-semibold text-white">{{ track.title }}</p>
+      <div class="min-w-0 flex-1 pr-12 md:pr-40">
+        <p class="truncate text-sm font-semibold text-white md:text-base">{{ track.title }}</p>
         <NuxtLink
           :to="{ path: '/search', query: { q: track.artist, searchArtist: '1' } }"
-          class="truncate text-sm text-neutral-400 hover:text-violet-400 hover:underline"
+          class="block truncate text-xs text-neutral-400 hover:text-violet-400 hover:underline md:text-sm"
           @click.stop
         >
           {{ track.artist }}
         </NuxtLink>
-        <div class="mt-1 flex items-center gap-3 text-xs text-neutral-500">
+        <div class="mt-0.5 flex items-center gap-2 text-[10px] text-neutral-500 md:mt-1 md:gap-3 md:text-xs">
           <span class="flex items-center gap-1">
             <UIcon name="i-heroicons-clock" class="h-3 w-3" />
             {{ formatDuration(track.duration) }}
           </span>
-          <span v-if="track.playback_count" class="flex items-center gap-1">
+          <span v-if="track.playback_count" class="hidden items-center gap-1 sm:flex">
             <UIcon name="i-heroicons-play" class="h-3 w-3" />
             {{ track.playback_count.toLocaleString() }}
           </span>
@@ -97,16 +97,16 @@ function formatDuration(ms: number): string {
     </a>
 
     <!-- Action buttons - absolute positioned -->
-    <div class="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-2" @click.stop>
+    <div class="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 md:right-4 md:gap-2" @click.stop>
       <!-- Free Direct Download -->
       <a
         v-if="isDirectDownload"
         :href="getDownloadUrl()!"
-        class="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 font-medium text-white shadow-lg transition-all duration-200 hover:bg-emerald-500 hover:shadow-emerald-500/25"
+        class="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg transition-all duration-200 hover:bg-emerald-500 hover:shadow-emerald-500/25 md:gap-2 md:rounded-xl md:px-4 md:py-2"
         @click.stop
       >
         <UIcon name="i-heroicons-arrow-down-tray" class="h-4 w-4" />
-        <span class="text-sm">Télécharger</span>
+        <span class="hidden text-sm sm:inline">Télécharger</span>
       </a>
 
       <!-- Free External Link -->
@@ -115,11 +115,11 @@ function formatDuration(ms: number): string {
         :href="getDownloadUrl() || track.permalink_url"
         target="_blank"
         rel="noopener"
-        class="flex items-center gap-2 rounded-xl bg-emerald-600/80 px-4 py-2 font-medium text-white shadow-lg transition-all duration-200 hover:bg-emerald-500 hover:shadow-emerald-500/25"
+        class="flex items-center gap-1.5 rounded-lg bg-emerald-600/80 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg transition-all duration-200 hover:bg-emerald-500 hover:shadow-emerald-500/25 md:gap-2 md:rounded-xl md:px-4 md:py-2"
         @click.stop
       >
         <UIcon name="i-heroicons-arrow-top-right-on-square" class="h-4 w-4" />
-        <span class="text-sm">Lien gratuit</span>
+        <span class="hidden text-sm sm:inline">Lien gratuit</span>
       </a>
 
       <!-- Buy button -->
@@ -128,11 +128,11 @@ function formatDuration(ms: number): string {
         :href="track.purchase_url"
         target="_blank"
         rel="noopener"
-        class="flex items-center gap-2 rounded-xl border border-orange-500/50 bg-orange-500/10 px-4 py-2 font-medium text-orange-400 transition-all duration-200 hover:bg-orange-500/20 hover:text-orange-300"
+        class="flex items-center gap-1.5 rounded-lg border border-orange-500/50 bg-orange-500/10 px-2.5 py-1.5 text-xs font-medium text-orange-400 transition-all duration-200 hover:bg-orange-500/20 hover:text-orange-300 md:gap-2 md:rounded-xl md:px-4 md:py-2"
         @click.stop
       >
         <UIcon name="i-heroicons-shopping-cart" class="h-4 w-4" />
-        <span class="text-sm">Acheter</span>
+        <span class="hidden text-sm sm:inline">Acheter</span>
       </a>
 
       <!-- SoundCloud link for non-downloadable -->
@@ -141,7 +141,7 @@ function formatDuration(ms: number): string {
         :href="track.permalink_url"
         target="_blank"
         rel="noopener"
-        class="flex items-center gap-2 rounded-xl border border-neutral-700 bg-neutral-800/50 px-3 py-2 text-neutral-400 transition-all duration-200 hover:bg-neutral-700/50 hover:text-white"
+        class="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800/50 px-2 py-1.5 text-neutral-400 transition-all duration-200 hover:bg-neutral-700/50 hover:text-white md:rounded-xl md:px-3 md:py-2"
         @click.stop
       >
         <UIcon name="i-simple-icons-soundcloud" class="h-4 w-4" />
