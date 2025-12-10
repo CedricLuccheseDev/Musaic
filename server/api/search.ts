@@ -1,15 +1,15 @@
-import { defineEventHandler } from "h3";
-import type { Results } from "~/shared/types/types";
-import { searchYoutube } from "../services/youtube";
+import type { TrackEntry } from '~/types/track'
+import { searchTracks } from '~/server/services/soundcloud'
 
-export default defineEventHandler(async (event) => {
-  const { entry } = getQuery(event) as { entry?: string };
-  if (!entry) {
-    event.node.res.statusCode = 400;
-    return { error: "Missing url param" };
+export default defineEventHandler(async (event): Promise<TrackEntry[]> => {
+  const { q } = getQuery(event)
+
+  if (!q || typeof q !== 'string') {
+    throw createError({
+      statusCode: 400,
+      message: 'Missing search query'
+    })
   }
 
-  console.log("/api/search: Searching for", entry);
-  const results: Results[] = await searchYoutube(entry, 5);
-  return results;
-});
+  return searchTracks(q)
+})
