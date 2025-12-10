@@ -1,2 +1,98 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+
+/* Animated waves */
+@keyframes wave-slow {
+  0%, 100% {
+    d: path("M0,400 C360,500 720,300 1080,400 C1260,450 1350,380 1440,400 L1440,800 L0,800 Z");
+  }
+  50% {
+    d: path("M0,450 C360,350 720,500 1080,350 C1260,300 1350,420 1440,380 L1440,800 L0,800 Z");
+  }
+}
+
+@keyframes wave-medium {
+  0%, 100% {
+    d: path("M0,500 C240,400 480,550 720,450 C960,350 1200,500 1440,450 L1440,800 L0,800 Z");
+  }
+  50% {
+    d: path("M0,450 C240,550 480,400 720,500 C960,600 1200,400 1440,500 L1440,800 L0,800 Z");
+  }
+}
+
+@keyframes wave-fast {
+  0%, 100% {
+    d: path("M0,550 C180,500 360,600 540,520 C720,440 900,580 1080,500 C1260,420 1350,550 1440,500 L1440,800 L0,800 Z");
+  }
+  50% {
+    d: path("M0,520 C180,580 360,480 540,560 C720,640 900,500 1080,580 C1260,660 1350,500 1440,560 L1440,800 L0,800 Z");
+  }
+}
+
+.animate-wave-slow {
+  animation: wave-slow 20s ease-in-out infinite;
+}
+
+.animate-wave-medium {
+  animation: wave-medium 15s ease-in-out infinite;
+}
+
+.animate-wave-fast {
+  animation: wave-fast 10s ease-in-out infinite;
+}
+
+/* Home page waves */
+@keyframes wave-home-1 {
+  0%, 100% {
+    d: path("M0,200 C240,100 480,300 720,200 C960,100 1200,250 1440,150 L1440,0 L0,0 Z");
+  }
+  50% {
+    d: path("M0,150 C240,250 480,150 720,250 C960,200 1200,100 1440,200 L1440,0 L0,0 Z");
+  }
+}
+
+@keyframes wave-home-2 {
+  0%, 100% {
+    d: path("M0,150 C360,250 720,100 1080,200 C1260,250 1350,180 1440,200 L1440,400 L0,400 Z");
+  }
+  50% {
+    d: path("M0,200 C360,100 720,250 1080,150 C1260,100 1350,220 1440,180 L1440,400 L0,400 Z");
+  }
+}
+
+@keyframes wave-home-3 {
+  0%, 100% {
+    d: path("M0,200 C240,150 480,280 720,180 C960,80 1200,220 1440,160 L1440,400 L0,400 Z");
+  }
+  50% {
+    d: path("M0,180 C240,250 480,120 720,220 C960,320 1200,140 1440,200 L1440,400 L0,400 Z");
+  }
+}
+
+.animate-wave-home-1 {
+  animation: wave-home-1 25s ease-in-out infinite;
+}
+
+.animate-wave-home-2 {
+  animation: wave-home-2 18s ease-in-out infinite;
+}
+
+.animate-wave-home-3 {
+  animation: wave-home-3 22s ease-in-out infinite;
+}
+
+/* Page transitions */
+.page-enter-active,
+.page-leave-active {
+  transition: all 0.3s ease-out;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+}
