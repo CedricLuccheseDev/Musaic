@@ -14,6 +14,8 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    supabaseUrl: process.env.SUPABASE_URL || '',
+    supabaseKey: process.env.SUPABASE_KEY || '',
     public: {
       isDev: process.env.NODE_ENV === 'development'
     }

@@ -6,8 +6,9 @@ let supabaseClient: SupabaseClient | null = null
 function getSupabaseClient(): SupabaseClient | null {
   if (supabaseClient) return supabaseClient
 
-  const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_KEY
+  const config = useRuntimeConfig()
+  const url = config.supabaseUrl as string
+  const key = config.supabaseKey as string
 
   if (!url || !key) {
     return null

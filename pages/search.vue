@@ -5,7 +5,6 @@ import type { SearchResult } from '~/server/services/soundcloud'
 const { t } = useI18n()
 
 type FilterType = 'all' | 'free' | 'paid'
-type SearchType = 'title' | 'artist'
 
 const MAX_RESULTS = 500
 
@@ -14,7 +13,8 @@ const query = computed(() => (route.query.q as string) || '')
 const searchInput = ref(query.value)
 
 // Filter state
-const searchType = ref<SearchType>('title')
+const showTracks = ref(true)
+const showArtist = ref(true)
 const activeFilter = ref<FilterType>('all')
 
 // AI search state
@@ -183,7 +183,7 @@ async function search() {
     <main class="relative mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-10">
       <ClientOnly>
         <!-- Filters -->
-        <SearchFilters v-model:search-type="searchType" v-model:filter="activeFilter" />
+        <SearchFilters v-model:show-tracks="showTracks" v-model:show-artist="showArtist" v-model:filter="activeFilter" />
 
         <!-- AI Section -->
         <SearchAiSection
@@ -191,17 +191,16 @@ async function search() {
           :loading="aiLoading"
           :results="filteredAiResults"
           :sql="aiSql"
-          :group-by-artist="searchType === 'artist'"
         />
 
-        <!-- Artist Section (if detected) -->
+        <!-- Artist Section (if detected and showArtist enabled) -->
         <SearchArtistSection
-          v-if="detectedArtist && filteredArtistTracks.length"
+          v-if="showArtist && detectedArtist && filteredArtistTracks.length"
           :artist="{ ...detectedArtist, tracks: filteredArtistTracks }"
         />
 
-        <!-- SoundCloud Results Section -->
-        <section>
+        <!-- SoundCloud Results Section (if showTracks enabled) -->
+        <section v-if="showTracks">
           <!-- Loading -->
           <div v-if="isLoading" class="flex flex-col items-center justify-center gap-4 py-16">
             <!-- Animated rings -->
