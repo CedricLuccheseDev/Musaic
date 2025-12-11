@@ -2,15 +2,12 @@
 const { t } = useI18n()
 
 const query = ref('')
-const searchArtist = ref(false)
+const isSearching = ref(false)
 
-function search() {
+async function search() {
   if (!query.value.trim()) return
-  const queryParams: Record<string, string> = { q: query.value }
-  if (searchArtist.value) {
-    queryParams.searchArtist = '1'
-  }
-  navigateTo({ path: '/search', query: queryParams })
+  isSearching.value = true
+  await navigateTo({ path: '/search', query: { q: query.value } })
 }
 </script>
 
@@ -33,8 +30,8 @@ function search() {
       <div class="w-full max-w-2xl px-2">
         <SearchBar
           v-model="query"
-          v-model:search-artist="searchArtist"
           size="large"
+          :loading="isSearching"
           @search="search"
         />
       </div>

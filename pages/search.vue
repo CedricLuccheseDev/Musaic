@@ -7,6 +7,8 @@ const { t } = useI18n()
 type FilterType = 'all' | 'free' | 'paid'
 type SearchType = 'title' | 'artist'
 
+const MAX_RESULTS = 500
+
 const route = useRoute()
 const query = computed(() => (route.query.q as string) || '')
 const searchInput = ref(query.value)
@@ -60,7 +62,7 @@ function applyFilter(tracks: TrackEntry[]): TrackEntry[] {
 
 // Filtered results
 const filteredTracks = computed(() => applyFilter(allTracks.value))
-const hasMore = computed(() => hasMoreFromApi.value)
+const hasMore = computed(() => hasMoreFromApi.value && allTracks.value.length < MAX_RESULTS)
 const filteredArtistTracks = computed(() => {
   if (!detectedArtist.value) return []
   return applyFilter(detectedArtist.value.tracks)
@@ -78,6 +80,7 @@ watch(query, () => {
 // Load more tracks from API
 async function loadMore() {
   if (!hasMore.value || isLoadingMore.value || nextOffset.value === undefined) return
+  if (allTracks.value.length >= MAX_RESULTS) return
 
   isLoadingMore.value = true
   try {
