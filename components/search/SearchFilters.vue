@@ -2,23 +2,41 @@
 const { t } = useI18n()
 
 type FilterType = 'all' | 'free' | 'paid'
-type SearchType = 'title' | 'artist'
 
-const searchType = defineModel<SearchType>('searchType', { default: 'title' })
+const showTracks = defineModel<boolean>('showTracks', { default: true })
+const showArtist = defineModel<boolean>('showArtist', { default: true })
 const filter = defineModel<FilterType>('filter', { default: 'all' })
+
+function toggleTracks() {
+  // Can only disable if artist is enabled
+  if (showTracks.value && showArtist.value) {
+    showTracks.value = false
+  } else {
+    showTracks.value = true
+  }
+}
+
+function toggleArtist() {
+  // Can only disable if tracks is enabled
+  if (showArtist.value && showTracks.value) {
+    showArtist.value = false
+  } else {
+    showArtist.value = true
+  }
+}
 </script>
 
 <template>
   <div class="flex flex-wrap items-center justify-between gap-3 py-4">
-    <!-- Left: Title/Artist toggle -->
+    <!-- Left: Tracks/Artist toggles (both can be active, min 1) -->
     <div class="flex items-center gap-1">
       <button
         type="button"
         class="flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200"
-        :class="searchType === 'title'
+        :class="showTracks
           ? 'bg-violet-600/20 text-violet-400'
           : 'text-neutral-400 hover:text-neutral-200'"
-        @click="searchType = 'title'"
+        @click="toggleTracks"
       >
         <UIcon name="i-heroicons-musical-note" class="h-4 w-4" />
         {{ t.title }}
@@ -26,10 +44,10 @@ const filter = defineModel<FilterType>('filter', { default: 'all' })
       <button
         type="button"
         class="flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200"
-        :class="searchType === 'artist'
+        :class="showArtist
           ? 'bg-violet-600/20 text-violet-400'
           : 'text-neutral-400 hover:text-neutral-200'"
-        @click="searchType = 'artist'"
+        @click="toggleArtist"
       >
         <UIcon name="i-heroicons-user" class="h-4 w-4" />
         {{ t.artist }}
