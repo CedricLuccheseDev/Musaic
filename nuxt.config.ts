@@ -6,10 +6,14 @@ export default defineNuxtConfig({
   components: [
     { path: '~/components/common', pathPrefix: false },
     { path: '~/components/home', pathPrefix: false },
-    { path: '~/components/search', pathPrefix: false }
+    { path: '~/components/search', pathPrefix: false },
+    { path: '~/components/auth', pathPrefix: false }
   ],
   app: {
     pageTransition: { name: 'page', mode: 'out-in' }
+  },
+  runtimeConfig: {
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY
   },
   supabase: {
     redirect: false

@@ -10,9 +10,12 @@
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "npx tsx tests/soundcloud.test.ts"
+    "test": "npx tsx tests/soundcloud.test.ts",
+    "test:supabase": "npx tsx --env-file=.env tests/supabase.test.ts",
+    "test:all": "npm run test && npm run test:supabase"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
     "@nuxt/eslint": "^1.3.0",
     "@nuxt/fonts": "^0.11.2",
     "@nuxt/icon": "^1.12.0",
