@@ -82,7 +82,14 @@ export default defineEventHandler(async (event) => {
 
     // Execute the query via RPC
     const config = useRuntimeConfig()
-    const supabase = createClient(config.public.supabase.url, config.public.supabase.key)
+    const supabaseUrl = config.supabaseUrl as string
+    const supabaseKey = config.supabaseKey as string
+
+    if (!supabaseUrl || !supabaseKey) {
+      return { sql, results: [], error: 'Supabase not configured' }
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey)
 
     const { data, error } = await supabase.rpc('exec_sql', { query: sql })
 
