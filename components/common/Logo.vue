@@ -37,7 +37,7 @@ const sizeClasses = {
     </div>
     <div class="flex items-center gap-1.5 md:gap-2">
       <span class="font-logo tracking-tight text-white" :class="sizeClasses[size].text">
-        Musaic
+        Mus<span class="text-ai-gradient">AI</span>c
       </span>
       <span
         class="rounded font-medium uppercase text-neutral-500"
