@@ -103,12 +103,11 @@ export async function generateSqlQuery(question: string): Promise<string> {
 }
 
 export async function executeAiQuery(question: string): Promise<{ sql: string; results: unknown[]; error?: string }> {
-  const config = useRuntimeConfig()
-  const supabaseUrl = config.public.supabase.url
-  const supabaseKey = config.public.supabase.key
+  const supabaseUrl = process.env.SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_KEY
 
   if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Missing Supabase configuration')
+    return { sql: '', results: [], error: 'Supabase not configured' }
   }
 
   // Generate SQL from question

@@ -1,17 +1,20 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { TrackEntry } from '~/types/track'
 
-function getSupabaseClient() {
-  const config = useRuntimeConfig()
-  const supabaseUrl = config.public.supabase.url
-  const supabaseKey = config.public.supabase.key
+let supabaseClient: SupabaseClient | null = null
 
-  if (!supabaseUrl || !supabaseKey) {
-    console.error('[TrackStorage] Config:', JSON.stringify(config.public.supabase))
-    throw new Error('Missing Supabase configuration')
+function getSupabaseClient(): SupabaseClient | null {
+  if (supabaseClient) return supabaseClient
+
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_KEY
+
+  if (!url || !key) {
+    return null
   }
 
-  return createClient(supabaseUrl, supabaseKey)
+  supabaseClient = createClient(url, key)
+  return supabaseClient
 }
 
 interface DbTrack {
@@ -71,6 +74,8 @@ function trackEntryToDbTrack(track: TrackEntry): DbTrack {
  */
 export async function upsertTrack(track: TrackEntry): Promise<void> {
   const supabase = getSupabaseClient()
+  if (!supabase) return
+
   const dbTrack = trackEntryToDbTrack(track)
 
   const { error } = await supabase
@@ -93,6 +98,8 @@ export async function upsertTracks(tracks: TrackEntry[]): Promise<void> {
   if (tracks.length === 0) return
 
   const supabase = getSupabaseClient()
+  if (!supabase) return
+
   const dbTracks = tracks.map(trackEntryToDbTrack)
 
   const { error } = await supabase
@@ -114,6 +121,7 @@ export async function upsertTracks(tracks: TrackEntry[]): Promise<void> {
  */
 export async function getTrackBySoundcloudId(soundcloudId: number): Promise<DbTrack | null> {
   const supabase = getSupabaseClient()
+  if (!supabase) return null
 
   const { data, error } = await supabase
     .from('tracks')
@@ -136,6 +144,7 @@ export async function getTrackBySoundcloudId(soundcloudId: number): Promise<DbTr
  */
 export async function getStoredTracks(limit = 50, offset = 0): Promise<DbTrack[]> {
   const supabase = getSupabaseClient()
+  if (!supabase) return []
 
   const { data, error } = await supabase
     .from('tracks')
@@ -156,6 +165,7 @@ export async function getStoredTracks(limit = 50, offset = 0): Promise<DbTrack[]
  */
 export async function getTrackCount(): Promise<number> {
   const supabase = getSupabaseClient()
+  if (!supabase) return 0
 
   const { count, error } = await supabase
     .from('tracks')
