@@ -39,6 +39,15 @@ ANALYSE L'INTENTION DE L'UTILISATEUR:
    → "tracks de Bicep" = veut tout de cet artiste
    Exemple: WHERE genre ILIKE '%techno%' OR genre ILIKE '%house%'
 
+3) Requête "ARTISTES SIMILAIRES" (EXCLURE l'artiste mentionné):
+   Mots-clés: "comme", "similaire à", "style de", "dans le genre de", "qui ressemble à"
+   → "artistes comme Wooli" = veut des tracks d'artistes AUTRES que Wooli, dans un style similaire
+   → "musique comme Deadmau5" = veut des tracks similaires mais PAS de Deadmau5
+   IMPORTANT: Quand l'utilisateur dit "comme [artiste]", il veut DÉCOUVRIR d'autres artistes !
+   → Utilise AND artist NOT ILIKE '%[artiste]%' pour exclure l'artiste mentionné
+   → Cherche dans le même genre/tags que l'artiste mentionné
+   Exemple pour "comme Wooli": WHERE (genre ILIKE '%dubstep%' OR EXISTS(SELECT 1 FROM unnest(tags) t WHERE t ILIKE '%bass%')) AND artist NOT ILIKE '%wooli%'
+
 ATTENTION - Vocabulaire musical:
 - MIX / DJ SET = enchaînement de plusieurs tracks par un DJ. Dure MINIMUM 15-20min, souvent 1h-2h+
 - REMIX = une track retravaillée par un autre artiste. Dure 3-7min comme une track normale
@@ -65,6 +74,14 @@ DURÉES DE RÉFÉRENCE:
 
 GENRES (cherche dans genre ET tags):
 (genre ILIKE '%house%' OR EXISTS(SELECT 1 FROM unnest(tags) t WHERE t ILIKE '%house%'))
+
+TÉLÉCHARGEMENT GRATUIT:
+- Quand l'utilisateur dit "gratuit", "free", "téléchargeable", "download", "à télécharger" → filtrer sur download_status
+- download_status = 'FreeDirectLink' : téléchargement gratuit direct sur SoundCloud
+- download_status = 'FreeExternalLink' : téléchargement gratuit via lien externe (Hypeddit, etc.)
+- download_status = 'No' : pas de téléchargement gratuit disponible
+- Pour les tracks gratuites: WHERE download_status IN ('FreeDirectLink', 'FreeExternalLink')
+- Pour les tracks avec lien direct uniquement: WHERE download_status = 'FreeDirectLink'
 
 Tri par défaut: ORDER BY playback_count DESC`
 
