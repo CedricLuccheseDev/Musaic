@@ -44,6 +44,7 @@ function onSearch() {
       <!-- Right -->
       <div class="flex items-center justify-end gap-3">
         <LangSwitch />
+        <ProfileButtons />
       </div>
     </div>
 
@@ -56,6 +57,7 @@ function onSearch() {
         </NuxtLink>
         <div class="flex items-center gap-2">
           <LangSwitch size="sm" />
+          <ProfileButtons size="sm" />
         </div>
       </div>
 
