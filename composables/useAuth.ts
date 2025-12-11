@@ -9,6 +9,8 @@ function getSupabase(): SupabaseClient | null {
   const url = config.public.supabaseUrl
   const key = config.public.supabaseAnonKey
 
+  console.log('[Auth] Config:', { url: url ? `${url.slice(0, 30)}...` : 'NOT SET', key: key ? 'SET' : 'NOT SET' })
+
   if (!url || !key) {
     console.warn('[Auth] Supabase not configured')
     return null
@@ -52,26 +54,25 @@ export const useAuth = () => {
       return { error: { message: 'Supabase not configured' } }
     }
 
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/`
-        }
-      })
-
-      if (error) {
-        console.error('[Auth] Google sign-in error:', error)
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+        skipBrowserRedirect: true
       }
+    })
 
+    if (error) {
+      console.error('[Auth] Google sign-in error:', error)
       return { data, error }
-    } catch (err) {
-      console.error('[Auth] Google sign-in exception:', err)
-      return {
-        data: null,
-        error: { message: err instanceof Error ? err.message : 'Sign-in failed' }
-      }
     }
+
+    // Redirect to Google OAuth
+    if (data?.url) {
+      window.location.assign(data.url)
+    }
+
+    return { data, error }
   }
 
   // Sign out

@@ -20,8 +20,8 @@ const sizeClasses = {
   }
 }
 
-async function handleSignIn() {
-  await signInWithGoogle()
+function handleSignIn() {
+  signInWithGoogle()
 }
 
 async function handleSignOut() {
