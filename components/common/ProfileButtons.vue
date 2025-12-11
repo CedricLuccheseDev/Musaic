@@ -6,14 +6,17 @@ withDefaults(defineProps<{
 })
 
 const { t } = useI18n()
+const { user } = useAuth()
+const router = useRouter()
 
-// TODO: Replace with actual auth state
-const isLoggedIn = ref(false)
+const goToLogin = () => {
+  router.push('/login')
+}
 </script>
 
 <template>
   <div class="flex items-center gap-2">
-    <template v-if="isLoggedIn">
+    <template v-if="user">
       <!-- Profile button when logged in -->
       <button
         type="button"
@@ -29,6 +32,7 @@ const isLoggedIn = ref(false)
         type="button"
         class="flex cursor-pointer items-center gap-1.5 rounded-lg bg-neutral-800 font-medium text-neutral-400 transition-all duration-200 hover:bg-neutral-700 hover:text-white"
         :class="size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'"
+        @click="goToLogin"
       >
         <UIcon name="i-heroicons-arrow-right-on-rectangle" :class="size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4'" />
         <span class="hidden sm:inline">{{ t.login }}</span>
@@ -38,6 +42,7 @@ const isLoggedIn = ref(false)
         type="button"
         class="flex cursor-pointer items-center gap-1.5 rounded-lg bg-violet-600 font-medium text-white transition-all duration-200 hover:bg-violet-500"
         :class="size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'"
+        @click="goToLogin"
       >
         <UIcon name="i-heroicons-user-plus" :class="size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4'" />
         <span class="hidden sm:inline">{{ t.signup }}</span>

@@ -7,6 +7,7 @@
 - camelCase for folders, files, and builtins
 - PascalCase for custom components
 - No eslint-disable comments
+- Script above template in Vue files
 
 ## Components
 
