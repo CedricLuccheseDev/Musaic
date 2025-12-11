@@ -28,5 +28,14 @@ jobs:
       - name: Run SoundCloud test
         run: npx tsx tests/soundcloud.test.ts
 
+      - name: Run Supabase connection test
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: npx tsx tests/supabase.test.ts
+
       - name: Build
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: npm run build

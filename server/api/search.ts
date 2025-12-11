@@ -1,7 +1,7 @@
-import type { TrackEntry } from '~/types/track'
-import { searchTracks } from '~/server/services/soundcloud'
+import { searchWithArtistDetection, type SearchResult } from '~/server/services/soundcloud'
+import { upsertTracks } from '~/server/services/trackStorage'
 
-export default defineEventHandler(async (event): Promise<TrackEntry[]> => {
+export default defineEventHandler(async (event): Promise<SearchResult> => {
   const { q } = getQuery(event)
 
   if (!q || typeof q !== 'string') {
@@ -11,5 +11,13 @@ export default defineEventHandler(async (event): Promise<TrackEntry[]> => {
     })
   }
 
-  return searchTracks(q)
+  const result = await searchWithArtistDetection(q, 25)
+
+  // Store tracks in database (non-blocking)
+  const allTracks = [...result.tracks, ...(result.artist?.tracks || [])]
+  upsertTracks(allTracks).catch(err => {
+    console.error('[Search API] Failed to store tracks:', err)
+  })
+
+  return result
 })

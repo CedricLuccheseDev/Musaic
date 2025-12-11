@@ -127,12 +127,44 @@ export const useAuth = () => {
     }
   }
 
+  const signInWithOAuth = async (provider: 'google' | 'apple') => {
+    try {
+      console.log(`[Auth] Starting OAuth signIn with ${provider}...`)
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/`
+        }
+      })
+
+      if (error) {
+        console.error(`[Auth] OAuth ${provider} error:`, error)
+      } else {
+        console.log(`[Auth] OAuth ${provider} initiated:`, data)
+      }
+
+      return { data, error }
+    } catch (err) {
+      console.error(`[Auth] OAuth ${provider} exception:`, err)
+      return {
+        data: null,
+        error: {
+          message: err instanceof Error ? err.message : `Erreur de connexion avec ${provider}`,
+          name: 'NetworkError',
+          status: 0
+        }
+      }
+    }
+  }
+
   return {
     user,
     signUp,
     signIn,
     signOut,
     resetPassword,
-    updatePassword
+    updatePassword,
+    signInWithOAuth
   }
 }

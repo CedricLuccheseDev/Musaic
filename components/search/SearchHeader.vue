@@ -6,7 +6,6 @@ withDefaults(defineProps<{
 })
 
 const searchInput = defineModel<string>('modelValue', { default: '' })
-const searchArtist = defineModel<boolean>('searchArtist', { default: false })
 
 const emit = defineEmits<{
   search: []
@@ -20,7 +19,7 @@ function onSearch() {
 <template>
   <header class="sticky top-0 z-50 bg-neutral-950/90 backdrop-blur-xl">
     <!-- Desktop layout -->
-    <div class="hidden md:grid md:grid-cols-3 md:items-center md:px-6 md:py-4">
+    <div class="hidden md:grid md:grid-cols-3 md:items-start md:px-6 md:py-4">
       <!-- Logo - Left -->
       <div class="flex justify-start">
         <NuxtLink to="/" class="group transition-transform hover:scale-105">
@@ -30,10 +29,9 @@ function onSearch() {
 
       <!-- Search bar - Center -->
       <div v-if="showSearch" class="flex justify-center">
-        <div class="w-full max-w-4xl">
+        <div class="w-full max-w-xl">
           <SearchBar
             v-model="searchInput"
-            v-model:search-artist="searchArtist"
             @search="onSearch"
           />
         </div>
@@ -64,7 +62,6 @@ function onSearch() {
       <div v-if="showSearch">
         <SearchBar
           v-model="searchInput"
-          v-model:search-artist="searchArtist"
           @search="onSearch"
         />
       </div>

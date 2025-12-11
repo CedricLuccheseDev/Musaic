@@ -1,60 +1,69 @@
 <script setup lang="ts">
 import { DownloadStatus, type TrackEntry } from '~/types/track'
+import type { SearchResult } from '~/server/services/soundcloud'
 
 const { t } = useI18n()
 
 type FilterType = 'all' | 'free' | 'paid'
+type SearchType = 'title' | 'artist'
 
 const route = useRoute()
 const query = computed(() => (route.query.q as string) || '')
-const isArtistSearch = computed(() => route.query.searchArtist === '1')
 const searchInput = ref(query.value)
-const searchArtist = ref(isArtistSearch.value)
 
-// Sync searchArtist when route changes
-watch(isArtistSearch, (val) => {
-  searchArtist.value = val
-})
+const PAGE_SIZE = 25
 
-const PAGE_SIZE = 10
+// Filter state
+const searchType = ref<SearchType>('title')
+const activeFilter = ref<FilterType>('all')
 
-const { data: allResults, status } = await useFetch<TrackEntry[]>('/api/search', {
-  query: { q: query, searchArtist: isArtistSearch },
-  watch: [query, isArtistSearch],
+// AI search state
+const aiLoading = ref(false)
+const aiSql = ref('')
+const aiResults = ref<TrackEntry[]>([])
+
+// Main search
+const { data: searchResult, status, refresh: refreshSearch } = await useFetch<SearchResult>('/api/search', {
+  query: { q: query },
+  watch: [query],
   server: false
 })
 
 const isLoading = computed(() => status.value === 'pending')
-const displayCount = ref(PAGE_SIZE)
 
-// Filter state
-const activeFilter = ref<FilterType>('all')
+// Extract tracks and artist from search result
+const allTracks = computed(() => searchResult.value?.tracks || [])
+const detectedArtist = computed(() => searchResult.value?.artist)
+
+// Filter function
+function applyFilter(tracks: TrackEntry[]): TrackEntry[] {
+  if (activeFilter.value === 'all') return tracks
+  if (activeFilter.value === 'free') {
+    return tracks.filter(t => t.downloadStatus !== DownloadStatus.No)
+  }
+  return tracks.filter(t => t.downloadStatus === DownloadStatus.No)
+}
+
+// Filtered results
+const filteredTracks = computed(() => applyFilter(allTracks.value))
+const filteredArtistTracks = computed(() => {
+  if (!detectedArtist.value) return []
+  return applyFilter(detectedArtist.value.tracks)
+})
+const filteredAiResults = computed(() => applyFilter(aiResults.value))
+
+// Pagination
+const displayCount = ref(PAGE_SIZE)
+const visibleResults = computed(() => filteredTracks.value.slice(0, displayCount.value))
+const hasMore = computed(() => displayCount.value < filteredTracks.value.length)
+const isLoadingMore = ref(false)
 
 // Reset display count when query changes
 watch(query, () => {
   displayCount.value = PAGE_SIZE
+  // Run AI search for new query
+  runAiSearch()
 })
-
-// Filtered results based on download status
-const filteredResults = computed(() => {
-  if (!allResults.value) return []
-  if (activeFilter.value === 'all') return allResults.value
-  if (activeFilter.value === 'free') {
-    return allResults.value.filter(t => t.downloadStatus !== DownloadStatus.No)
-  }
-  // paid = not free
-  return allResults.value.filter(t => t.downloadStatus === DownloadStatus.No)
-})
-
-const visibleResults = computed(() => {
-  return filteredResults.value.slice(0, displayCount.value)
-})
-
-const hasMore = computed(() => {
-  return displayCount.value < filteredResults.value.length
-})
-
-const isLoadingMore = ref(false)
 
 function loadMore() {
   if (!hasMore.value || isLoadingMore.value) return
@@ -73,13 +82,11 @@ function handleScroll() {
   const windowHeight = window.innerHeight
   const documentHeight = document.documentElement.scrollHeight
 
-  // Load more when user is 200px from bottom
   if (scrollTop + windowHeight >= documentHeight - 200) {
     loadMore()
   }
 }
 
-// Check if we need to load more on initial render (when content doesn't fill the page)
 function checkInitialLoad() {
   if (import.meta.server) return
 
@@ -87,7 +94,6 @@ function checkInitialLoad() {
     const windowHeight = window.innerHeight
     const documentHeight = document.documentElement.scrollHeight
 
-    // If page doesn't scroll and we have more results, load them
     if (documentHeight <= windowHeight && hasMore.value) {
       loadMore()
     }
@@ -96,124 +102,122 @@ function checkInitialLoad() {
 
 onMounted(() => {
   window.addEventListener('scroll', handleScroll, { passive: true })
-  // Check after initial render
   checkInitialLoad()
+  // Run AI search on mount if we have a query
+  if (query.value) {
+    runAiSearch()
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
 })
 
-// Also check when results change
 watch(visibleResults, () => {
   checkInitialLoad()
 })
 
-function search() {
+// AI Search (always runs)
+async function runAiSearch() {
   if (!searchInput.value.trim()) return
-  const queryParams: Record<string, string> = { q: searchInput.value }
-  if (searchArtist.value) {
-    queryParams.searchArtist = '1'
+
+  aiLoading.value = true
+  aiSql.value = ''
+  aiResults.value = []
+
+  try {
+    const response = await $fetch<{ sql: string; results: TrackEntry[] }>('/api/ai-query', {
+      method: 'POST',
+      body: { question: searchInput.value }
+    })
+
+    aiSql.value = response.sql
+    aiResults.value = response.results || []
+  } catch (err) {
+    console.error('[AI Search] Error:', err)
+  } finally {
+    aiLoading.value = false
   }
-  navigateTo({ path: '/search', query: queryParams })
+}
+
+async function search() {
+  if (!searchInput.value.trim()) return
+  navigateTo({ path: '/search', query: { q: searchInput.value } })
+  runAiSearch()
+  refreshSearch()
 }
 </script>
 
 <template>
   <div class="relative min-h-screen bg-neutral-950 lg:p-8">
     <SearchBackground />
-    <SearchHeader v-model="searchInput" v-model:search-artist="searchArtist" @search="search" />
+    <SearchHeader v-model="searchInput" @search="search" />
 
     <!-- Results -->
     <main class="relative mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-10">
       <ClientOnly>
-        <!-- Loading -->
-        <div v-if="isLoading" class="flex justify-center py-12">
-          <UIcon name="i-heroicons-arrow-path" class="h-8 w-8 animate-spin text-muted" />
-        </div>
+        <!-- Filters -->
+        <SearchFilters v-model:search-type="searchType" v-model:filter="activeFilter" />
 
-        <!-- Results list -->
-        <template v-else-if="allResults?.length">
-          <!-- Search header -->
-          <div class="mb-4 md:mb-6">
-            <h1 class="text-xl font-bold text-white md:text-2xl">
-              <template v-if="isArtistSearch">
-                {{ t.tracksBy }} <span class="text-violet-400">{{ query }}</span>
-              </template>
-              <template v-else>
-                {{ t.resultsFor }} "<span class="text-violet-400">{{ query }}</span>"
-              </template>
-            </h1>
-            <p class="mt-1 text-xs text-neutral-500 md:text-sm">
-              {{ filteredResults.length }} {{ filteredResults.length > 1 ? t.results : t.result }}
-              <span v-if="activeFilter !== 'all'">
-                ({{ allResults.length }} {{ t.total }})
-              </span>
-            </p>
+        <!-- AI Section -->
+        <SearchAiSection
+          v-if="aiLoading || filteredAiResults.length"
+          :loading="aiLoading"
+          :results="filteredAiResults"
+          :sql="aiSql"
+          :group-by-artist="searchType === 'artist'"
+        />
+
+        <!-- Artist Section (if detected) -->
+        <SearchArtistSection
+          v-if="detectedArtist && filteredArtistTracks.length"
+          :artist="{ ...detectedArtist, tracks: filteredArtistTracks }"
+        />
+
+        <!-- SoundCloud Results Section -->
+        <section>
+          <!-- Loading -->
+          <div v-if="isLoading" class="flex justify-center py-12">
+            <UIcon name="i-heroicons-arrow-path" class="h-8 w-8 animate-spin text-muted" />
           </div>
 
-          <!-- Filters -->
-          <div class="mb-4 flex flex-wrap items-center gap-2 md:mb-6">
-            <button
-              class="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 md:rounded-xl md:px-4 md:py-2 md:text-sm"
-              :class="activeFilter === 'all'
-                ? 'bg-violet-600 text-white'
-                : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white'"
-              @click="activeFilter = 'all'"
-            >
-              {{ t.all }}
-            </button>
-            <button
-              class="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 md:rounded-xl md:px-4 md:py-2 md:text-sm"
-              :class="activeFilter === 'free'
-                ? 'bg-emerald-600 text-white'
-                : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white'"
-              @click="activeFilter = 'free'"
-            >
-              <span class="flex items-center gap-1 md:gap-1.5">
-                <UIcon name="i-heroicons-arrow-down-tray" class="h-3.5 w-3.5 md:h-4 md:w-4" />
-                {{ t.free }}
-              </span>
-            </button>
-            <button
-              class="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 md:rounded-xl md:px-4 md:py-2 md:text-sm"
-              :class="activeFilter === 'paid'
-                ? 'bg-orange-600 text-white'
-                : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white'"
-              @click="activeFilter = 'paid'"
-            >
-              <span class="flex items-center gap-1 md:gap-1.5">
-                <UIcon name="i-heroicons-shopping-cart" class="h-3.5 w-3.5 md:h-4 md:w-4" />
-                {{ t.paid }}
-              </span>
-            </button>
-          </div>
+          <!-- Results list -->
+          <template v-else-if="filteredTracks.length">
+            <!-- Section header (clickable to collapse) -->
+            <div class="flex items-center gap-3 py-3">
+              <UIcon name="i-heroicons-magnifying-glass" class="h-5 w-5 text-violet-400" />
+              <h2 class="flex-1 text-base font-semibold text-white">
+                {{ t.resultsFor }} "{{ query }}"
+              </h2>
+              <span class="text-xs text-neutral-500">{{ filteredTracks.length }} {{ t.results }}</span>
+            </div>
 
-          <!-- Track list -->
-          <div class="space-y-2 md:space-y-3">
-            <SearchTrackCard v-for="(track, index) in visibleResults" :key="track.id" :track="track" :index="index" />
-          </div>
+            <!-- Track list -->
+            <div class="space-y-2">
+              <SearchTrackCard v-for="(track, index) in visibleResults" :key="track.id" :track="track" :index="index" />
+            </div>
+
+            <!-- Load more indicator -->
+            <div v-if="hasMore" class="flex justify-center py-8">
+              <UIcon name="i-heroicons-arrow-path" class="h-6 w-6 animate-spin text-muted" />
+            </div>
+
+            <!-- End of results -->
+            <div v-else class="py-8 text-center text-sm text-neutral-500">
+              {{ t.endOfResults }}
+            </div>
+          </template>
 
           <!-- No results after filter -->
-          <div v-if="!visibleResults.length" class="py-12 text-center">
+          <div v-else-if="allTracks.length && !filteredTracks.length" class="py-12 text-center">
             <p class="text-neutral-500">{{ t.noFilterResults }}</p>
           </div>
 
-          <!-- Load more indicator -->
-          <div v-else-if="hasMore" class="flex justify-center py-8">
-            <UIcon name="i-heroicons-arrow-path" class="h-6 w-6 animate-spin text-muted" />
+          <!-- Empty state -->
+          <div v-else-if="query && !isLoading" class="py-12 text-center">
+            <p class="text-muted">{{ t.noResults }} "{{ query }}"</p>
           </div>
-
-          <!-- End of results -->
-          <div v-else class="py-8 text-center text-sm text-neutral-500">
-            {{ t.endOfResults }}
-          </div>
-        </template>
-
-        <!-- Empty state -->
-        <div v-else-if="query" class="py-12 text-center">
-          <p class="text-muted">{{ t.noResults }} "{{ query }}"</p>
-        </div>
+        </section>
 
         <!-- Fallback on server -->
         <template #fallback>

@@ -3,13 +3,15 @@ type Lang = 'fr' | 'en'
 const translations = {
   fr: {
     // SearchBar
+    searchPlaceholder: 'Rechercher...',
     searchPlaceholderTitle: 'Titre...',
     searchPlaceholderArtist: 'Artiste...',
+    title: 'Titre',
     artist: 'Artiste',
     search: 'Rechercher',
 
     // Home
-    tagline: 'Trouve où télécharger tes tracks',
+    tagline: 'Cherche et Télécharge tes tracks facilement, rapidement.',
 
     // Search results
     tracksBy: 'Tracks de',
@@ -26,6 +28,13 @@ const translations = {
     free: 'Gratuit',
     paid: 'Payant',
 
+    // AI Search
+    aiGenerating: 'Génération de la requête...',
+    aiResults: 'Résultats IA',
+    noAiResults: 'Aucun résultat trouvé',
+    showSql: 'Voir la requête SQL',
+    exit: 'Quitter',
+
     // TrackCard
     download: 'Télécharger',
     freeLink: 'Lien gratuit',
@@ -40,13 +49,15 @@ const translations = {
   },
   en: {
     // SearchBar
+    searchPlaceholder: 'Search...',
     searchPlaceholderTitle: 'Title...',
     searchPlaceholderArtist: 'Artist...',
+    title: 'Title',
     artist: 'Artist',
     search: 'Search',
 
     // Home
-    tagline: 'Find where to download your tracks',
+    tagline: 'Search and Download your tracks easily, quickly.',
 
     // Search results
     tracksBy: 'Tracks by',
@@ -62,6 +73,13 @@ const translations = {
     all: 'All',
     free: 'Free',
     paid: 'Paid',
+
+    // AI Search
+    aiGenerating: 'Generating query...',
+    aiResults: 'AI Results',
+    noAiResults: 'No results found',
+    showSql: 'Show SQL query',
+    exit: 'Exit',
 
     // TrackCard
     download: 'Download',
