@@ -17,7 +17,9 @@ export default defineNuxtConfig({
     supabaseUrl: process.env.SUPABASE_URL || '',
     supabaseKey: process.env.SUPABASE_KEY || '',
     public: {
-      isDev: process.env.NODE_ENV === 'development'
+      isDev: process.env.NODE_ENV === 'development',
+      supabaseUrl: process.env.SUPABASE_URL || '',
+      supabaseAnonKey: process.env.SUPABASE_KEY || ''
     }
   }
 })
