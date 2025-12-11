@@ -10,7 +10,10 @@ function getSupabaseClient(): SupabaseClient | null {
   const url = config.supabaseUrl as string
   const key = config.supabaseKey as string
 
+  console.log('[TrackStorage] Supabase config:', { url: url ? `${url.substring(0, 30)}...` : 'MISSING', key: key ? 'SET' : 'MISSING' })
+
   if (!url || !key) {
+    console.warn('[TrackStorage] Supabase not configured, skipping')
     return null
   }
 

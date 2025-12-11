@@ -107,7 +107,10 @@ export async function executeAiQuery(question: string): Promise<{ sql: string; r
   const supabaseUrl = config.supabaseUrl as string
   const supabaseKey = config.supabaseKey as string
 
+  console.log('[AiQuery] Supabase config:', { url: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'MISSING', key: supabaseKey ? 'SET' : 'MISSING' })
+
   if (!supabaseUrl || !supabaseKey) {
+    console.warn('[AiQuery] Supabase not configured, skipping')
     return { sql: '', results: [], error: 'Supabase not configured' }
   }
 
