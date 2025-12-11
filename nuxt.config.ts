@@ -13,7 +13,10 @@ export default defineNuxtConfig({
     pageTransition: { name: 'page', mode: 'out-in' }
   },
   runtimeConfig: {
-    anthropicApiKey: process.env.ANTHROPIC_API_KEY
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    public: {
+      isDev: process.env.NODE_ENV === 'development'
+    }
   },
   supabase: {
     redirect: false

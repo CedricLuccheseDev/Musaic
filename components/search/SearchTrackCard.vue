@@ -7,6 +7,7 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
+const config = useRuntimeConfig()
 
 const isVisible = ref(false)
 
@@ -28,6 +29,19 @@ function getDownloadUrl(): string | null {
 
 const isFreeDownload = computed(() => props.track.downloadStatus !== DownloadStatus.No)
 const isDirectDownload = computed(() => props.track.downloadStatus === DownloadStatus.FreeDirectLink)
+
+// Extract artist URL from track permalink (e.g., https://soundcloud.com/artist-name/track -> https://soundcloud.com/artist-name)
+const artistUrl = computed(() => {
+  const url = props.track.permalink_url
+  const match = url.match(/^(https:\/\/soundcloud\.com\/[^/]+)/)
+  return match ? match[1] : `https://soundcloud.com/search?q=${encodeURIComponent(props.track.artist)}`
+})
+
+// Generate soundcloudmp3.org URL with track title as query
+const mp3DownloadUrl = computed(() => {
+  const query = encodeURIComponent(`${props.track.artist} ${props.track.title}`)
+  return `https://soundcloudmp3.org/search?q=${query}`
+})
 
 const cardClass = computed(() => {
   if (props.track.downloadStatus === DownloadStatus.FreeDirectLink) {
@@ -78,13 +92,15 @@ function formatDuration(ms: number): string {
       <!-- Info -->
       <div class="min-w-0 flex-1 pr-12 md:pr-40">
         <p class="truncate text-sm font-semibold text-white md:text-base">{{ track.title }}</p>
-        <NuxtLink
-          :to="{ path: '/search', query: { q: track.artist, searchArtist: '1' } }"
+        <a
+          :href="artistUrl"
+          target="_blank"
+          rel="noopener"
           class="block truncate text-xs text-neutral-400 hover:text-violet-400 hover:underline md:text-sm"
           @click.stop
         >
           {{ track.artist }}
-        </NuxtLink>
+        </a>
         <div class="mt-0.5 flex items-center gap-2 text-[10px] text-neutral-500 md:mt-1 md:gap-3 md:text-xs">
           <span class="flex items-center gap-1">
             <UIcon name="i-heroicons-clock" class="h-3 w-3" />
@@ -137,7 +153,20 @@ function formatDuration(ms: number): string {
         <span class="hidden text-sm sm:inline">{{ t.buy }}</span>
       </a>
 
-      <!-- SoundCloud link for non-downloadable -->
+      <!-- MP3 Download link for non-downloadable (dev only) -->
+      <a
+        v-else-if="config.public.isDev"
+        :href="mp3DownloadUrl"
+        target="_blank"
+        rel="noopener"
+        class="flex items-center gap-1.5 rounded-lg border border-violet-500/50 bg-violet-500/10 px-2.5 py-1.5 text-xs font-medium text-violet-400 transition-all duration-200 hover:bg-violet-500/20 hover:text-violet-300 md:gap-2 md:rounded-xl md:px-4 md:py-2"
+        @click.stop
+      >
+        <UIcon name="i-heroicons-arrow-down-tray" class="h-4 w-4" />
+        <span class="hidden text-sm sm:inline">MP3</span>
+      </a>
+
+      <!-- SoundCloud link for non-downloadable (prod) -->
       <a
         v-else
         :href="track.permalink_url"

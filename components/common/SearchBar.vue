@@ -46,11 +46,26 @@ const inputText = computed(() => props.size === 'large' ? 'text-base md:text-lg'
       <!-- Search button with AI glow -->
       <button
         type="button"
-        class="m-1.5 flex shrink-0 cursor-pointer items-center justify-center rounded-xl bg-linear-to-r from-violet-600 via-purple-600 to-pink-600 p-2.5 text-white shadow-lg shadow-purple-500/30 transition-all duration-200 hover:shadow-purple-500/50"
-        :class="size === 'large' ? 'md:p-3' : 'p-2.5'"
+        class="group relative m-1.5 flex shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-linear-to-r from-violet-600 via-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-purple-500/40"
+        :class="size === 'large' ? 'p-2.5 md:p-3 md:hover:pr-5' : 'p-2.5 hover:pr-4'"
         @click="onSearch"
       >
-        <UIcon name="i-heroicons-sparkles" class="h-5 w-5" />
+        <!-- Animated background gradient -->
+        <span class="absolute inset-0 bg-linear-to-r from-pink-600 via-purple-600 to-violet-600 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+
+        <!-- Glow pulse effect -->
+        <span class="absolute inset-0 animate-pulse bg-linear-to-r from-violet-400/20 via-purple-400/20 to-pink-400/20 opacity-0 blur-xl transition-opacity duration-300 group-hover:opacity-100" />
+
+        <!-- Icon with rotation -->
+        <UIcon
+          name="i-heroicons-sparkles"
+          class="relative z-10 h-5 w-5 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110"
+        />
+
+        <!-- Text that appears on hover -->
+        <span class="relative z-10 ml-0 max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium transition-all duration-300 group-hover:ml-2 group-hover:max-w-24">
+          {{ t.search }}
+        </span>
       </button>
     </div>
   </div>

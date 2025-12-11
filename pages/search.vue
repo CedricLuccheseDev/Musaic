@@ -177,8 +177,24 @@ async function search() {
         <!-- SoundCloud Results Section -->
         <section>
           <!-- Loading -->
-          <div v-if="isLoading" class="flex justify-center py-12">
-            <UIcon name="i-heroicons-arrow-path" class="h-8 w-8 animate-spin text-muted" />
+          <div v-if="isLoading" class="flex flex-col items-center justify-center gap-4 py-16">
+            <!-- Animated rings -->
+            <div class="relative flex items-center justify-center">
+              <div class="absolute h-16 w-16 animate-ping rounded-full bg-violet-500/20" />
+              <div class="absolute h-12 w-12 animate-pulse rounded-full bg-purple-500/30" />
+              <div class="relative flex h-10 w-10 items-center justify-center rounded-full bg-linear-to-r from-violet-600 to-purple-600 shadow-lg shadow-purple-500/30">
+                <UIcon name="i-heroicons-musical-note" class="h-5 w-5 animate-bounce text-white" />
+              </div>
+            </div>
+            <!-- Loading text -->
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-neutral-400">{{ t.searching }}</span>
+              <span class="flex gap-1">
+                <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-500" style="animation-delay: 0ms" />
+                <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-purple-500" style="animation-delay: 150ms" />
+                <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-pink-500" style="animation-delay: 300ms" />
+              </span>
+            </div>
           </div>
 
           <!-- Results list -->
