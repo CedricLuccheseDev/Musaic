@@ -154,36 +154,52 @@ export async function searchTracks(query: string, limit = 25): Promise<TrackEntr
 export async function searchWithArtistDetection(query: string, limit = 25): Promise<SearchResult> {
   const soundcloud = new Soundcloud()
 
-  // Search tracks and users in parallel
-  const [tracksResponse, usersResponse] = await Promise.all([
+  // Search tracks and users in parallel with error handling
+  const [tracksResult, usersResult] = await Promise.allSettled([
     soundcloud.tracks.search({ q: query }),
     soundcloud.users.search({ q: query })
   ])
 
+  // Handle tracks search result
+  const tracksResponse = tracksResult.status === 'fulfilled' ? tracksResult.value : { collection: [] }
   const tracks = (tracksResponse.collection || []).slice(0, limit).map(mapToTrackEntry)
 
-  // Check if first user matches the query (case insensitive)
+  // Handle users search result
+  const usersResponse = usersResult.status === 'fulfilled' ? usersResult.value : { collection: [] }
   const users = usersResponse.collection || []
-  const firstUser = users[0]
 
-  if (firstUser && firstUser.username.toLowerCase() === query.toLowerCase()) {
-    // Found matching artist, get their tracks
-    const artistTracks = await soundcloud.users.tracks(firstUser.id)
-    const mappedArtistTracks = (artistTracks || []).slice(0, 10).map(mapToTrackEntry)
+  // Normalize strings for comparison (remove spaces, lowercase)
+  const normalizeForMatch = (s: string) => s.toLowerCase().replace(/\s+/g, '')
+  const queryNorm = normalizeForMatch(query)
 
-    if (mappedArtistTracks.length > 0) {
-      return {
-        tracks,
-        artist: {
-          id: firstUser.id,
-          username: firstUser.username,
-          avatar_url: firstUser.avatar_url,
-          followers_count: firstUser.followers_count,
-          track_count: firstUser.track_count,
-          permalink_url: firstUser.permalink_url,
-          tracks: mappedArtistTracks
+  // Find matching artist (exact match or normalized match)
+  const matchingUser = users.find(user => {
+    const usernameNorm = normalizeForMatch(user.username)
+    return usernameNorm === queryNorm || user.username.toLowerCase() === query.toLowerCase()
+  })
+
+  if (matchingUser) {
+    try {
+      // Found matching artist, get their tracks
+      const artistTracks = await soundcloud.users.tracks(matchingUser.id)
+      const mappedArtistTracks = (artistTracks || []).slice(0, 10).map(mapToTrackEntry)
+
+      if (mappedArtistTracks.length > 0) {
+        return {
+          tracks,
+          artist: {
+            id: matchingUser.id,
+            username: matchingUser.username,
+            avatar_url: matchingUser.avatar_url,
+            followers_count: matchingUser.followers_count,
+            track_count: matchingUser.track_count,
+            permalink_url: matchingUser.permalink_url,
+            tracks: mappedArtistTracks
+          }
         }
       }
+    } catch {
+      // Artist tracks fetch failed (404 is common), continue without artist section
     }
   }
 

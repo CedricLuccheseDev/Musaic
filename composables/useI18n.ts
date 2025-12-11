@@ -14,6 +14,7 @@ const translations = {
     tagline: 'Cherche et Télécharge tes tracks facilement, rapidement.',
 
     // Search results
+    searching: 'Recherche en cours',
     tracksBy: 'Tracks de',
     resultsFor: 'Résultats pour',
     result: 'résultat',
@@ -60,6 +61,7 @@ const translations = {
     tagline: 'Search and Download your tracks easily, quickly.',
 
     // Search results
+    searching: 'Searching',
     tracksBy: 'Tracks by',
     resultsFor: 'Results for',
     result: 'result',
