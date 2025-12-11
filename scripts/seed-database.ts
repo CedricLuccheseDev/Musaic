@@ -205,7 +205,11 @@ async function searchAndStore(
 
     const dbTracks = tracks.slice(0, config.tracksPerSearch).map(trackToDbTrack)
 
-    const { error } = await supabase.from('tracks').upsert(dbTracks, {
+    // Deduplicate by soundcloud_id (SoundCloud API can return duplicates)
+    const uniqueTracks = [...new Map(dbTracks.map(t => [t.soundcloud_id, t])).values()]
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await supabase.from('tracks').upsert(uniqueTracks as any, {
       onConflict: 'soundcloud_id',
       ignoreDuplicates: false
     })

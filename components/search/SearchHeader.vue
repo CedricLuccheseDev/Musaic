@@ -1,8 +1,10 @@
 <script setup lang="ts">
 withDefaults(defineProps<{
   showSearch?: boolean
+  loading?: boolean
 }>(), {
-  showSearch: true
+  showSearch: true,
+  loading: false
 })
 
 const searchInput = defineModel<string>('modelValue', { default: '' })
@@ -32,6 +34,7 @@ function onSearch() {
         <div class="w-full max-w-xl">
           <SearchBar
             v-model="searchInput"
+            :loading="loading"
             @search="onSearch"
           />
         </div>
@@ -62,6 +65,7 @@ function onSearch() {
       <div v-if="showSearch">
         <SearchBar
           v-model="searchInput"
+          :loading="loading"
           @search="onSearch"
         />
       </div>

@@ -1,20 +1,25 @@
 <script setup lang="ts">
 import { DownloadStatus, type TrackEntry } from '~/types/track'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   track: TrackEntry
   index?: number
-}>()
+  skipAnimation?: boolean
+}>(), {
+  index: 0,
+  skipAnimation: false
+})
 
 const { t } = useI18n()
 const config = useRuntimeConfig()
 
-const isVisible = ref(false)
+const isVisible = ref(props.skipAnimation)
 
 onMounted(() => {
+  if (props.skipAnimation) return
   setTimeout(() => {
     isVisible.value = true
-  }, (props.index || 0) * 50)
+  }, props.index * 50)
 })
 
 function getDownloadUrl(): string | null {

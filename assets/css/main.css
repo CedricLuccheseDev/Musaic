@@ -3,7 +3,16 @@
 
 /* Logo font */
 .font-logo {
-  font-family: "Righteous", sans-serif;
+  font-family: "Orbitron", sans-serif;
+  font-weight: 700;
+}
+
+/* AI gradient text */
+.text-ai-gradient {
+  background: linear-gradient(135deg, #a78bfa, #c084fc, #f472b6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 /* Animated waves */

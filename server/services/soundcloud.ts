@@ -11,16 +11,18 @@ interface SoundcloudConstructor {
 
 interface SoundcloudInstance {
   tracks: {
-    search: (params: { q: string }) => Promise<SoundcloudSearchResponse>
+    search: (params: { q: string; limit?: number; offset?: number }) => Promise<SoundcloudSearchResponse>
   }
   users: {
-    search: (params: { q: string }) => Promise<SoundcloudUserSearchResponse>
+    search: (params: { q: string; limit?: number }) => Promise<SoundcloudUserSearchResponse>
     tracks: (userId: number) => Promise<SoundcloudTrack[]>
   }
 }
 
 interface SoundcloudSearchResponse {
   collection: SoundcloudTrack[]
+  next_href: string | null
+  total_results?: number
 }
 
 interface SoundcloudUserSearchResponse {
@@ -63,6 +65,8 @@ interface SoundcloudTrack {
 // Constants
 // ============================================================================
 
+const SEARCH_LIMIT = 25
+const ARTIST_TRACKS_LIMIT = 20
 const FREE_KEYWORDS = ['free download', 'free dl', 'freedl', 'free']
 
 // ============================================================================
@@ -141,28 +145,32 @@ export interface ArtistInfo {
 export interface SearchResult {
   tracks: TrackEntry[]
   artist?: ArtistInfo
+  hasMore?: boolean
+  nextOffset?: number
 }
 
-export async function searchTracks(query: string, limit = 25): Promise<TrackEntry[]> {
+export async function searchTracks(query: string, limit = SEARCH_LIMIT): Promise<TrackEntry[]> {
   const soundcloud = new Soundcloud()
-  const response = await soundcloud.tracks.search({ q: query })
+  const response = await soundcloud.tracks.search({ q: query, limit })
   const tracks = response.collection || []
 
-  return tracks.slice(0, limit).map(mapToTrackEntry)
+  return tracks.map(mapToTrackEntry)
 }
 
-export async function searchWithArtistDetection(query: string, limit = 25): Promise<SearchResult> {
+export async function searchWithArtistDetection(query: string, limit = SEARCH_LIMIT, offset = 0): Promise<SearchResult> {
   const soundcloud = new Soundcloud()
 
   // Search tracks and users in parallel with error handling
   const [tracksResult, usersResult] = await Promise.allSettled([
-    soundcloud.tracks.search({ q: query }),
-    soundcloud.users.search({ q: query })
+    soundcloud.tracks.search({ q: query, limit, offset }),
+    offset === 0 ? soundcloud.users.search({ q: query }) : Promise.resolve({ collection: [] })
   ])
 
   // Handle tracks search result
-  const tracksResponse = tracksResult.status === 'fulfilled' ? tracksResult.value : { collection: [] }
-  const tracks = (tracksResponse.collection || []).slice(0, limit).map(mapToTrackEntry)
+  const tracksResponse = tracksResult.status === 'fulfilled' ? tracksResult.value : { collection: [], next_href: null }
+  const tracks = (tracksResponse.collection || []).map(mapToTrackEntry)
+  const hasMore = !!tracksResponse.next_href
+  const nextOffset = hasMore ? offset + limit : undefined
 
   // Handle users search result
   const usersResponse = usersResult.status === 'fulfilled' ? usersResult.value : { collection: [] }
@@ -182,7 +190,7 @@ export async function searchWithArtistDetection(query: string, limit = 25): Prom
     try {
       // Found matching artist, get their tracks
       const artistTracks = await soundcloud.users.tracks(matchingUser.id)
-      const mappedArtistTracks = (artistTracks || []).slice(0, 10).map(mapToTrackEntry)
+      const mappedArtistTracks = (artistTracks || []).slice(0, ARTIST_TRACKS_LIMIT).map(mapToTrackEntry)
 
       if (mappedArtistTracks.length > 0) {
         return {
@@ -195,7 +203,9 @@ export async function searchWithArtistDetection(query: string, limit = 25): Prom
             track_count: matchingUser.track_count,
             permalink_url: matchingUser.permalink_url,
             tracks: mappedArtistTracks
-          }
+          },
+          hasMore,
+          nextOffset
         }
       }
     } catch {
@@ -203,5 +213,5 @@ export async function searchWithArtistDetection(query: string, limit = 25): Prom
     }
   }
 
-  return { tracks }
+  return { tracks, hasMore, nextOffset }
 }
