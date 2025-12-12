@@ -89,13 +89,20 @@ const FREE_DOWNLOAD_DOMAINS = [
   'hypeddit.com',
   'toneden.io',
   'fanlink.to',
-  'linktr.ee',
   'gate.fm',
-  'distrokid.com',
-  'smarturl.it',
-  'ffm.to',
   'bfrnd.link',
   'edmdisc.com'
+]
+
+const SMART_LINK_DOMAINS = [
+  'smarturl.it',
+  'ffm.to',
+  'linktr.ee',
+  'distrokid.com',
+  'lnk.to',
+  'found.ee',
+  'song.link',
+  'odesli.co'
 ]
 
 const PURCHASE_DOMAINS = [
@@ -135,12 +142,31 @@ function hasFreeDownloadLink(text: string): boolean {
   )
 }
 
+const BUY_KEYWORDS = ['buy', 'purchase', 'acheter', 'get it', 'stream', 'out now', 'available']
+
 function hasPurchaseLink(text: string): string | null {
   const urls = extractUrlsFromText(text)
+
+  // First check for known purchase domains
   const purchaseUrl = urls.find(url =>
     PURCHASE_DOMAINS.some(domain => url.toLowerCase().includes(domain))
   )
-  return purchaseUrl || null
+  if (purchaseUrl) return purchaseUrl
+
+  // Check for smart link domains (streaming/purchase aggregators)
+  const smartLinkUrl = urls.find(url =>
+    SMART_LINK_DOMAINS.some(domain => url.toLowerCase().includes(domain))
+  )
+  if (smartLinkUrl) return smartLinkUrl
+
+  // Then check for "Buy" or similar keywords near a URL
+  const textLower = text.toLowerCase()
+  if (BUY_KEYWORDS.some(keyword => textLower.includes(keyword)) && urls.length > 0) {
+    // Return the first URL found near a buy keyword
+    return urls[0]
+  }
+
+  return null
 }
 
 function getDownloadStatus(track: SoundcloudTrack): DownloadStatus {
