@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import { DownloadStatus, type TrackEntry } from '~/types/track'
+import type { ArtistInfo } from '~/server/services/soundcloud'
 
 const props = withDefaults(defineProps<{
   track: TrackEntry
   index?: number
   skipAnimation?: boolean
+  detectedArtist?: ArtistInfo | null
 }>(), {
   index: 0,
-  skipAnimation: false
+  skipAnimation: false,
+  detectedArtist: null
+})
+
+const isFromDetectedArtist = computed(() => {
+  if (!props.detectedArtist) return false
+  return props.track.artist.toLowerCase() === props.detectedArtist.username.toLowerCase()
 })
 
 const { t } = useI18n()
@@ -86,6 +94,21 @@ function formatDuration(ms: number): string {
       class="flex cursor-pointer items-center gap-3 p-3 md:gap-4 md:p-4"
       @click="handleCardClick"
     >
+      <!-- Artist badge (when track is from detected artist) -->
+      <UTooltip v-if="isFromDetectedArtist && detectedArtist" :text="`Track de ${detectedArtist.username}`">
+        <div class="relative -mr-1 h-8 w-8 shrink-0 overflow-hidden rounded-full ring-2 ring-cyan-500/50 md:-mr-2 md:h-10 md:w-10">
+          <img
+            v-if="detectedArtist.avatar_url"
+            :src="detectedArtist.avatar_url"
+            :alt="detectedArtist.username"
+            class="h-full w-full object-cover"
+          >
+          <div v-else class="flex h-full w-full items-center justify-center bg-cyan-900">
+            <UIcon name="i-heroicons-user" class="h-4 w-4 text-cyan-400" />
+          </div>
+        </div>
+      </UTooltip>
+
       <!-- Artwork with play/pause overlay -->
       <div class="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg shadow-lg md:h-16 md:w-16 md:rounded-xl">
         <img
