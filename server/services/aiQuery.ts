@@ -1,89 +1,41 @@
 import Anthropic from '@anthropic-ai/sdk'
+import type { MessageParam } from '@anthropic-ai/sdk/resources/messages'
 
-const SCHEMA = `Table: tracks
-Columns:
-- soundcloud_id (BIGINT, PRIMARY KEY)
-- title (TEXT)
-- artist (TEXT)
-- genre (TEXT) - ex: "Electronic", "House", "Techno", "Hip-hop", "Dubstep", "Drum & Bass", "Ambient"
-- duration (INTEGER, milliseconds)
-- download_status (TEXT: 'FreeDirectLink', 'FreeExternalLink', 'No')
-- downloadable (BOOLEAN)
-- playback_count (INTEGER)
-- likes_count (INTEGER)
-- tags (TEXT[]) - array of keywords like "remix", "chill", "bass", "vocal", "instrumental", "dark", "melodic"
-- soundcloud_created_at (TIMESTAMPTZ)
-- created_at (TIMESTAMPTZ, when added to our db)
-- updated_at (TIMESTAMPTZ)`
+// Cached system prompt - optimized for token efficiency
+const SYSTEM_PROMPT = `SQL generator for music app. Output ONLY valid PostgreSQL, no markdown.
 
-const SYSTEM_PROMPT = `Tu es un assistant SQL expert pour une app de musique. Génère UNIQUEMENT une requête SQL PostgreSQL valide, sans markdown ni explication.
+TABLES:
+- tracks (soundcloud_id PK, title, artist, artist_id FK, genre, duration ms, download_status, downloadable, playback_count, likes_count, tags TEXT[], soundcloud_created_at, bpm INT, key TEXT)
+- artists (soundcloud_id PK, username, full_name, city, country, followers_count, track_count, genres TEXT[], labels TEXT[], verified BOOL, pro_user BOOL)
 
-Règles techniques:
-- Table: tracks
-- SELECT * FROM tracks
-- ILIKE pour recherche texte (case insensitive)
-- LIMIT 10 max
-- Durées en ms (1 min = 60000ms)
+JOIN: tracks.artist_id = artists.soundcloud_id
 
-ANALYSE L'INTENTION DE L'UTILISATEUR:
+RULES:
+- Default tracks: SELECT * FROM tracks, ILIKE for text, LIMIT 20 (max 50), ORDER BY playback_count DESC
+- Default artists: SELECT * FROM artists, ORDER BY followers_count DESC
 
-1) Requête RESTRICTIVE (utilise AND entre les critères principaux):
-   L'utilisateur veut un type PRÉCIS de contenu. Mots-clés: "trouve-moi des", "je veux des", "que des", "uniquement", "seulement"
-   → "mix de Quyver" = veut UNIQUEMENT des mix, pas des tracks normales
-   → "remix techno" = veut UNIQUEMENT des remix, dans le style techno
-   Exemple: WHERE artist ILIKE '%quyver%' AND (title ILIKE '%mix%' OR title ILIKE '%set%' OR duration > 1200000)
+INTENT DETECTION:
+1) TRACK SEARCH (default): search in tracks table
+   "techno tracks" → SELECT * FROM tracks WHERE genre ILIKE '%techno%'
+2) ARTIST SEARCH ("artists", "producers", "DJs"): search in artists table
+   "french artists" → SELECT * FROM artists WHERE country ILIKE '%france%'
+   "verified dubstep artists" → SELECT * FROM artists WHERE verified = true AND 'dubstep' = ANY(genres)
+3) TRACKS BY ARTIST CRITERIA (join):
+   "tracks from french artists" → SELECT t.* FROM tracks t JOIN artists a ON t.artist_id = a.soundcloud_id WHERE a.country ILIKE '%france%'
+4) SIMILAR ARTISTS ("like X", "similar to"): EXCLUDE mentioned artist
+   "like Wooli" → WHERE genre ILIKE '%dubstep%' AND artist NOT ILIKE '%wooli%'
 
-2) Requête EXPLORATOIRE (utilise OR pour élargir):
-   L'utilisateur explore ou cherche de manière générale. Mots-clés: "ou", "style", "genre", "comme"
-   → "techno ou house" = veut l'un OU l'autre
-   → "tracks de Bicep" = veut tout de cet artiste
-   Exemple: WHERE genre ILIKE '%techno%' OR genre ILIKE '%house%'
-
-3) Requête "ARTISTES SIMILAIRES" (EXCLURE l'artiste mentionné):
-   Mots-clés: "comme", "similaire à", "style de", "dans le genre de", "qui ressemble à"
-   → "artistes comme Wooli" = veut des tracks d'artistes AUTRES que Wooli, dans un style similaire
-   → "musique comme Deadmau5" = veut des tracks similaires mais PAS de Deadmau5
-   IMPORTANT: Quand l'utilisateur dit "comme [artiste]", il veut DÉCOUVRIR d'autres artistes !
-   → Utilise AND artist NOT ILIKE '%[artiste]%' pour exclure l'artiste mentionné
-   → Cherche dans le même genre/tags que l'artiste mentionné
-   Exemple pour "comme Wooli": WHERE (genre ILIKE '%dubstep%' OR EXISTS(SELECT 1 FROM unnest(tags) t WHERE t ILIKE '%bass%')) AND artist NOT ILIKE '%wooli%'
-
-ATTENTION - Vocabulaire musical:
-- MIX / DJ SET = enchaînement de plusieurs tracks par un DJ. Dure MINIMUM 15-20min, souvent 1h-2h+
-- REMIX = une track retravaillée par un autre artiste. Dure 3-7min comme une track normale
-- "Original Mix" = version originale d'une track, PAS un DJ set ! C'est juste l'opposé d'un remix
-- Quand l'utilisateur dit "mix" ou "dj set", il veut des LONGS enchaînements, pas des tracks de 5min
-
-CRITÈRE CLÉ POUR LES MIX: LA DURÉE !
-- Une track normale dure max ~7min (420000ms)
-- Un vrai mix/dj set dure MINIMUM 15min (900000ms), généralement 30min-2h
-- Pour chercher des mix: duration > 900000 est ESSENTIEL
-
-TYPES DE CONTENU (pour filtrage strict):
-- mix/dj set: duration > 900000 AND title NOT ILIKE '%remix%' AND title NOT ILIKE '%original mix%'
+CONTENT TYPES (1min=60000ms):
+- mix/dj set: duration > 900000 (15min+), title NOT ILIKE '%remix%'
 - remix: title ILIKE '%remix%' AND title NOT ILIKE '%original mix%'
-- bootleg/edit: title ILIKE '%bootleg%' OR title ILIKE '% edit%' OR title ILIKE '%flip%'
-- live: title ILIKE '%live%' OR title ILIKE '% @ %'
-- original/track normale: duration < 480000
+- bootleg/edit: title ILIKE '%bootleg%' OR title ILIKE '%edit%' OR title ILIKE '%flip%'
 
-DURÉES DE RÉFÉRENCE:
-- Track normale: 3-7min (180000-420000ms)
-- Mix court: 15-30min (900000-1800000ms)
-- Mix moyen: 30min-1h (1800000-3600000ms)
-- Long mix: 1h+ (> 3600000ms)
+DOWNLOAD:
+- Free: download_status IN ('FreeDirectLink','FreeExternalLink')
+- Direct only: download_status = 'FreeDirectLink'
 
-GENRES (cherche dans genre ET tags):
-(genre ILIKE '%house%' OR EXISTS(SELECT 1 FROM unnest(tags) t WHERE t ILIKE '%house%'))
-
-TÉLÉCHARGEMENT GRATUIT:
-- Quand l'utilisateur dit "gratuit", "free", "téléchargeable", "download", "à télécharger" → filtrer sur download_status
-- download_status = 'FreeDirectLink' : téléchargement gratuit direct sur SoundCloud
-- download_status = 'FreeExternalLink' : téléchargement gratuit via lien externe (Hypeddit, etc.)
-- download_status = 'No' : pas de téléchargement gratuit disponible
-- Pour les tracks gratuites: WHERE download_status IN ('FreeDirectLink', 'FreeExternalLink')
-- Pour les tracks avec lien direct uniquement: WHERE download_status = 'FreeDirectLink'
-
-Tri par défaut: ORDER BY playback_count DESC`
+GENRE/TAG search: (genre ILIKE '%X%' OR EXISTS(SELECT 1 FROM unnest(tags) t WHERE t ILIKE '%X%'))
+ARTIST GENRE: 'X' = ANY(genres) OR EXISTS(SELECT 1 FROM unnest(labels) l WHERE l ILIKE '%X%')`
 
 export async function generateSqlQuery(question: string): Promise<string> {
   const config = useRuntimeConfig()
@@ -95,16 +47,21 @@ export async function generateSqlQuery(question: string): Promise<string> {
 
   const anthropic = new Anthropic({ apiKey })
 
+  const messages: MessageParam[] = [
+    { role: 'user', content: question }
+  ]
+
   const message = await anthropic.messages.create({
     model: 'claude-3-5-haiku-latest',
     max_tokens: 256,
-    system: SYSTEM_PROMPT,
-    messages: [
+    system: [
       {
-        role: 'user',
-        content: `${SCHEMA}\n\nQuestion: ${question}`
+        type: 'text',
+        text: SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' }
       }
-    ]
+    ],
+    messages
   })
 
   const content = message.content[0]
@@ -144,7 +101,7 @@ export async function executeAiQuery(question: string): Promise<{ sql: string; r
   const { createClient } = await import('@supabase/supabase-js')
   const supabase = createClient(supabaseUrl, supabaseKey)
 
-  const { data, error } = await supabase.rpc('exec_sql', { query: sql }).single()
+  const { data, error } = await supabase.rpc('exec', { query: sql }).single()
 
   if (error) {
     // If RPC doesn't exist, try raw query via PostgREST

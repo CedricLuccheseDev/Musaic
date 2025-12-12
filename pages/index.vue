@@ -18,7 +18,7 @@ async function search() {
     <div class="relative flex flex-1 flex-col items-center justify-center px-4">
       <!-- Logo -->
       <div class="mb-3 md:mb-4">
-        <Logo size="lg" />
+        <AppLogo size="lg" />
       </div>
 
       <!-- Tagline -->
@@ -36,6 +36,6 @@ async function search() {
         />
       </div>
     </div>
-    <Footer />
+    <AppFooter />
   </div>
 </template>

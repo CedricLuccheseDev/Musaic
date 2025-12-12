@@ -274,6 +274,6 @@ async function search() {
         </template>
       </ClientOnly>
     </main>
-    <Footer />
+    <AppFooter />
   </div>
 </template>

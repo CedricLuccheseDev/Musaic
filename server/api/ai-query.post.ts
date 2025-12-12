@@ -9,6 +9,7 @@ interface DbTrack {
   permalink_url: string
   title: string
   artist: string
+  artist_id: number | null
   artwork: string | null
   duration: number
   genre: string | null
@@ -16,6 +17,8 @@ interface DbTrack {
   soundcloud_created_at: string | null
   label: string | null
   tags: string[]
+  bpm: number | null
+  key: string | null
   playback_count: number
   likes_count: number
   reposts_count: number
@@ -35,6 +38,7 @@ function dbTrackToTrackEntry(db: DbTrack): TrackEntry {
     permalink_url: db.permalink_url,
     title: db.title,
     artist: db.artist,
+    artist_id: db.artist_id,
     artwork: db.artwork,
     duration: db.duration,
     genre: db.genre,
@@ -42,6 +46,8 @@ function dbTrackToTrackEntry(db: DbTrack): TrackEntry {
     created_at: db.soundcloud_created_at,
     label: db.label,
     tags: db.tags || [],
+    bpm: db.bpm,
+    key: db.key,
     playback_count: db.playback_count,
     likes_count: db.likes_count,
     reposts_count: db.reposts_count,
@@ -67,7 +73,10 @@ export default defineEventHandler(async (event) => {
 
   try {
     // Generate SQL from natural language
-    const sql = await generateSqlQuery(question)
+    let sql = await generateSqlQuery(question)
+
+    // Clean up SQL (remove trailing semicolons that break the RPC)
+    sql = sql.trim().replace(/;+$/, '')
 
     // Validate SQL (security check)
     const sqlLower = sql.toLowerCase().trim()
@@ -91,7 +100,7 @@ export default defineEventHandler(async (event) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    const { data, error } = await supabase.rpc('exec_sql', { query: sql })
+    const { data, error } = await supabase.rpc('exec', { query: sql })
 
     if (error) {
       console.error('[AI Query] RPC error:', error.message)
