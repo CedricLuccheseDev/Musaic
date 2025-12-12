@@ -33,11 +33,11 @@ const flatResults = computed(() => props.results.slice(0, 10))
 </script>
 
 <template>
-  <section class="mb-8">
+  <section class="-mx-4 mb-8 rounded-xl border border-purple-500/20 bg-purple-900/10 px-4">
     <!-- AI Loading -->
-    <div v-if="loading" class="flex items-center gap-3 rounded-xl border border-purple-500/20 bg-purple-900/10 px-4 py-4">
-      <UIcon name="i-heroicons-sparkles" class="h-5 w-5 animate-pulse text-purple-400" />
-      <span class="bg-linear-to-r from-purple-400 to-pink-400 bg-clip-text text-sm font-medium text-transparent">
+    <div v-if="loading" class="flex items-center gap-3 py-4">
+      <UIcon name="i-heroicons-sparkles" class="h-6 w-6 animate-pulse text-purple-400" />
+      <span class="bg-linear-to-r from-purple-400 to-pink-400 bg-clip-text text-lg font-semibold text-transparent">
         {{ t.aiGenerating }}
       </span>
       <div class="flex gap-1">
@@ -47,22 +47,22 @@ const flatResults = computed(() => props.results.slice(0, 10))
       </div>
     </div>
 
-    <!-- AI Results Card -->
-    <div v-else-if="results.length" class="overflow-hidden rounded-xl border border-purple-500/20 bg-purple-900/10">
+    <!-- AI Results -->
+    <template v-else-if="results.length">
       <!-- Header (clickable to collapse) -->
       <button
         type="button"
-        class="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-purple-900/20"
+        class="flex w-full cursor-pointer items-center gap-3 py-4 text-left"
         @click="collapsed = !collapsed"
       >
-        <UIcon name="i-heroicons-sparkles" class="h-5 w-5 text-purple-400" />
-        <h2 class="flex-1 bg-linear-to-r from-purple-400 to-pink-400 bg-clip-text text-base font-semibold text-transparent">
+        <UIcon name="i-heroicons-sparkles" class="h-6 w-6 text-purple-400" />
+        <h2 class="flex-1 bg-linear-to-r from-purple-400 to-pink-400 bg-clip-text text-lg font-semibold text-transparent">
           {{ t.aiResults }}
         </h2>
-        <span class="text-xs text-purple-400/60">{{ results.slice(0, 10).length }} {{ t.results }}</span>
+        <span class="text-sm text-purple-400/60">{{ results.slice(0, 10).length }} {{ t.results }}</span>
         <UIcon
           name="i-heroicons-chevron-down"
-          class="h-4 w-4 text-purple-400 transition-transform duration-200"
+          class="h-5 w-5 text-purple-400 transition-transform duration-200"
           :class="{ 'rotate-180': !collapsed }"
         />
       </button>
@@ -76,7 +76,7 @@ const flatResults = computed(() => props.results.slice(0, 10))
         leave-from-class="opacity-100 max-h-[2000px]"
         leave-to-class="opacity-0 max-h-0"
       >
-        <div v-if="!collapsed" class="overflow-hidden border-t border-purple-500/10 px-4 py-4">
+        <div v-if="!collapsed" class="overflow-hidden border-t border-purple-500/10 pb-4 pt-4">
           <!-- SQL Query preview -->
           <details v-if="sql" class="mb-4">
             <summary class="cursor-pointer text-xs text-purple-400/60 hover:text-purple-300">
@@ -117,6 +117,6 @@ const flatResults = computed(() => props.results.slice(0, 10))
           </div>
         </div>
       </Transition>
-    </div>
+    </template>
   </section>
 </template>

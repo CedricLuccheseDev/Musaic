@@ -1,6 +1,7 @@
 import { generateSqlQuery } from '~/server/services/aiQuery'
 import { createClient } from '@supabase/supabase-js'
 import type { DownloadStatus, TrackEntry } from '~/types/track'
+import { logger } from '~/server/utils/logger'
 
 // Database record format (snake_case)
 interface DbTrack {
@@ -9,7 +10,6 @@ interface DbTrack {
   permalink_url: string
   title: string
   artist: string
-  artist_id: number | null
   artwork: string | null
   duration: number
   genre: string | null
@@ -38,7 +38,6 @@ function dbTrackToTrackEntry(db: DbTrack): TrackEntry {
     permalink_url: db.permalink_url,
     title: db.title,
     artist: db.artist,
-    artist_id: db.artist_id,
     artwork: db.artwork,
     duration: db.duration,
     genre: db.genre,
@@ -78,6 +77,8 @@ export default defineEventHandler(async (event) => {
     // Clean up SQL (remove trailing semicolons that break the RPC)
     sql = sql.trim().replace(/;+$/, '')
 
+    logger.ai.query(question, sql)
+
     // Validate SQL (security check)
     const sqlLower = sql.toLowerCase().trim()
     const forbidden = ['drop', 'delete', 'update', 'insert', 'alter', 'truncate', 'create']
@@ -103,7 +104,7 @@ export default defineEventHandler(async (event) => {
     const { data, error } = await supabase.rpc('exec', { query: sql })
 
     if (error) {
-      console.error('[AI Query] RPC error:', error.message)
+      logger.ai.error(error.message)
       return { sql, results: [], error: error.message }
     }
 
@@ -112,12 +113,14 @@ export default defineEventHandler(async (event) => {
     // Transform DB results to TrackEntry format
     const results = (data || []).map((row: DbTrack) => dbTrackToTrackEntry(row))
 
+    logger.ai.result(results.length)
+
     return {
       sql: isDev ? sql : undefined,
       results
     }
   } catch (err) {
-    console.error('[AI Query] Error:', err)
+    logger.ai.error(err instanceof Error ? err.message : 'Unknown error')
     throw createError({
       statusCode: 500,
       message: err instanceof Error ? err.message : 'Failed to generate query'

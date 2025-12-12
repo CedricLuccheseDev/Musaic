@@ -13,9 +13,10 @@ const query = computed(() => (route.query.q as string) || '')
 const searchInput = ref(query.value)
 
 // Filter state
-const showTracks = ref(true)
-const showArtist = ref(true)
 const activeFilter = ref<FilterType>('all')
+
+// Collapsable sections
+const tracksExpanded = ref(true)
 
 // AI search state
 const aiLoading = ref(false)
@@ -74,6 +75,7 @@ watch(query, () => {
   allTracks.value = []
   hasMoreFromApi.value = false
   nextOffset.value = undefined
+  tracksExpanded.value = true
   runAiSearch()
 })
 
@@ -183,7 +185,7 @@ async function search() {
     <main class="relative mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-10">
       <ClientOnly>
         <!-- Filters -->
-        <SearchFilters v-model:show-tracks="showTracks" v-model:show-artist="showArtist" v-model:filter="activeFilter" />
+        <SearchFilters v-model:filter="activeFilter" />
 
         <!-- AI Section -->
         <SearchAiSection
@@ -193,17 +195,16 @@ async function search() {
           :sql="aiSql"
         />
 
-        <!-- Artist Section (if detected and showArtist enabled) -->
+        <!-- Artist Section (has built-in collapse) -->
         <SearchArtistSection
-          v-if="showArtist && detectedArtist && filteredArtistTracks.length"
+          v-if="detectedArtist && filteredArtistTracks.length"
           :artist="{ ...detectedArtist, tracks: filteredArtistTracks }"
         />
 
-        <!-- SoundCloud Results Section (if showTracks enabled) -->
-        <section v-if="showTracks">
+        <!-- SoundCloud Results Section (collapsable) -->
+        <section>
           <!-- Loading -->
           <div v-if="isLoading" class="flex flex-col items-center justify-center gap-4 py-16">
-            <!-- Animated rings -->
             <div class="relative flex items-center justify-center">
               <div class="absolute h-16 w-16 animate-ping rounded-full bg-violet-500/20" />
               <div class="absolute h-12 w-12 animate-pulse rounded-full bg-purple-500/30" />
@@ -211,7 +212,6 @@ async function search() {
                 <UIcon name="i-heroicons-musical-note" class="h-5 w-5 animate-bounce text-white" />
               </div>
             </div>
-            <!-- Loading text -->
             <div class="flex items-center gap-2">
               <span class="text-sm text-neutral-400">{{ t.searching }}</span>
               <span class="flex gap-1">
@@ -222,37 +222,51 @@ async function search() {
             </div>
           </div>
 
-          <!-- Results list -->
+          <!-- Results list (collapsable) -->
           <template v-else-if="filteredTracks.length">
-            <!-- Section header (clickable to collapse) -->
-            <div class="flex items-center gap-3 py-3">
-              <UIcon name="i-heroicons-magnifying-glass" class="h-5 w-5 text-violet-400" />
-              <h2 class="flex-1 text-base font-semibold text-white">
+            <button
+              type="button"
+              class="flex w-full cursor-pointer items-center gap-3 py-4 text-left"
+              @click="tracksExpanded = !tracksExpanded"
+            >
+              <UIcon name="i-heroicons-magnifying-glass" class="h-6 w-6 text-violet-400" />
+              <h2 class="flex-1 text-lg font-semibold text-white">
                 {{ t.resultsFor }} "{{ query }}"
               </h2>
-              <span class="text-xs text-neutral-500">{{ filteredTracks.length }} {{ t.results }}</span>
-            </div>
-
-            <!-- Track list -->
-            <div class="space-y-2">
-              <SearchTrackCard
-                v-for="(track, index) in filteredTracks"
-                :key="track.id"
-                :track="track"
-                :index="index"
-                :skip-animation="index >= initialBatchSize"
+              <span class="text-sm text-neutral-500">{{ filteredTracks.length }} {{ t.results }}</span>
+              <UIcon
+                name="i-heroicons-chevron-down"
+                class="h-5 w-5 text-violet-400 transition-transform duration-200"
+                :class="{ 'rotate-180': !tracksExpanded }"
               />
-            </div>
+            </button>
 
-            <!-- Load more indicator -->
-            <div v-if="hasMore || isLoadingMore" class="flex justify-center py-8">
-              <UIcon name="i-heroicons-arrow-path" class="h-6 w-6 animate-spin text-muted" />
-            </div>
+            <Transition
+              enter-active-class="transition-all duration-300 ease-out"
+              enter-from-class="opacity-0 max-h-0"
+              enter-to-class="opacity-100 max-h-[5000px]"
+              leave-active-class="transition-all duration-200 ease-in"
+              leave-from-class="opacity-100 max-h-[5000px]"
+              leave-to-class="opacity-0 max-h-0"
+            >
+              <div v-if="tracksExpanded" class="mt-2 space-y-2 overflow-hidden">
+                <SearchTrackCard
+                  v-for="(track, index) in filteredTracks"
+                  :key="track.id"
+                  :track="track"
+                  :index="index"
+                  :skip-animation="index >= initialBatchSize"
+                />
 
-            <!-- End of results -->
-            <div v-else class="py-8 text-center text-sm text-neutral-500">
-              {{ t.endOfResults }}
-            </div>
+                <div v-if="hasMore || isLoadingMore" class="flex justify-center py-8">
+                  <UIcon name="i-heroicons-arrow-path" class="h-6 w-6 animate-spin text-muted" />
+                </div>
+
+                <div v-else class="py-8 text-center text-sm text-neutral-500">
+                  {{ t.endOfResults }}
+                </div>
+              </div>
+            </Transition>
           </template>
 
           <!-- No results after filter -->

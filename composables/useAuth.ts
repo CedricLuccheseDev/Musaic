@@ -9,10 +9,7 @@ function getSupabase(): SupabaseClient | null {
   const url = config.public.supabaseUrl
   const key = config.public.supabaseAnonKey
 
-  console.log('[Auth] Config:', { url: url ? `${url.slice(0, 30)}...` : 'NOT SET', key: key ? 'SET' : 'NOT SET' })
-
   if (!url || !key) {
-    console.warn('[Auth] Supabase not configured')
     return null
   }
 
@@ -41,35 +38,45 @@ export const useAuth = () => {
       supabase.auth.onAuthStateChange((_event, session) => {
         user.value = session?.user ?? null
       })
-    } catch (err) {
-      console.error('[Auth] Init error:', err)
+    } catch {
+      // Init failed silently
     } finally {
       loading.value = false
     }
   }
 
-  // Sign in with Google
+  // Sign in with Google (opens popup that closes after auth)
   async function signInWithGoogle() {
     if (!supabase) {
       return { error: { message: 'Supabase not configured' } }
     }
 
+    const redirectUrl = `${window.location.origin}/auth/callback`
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: redirectUrl,
         skipBrowserRedirect: true
       }
     })
 
     if (error) {
-      console.error('[Auth] Google sign-in error:', error)
       return { data, error }
     }
 
-    // Redirect to Google OAuth
+    // Open OAuth in popup instead of redirect
     if (data?.url) {
-      window.location.assign(data.url)
+      const width = 500
+      const height = 600
+      const left = window.screenX + (window.outerWidth - width) / 2
+      const top = window.screenY + (window.outerHeight - height) / 2
+
+      window.open(
+        data.url,
+        'google-oauth',
+        `width=${width},height=${height},left=${left},top=${top},popup=true`
+      )
     }
 
     return { data, error }
@@ -82,16 +89,15 @@ export const useAuth = () => {
     }
 
     try {
-      const { error } = await supabase.auth.signOut()
-      if (!error) {
-        user.value = null
+      const { error } = await supabase.auth.signOut({ scope: 'local' })
+      if (error) {
+        return { error }
       }
-      return { error }
-    } catch (err) {
-      console.error('[Auth] Sign-out exception:', err)
-      return {
-        error: { message: err instanceof Error ? err.message : 'Sign-out failed' }
-      }
+      // Force clear user state (onAuthStateChange should also trigger)
+      user.value = null
+      return { error: null }
+    } catch {
+      return { error: { message: 'Sign-out failed' } }
     }
   }
 

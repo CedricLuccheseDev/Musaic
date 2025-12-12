@@ -1,6 +1,5 @@
 import SoundcloudModule from 'soundcloud.ts'
 import { DownloadStatus, type TrackEntry } from '~/types/track'
-import type { ArtistEntry } from '~/types/artist'
 
 // ============================================================================
 // Types
@@ -184,14 +183,6 @@ function parseTags(tagList?: string): string[] {
   return tagList.split(' ').filter(tag => tag.length > 0)
 }
 
-const SOCIAL_PATTERNS = {
-  instagram: /(?:instagram\.com|instagr\.am)\/([a-zA-Z0-9_.]+)/i,
-  twitter: /(?:twitter\.com|x\.com)\/([a-zA-Z0-9_]+)/i,
-  facebook: /facebook\.com\/([a-zA-Z0-9.]+)/i,
-  spotify: /open\.spotify\.com\/artist\/([a-zA-Z0-9]+)/i,
-  youtube: /(?:youtube\.com\/(?:c\/|channel\/|user\/|@)?([a-zA-Z0-9_-]+))/i
-}
-
 const BPM_PATTERNS = [
   /(\d{2,3})\s*bpm/i,
   /bpm\s*[:|-]?\s*(\d{2,3})/i,
@@ -257,84 +248,6 @@ function extractAudioMetadata(track: SoundcloudTrack): { bpm: number | null; key
   }
 }
 
-function extractSocialLinks(description: string | undefined): {
-  website_url: string | null
-  instagram_url: string | null
-  twitter_url: string | null
-  facebook_url: string | null
-  spotify_url: string | null
-  youtube_url: string | null
-} {
-  const result = {
-    website_url: null as string | null,
-    instagram_url: null as string | null,
-    twitter_url: null as string | null,
-    facebook_url: null as string | null,
-    spotify_url: null as string | null,
-    youtube_url: null as string | null
-  }
-
-  if (!description) return result
-
-  const urls = extractUrlsFromText(description)
-
-  for (const url of urls) {
-    const lowerUrl = url.toLowerCase()
-
-    if (SOCIAL_PATTERNS.instagram.test(url) && !result.instagram_url) {
-      result.instagram_url = url
-    } else if (SOCIAL_PATTERNS.twitter.test(url) && !result.twitter_url) {
-      result.twitter_url = url
-    } else if (SOCIAL_PATTERNS.facebook.test(url) && !result.facebook_url) {
-      result.facebook_url = url
-    } else if (SOCIAL_PATTERNS.spotify.test(url) && !result.spotify_url) {
-      result.spotify_url = url
-    } else if (SOCIAL_PATTERNS.youtube.test(url) && !result.youtube_url) {
-      result.youtube_url = url
-    } else if (
-      !result.website_url &&
-      !FREE_DOWNLOAD_DOMAINS.some(d => lowerUrl.includes(d)) &&
-      !PURCHASE_DOMAINS.some(d => lowerUrl.includes(d)) &&
-      !lowerUrl.includes('soundcloud.com')
-    ) {
-      result.website_url = url
-    }
-  }
-
-  return result
-}
-
-export function mapToArtistEntry(user: SoundcloudUser): ArtistEntry {
-  const socialLinks = extractSocialLinks(user.description)
-  const bannerUrl = user.visuals?.visuals?.[0]?.visual_url || null
-  const isPro = user.creator_subscriptions?.some(sub => sub.product?.id) || false
-
-  return {
-    id: user.id,
-    permalink_url: user.permalink_url,
-    username: user.username,
-    full_name: user.full_name || null,
-    avatar_url: user.avatar_url || null,
-    banner_url: bannerUrl,
-    description: user.description || null,
-    city: user.city || null,
-    country: user.country_code || null,
-    followers_count: user.followers_count || 0,
-    followings_count: user.followings_count || 0,
-    track_count: user.track_count || 0,
-    playlist_count: user.playlist_count || 0,
-    likes_count: user.likes_count || 0,
-    reposts_count: user.reposts_count || 0,
-    ...socialLinks,
-    genres: [],
-    labels: [],
-    artist_type: null,
-    verified: user.verified || false,
-    pro_user: isPro,
-    created_at: user.created_at || null
-  }
-}
-
 function mapToTrackEntry(track: SoundcloudTrack): TrackEntry {
   const audioMetadata = extractAudioMetadata(track)
 
@@ -344,7 +257,6 @@ function mapToTrackEntry(track: SoundcloudTrack): TrackEntry {
     permalink_url: track.permalink_url,
     title: track.title,
     artist: track.user?.username || 'Unknown',
-    artist_id: track.user?.id || null,
     artwork: track.artwork_url?.replace('-large', '-t300x300') || null,
     duration: track.duration,
     genre: track.genre || null,

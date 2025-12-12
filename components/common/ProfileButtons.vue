@@ -37,7 +37,7 @@ async function handleSignOut() {
     </div>
 
     <!-- Logged in: Avatar with dropdown -->
-    <UDropdownMenu v-else-if="user" :items="[[{ label: 'Se déconnecter', icon: 'i-heroicons-arrow-right-on-rectangle', click: handleSignOut }]]">
+    <UDropdownMenu v-else-if="user" :items="[[{ label: 'Se déconnecter', icon: 'i-heroicons-arrow-right-on-rectangle', onSelect: handleSignOut, class: 'cursor-pointer' }]]">
       <button type="button" class="cursor-pointer overflow-hidden rounded-full ring-2 ring-violet-500/50 transition-all hover:ring-violet-500">
         <img
           v-if="user.user_metadata?.avatar_url"
