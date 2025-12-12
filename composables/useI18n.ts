@@ -41,6 +41,15 @@ const translations = {
     freeLink: 'Lien gratuit',
     buy: 'Acheter',
 
+    // Tooltips
+    tooltipDirectDownload: 'Télécharger gratuitement en MP3',
+    tooltipFreeLink: 'Ouvrir le lien de téléchargement gratuit',
+    tooltipBuy: 'Acheter ou obtenir ce track',
+    tooltipMp3: 'Rechercher sur SoundCloudMP3',
+    tooltipSoundcloud: 'Écouter sur SoundCloud',
+    tooltipTrackPage: 'Aller à la page SoundCloud',
+    tooltipArtistPage: 'Aller à la page artiste SoundCloud',
+
     // Auth
     login: 'Connexion',
     signup: 'Inscription',
@@ -87,6 +96,15 @@ const translations = {
     download: 'Download',
     freeLink: 'Free link',
     buy: 'Buy',
+
+    // Tooltips
+    tooltipDirectDownload: 'Download free MP3',
+    tooltipFreeLink: 'Open free download link',
+    tooltipBuy: 'Buy or get this track',
+    tooltipMp3: 'Search on SoundCloudMP3',
+    tooltipSoundcloud: 'Listen on SoundCloud',
+    tooltipTrackPage: 'Go to SoundCloud page',
+    tooltipArtistPage: 'Go to artist SoundCloud page',
 
     // Auth
     login: 'Login',

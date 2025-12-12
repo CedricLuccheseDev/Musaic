@@ -9,5 +9,6 @@ onMounted(() => {
 <template>
   <UApp>
     <NuxtPage />
+    <SoundCloudPlayer />
   </UApp>
 </template>
