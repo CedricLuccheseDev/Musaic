@@ -61,8 +61,8 @@ const artistCount = computed(() => Object.keys(resultsByArtist.value).length)
         class="flex w-full cursor-pointer items-center gap-3 py-4 text-left"
         @click="collapsed = !collapsed"
       >
-        <UIcon name="i-heroicons-sparkles" class="h-6 w-6 text-purple-400" />
-        <h2 class="flex-1 bg-linear-to-r from-purple-400 to-pink-400 bg-clip-text text-lg font-semibold text-transparent">
+        <UIcon name="i-heroicons-sparkles" class="h-6 w-6 animate-magic text-purple-400" />
+        <h2 class="animate-magic-text flex-1 text-lg font-semibold">
           {{ t.aiResults }}
         </h2>
         <span class="text-sm text-purple-400/60">{{ results.length }} tracks · {{ artistCount }} artistes</span>

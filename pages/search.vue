@@ -66,18 +66,11 @@ function applyFilter(tracks: TrackEntry[]): TrackEntry[] {
 const filteredAiResults = computed(() => applyFilter(aiResults.value))
 const aiTrackIds = computed(() => new Set(filteredAiResults.value.map(t => t.id)))
 
-const filteredArtistTracks = computed(() => {
-  if (!detectedArtist.value) return []
-  const filtered = applyFilter(detectedArtist.value.tracks)
-  // Exclude tracks already in AI results
-  return filtered.filter(t => !aiTrackIds.value.has(t.id))
-})
-const artistTrackIds = computed(() => new Set(filteredArtistTracks.value.map(t => t.id)))
 
 const filteredTracks = computed(() => {
   const filtered = applyFilter(allTracks.value)
-  // Exclude tracks already in AI or Artist results
-  return filtered.filter(t => !aiTrackIds.value.has(t.id) && !artistTrackIds.value.has(t.id))
+  // Exclude tracks already in AI results
+  return filtered.filter(t => !aiTrackIds.value.has(t.id))
 })
 const hasMore = computed(() => hasMoreFromApi.value && allTracks.value.length < MAX_RESULTS)
 
@@ -206,12 +199,6 @@ async function search() {
           :sql="aiSql"
         />
 
-        <!-- Artist Section (has built-in collapse) -->
-        <SearchArtistSection
-          v-if="detectedArtist && filteredArtistTracks.length"
-          :artist="{ ...detectedArtist, tracks: filteredArtistTracks }"
-        />
-
         <!-- SoundCloud Results Section (collapsable) -->
         <section>
           <!-- Loading -->
@@ -267,6 +254,7 @@ async function search() {
                   :track="track"
                   :index="index"
                   :skip-animation="index >= initialBatchSize"
+                  :detected-artist="detectedArtist"
                 />
 
                 <div v-if="hasMore || isLoadingMore" class="flex justify-center py-8">
