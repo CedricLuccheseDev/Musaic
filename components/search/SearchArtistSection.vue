@@ -25,7 +25,7 @@ function formatFollowers(count: number): string {
     <!-- Header (clickable to collapse) -->
     <button
       type="button"
-      class="flex w-full cursor-pointer items-center gap-3 py-3 text-left"
+      class="flex w-full cursor-pointer items-center gap-3 py-4 text-left"
       @click="collapsed = !collapsed"
     >
       <!-- Artist avatar -->
@@ -33,23 +33,23 @@ function formatFollowers(count: number): string {
         v-if="artist.avatar_url"
         :src="artist.avatar_url"
         :alt="artist.username"
-        class="h-8 w-8 rounded-full object-cover"
+        class="h-10 w-10 rounded-full object-cover"
       >
-      <UIcon v-else name="i-heroicons-user-circle" class="h-8 w-8 text-cyan-400" />
+      <UIcon v-else name="i-heroicons-user-circle" class="h-10 w-10 text-cyan-400" />
 
       <div class="flex-1">
-        <h2 class="text-base font-semibold text-cyan-400">
+        <h2 class="text-lg font-semibold text-cyan-400">
           {{ t.tracksBy }} {{ artist.username }}
         </h2>
-        <p class="text-xs text-neutral-500">
+        <p class="text-sm text-neutral-500">
           {{ formatFollowers(artist.followers_count) }} followers
         </p>
       </div>
 
-      <span class="text-xs text-neutral-500">{{ artist.tracks.length }} {{ t.results }}</span>
+      <span class="text-sm text-neutral-500">{{ artist.tracks.length }} {{ t.results }}</span>
       <UIcon
         name="i-heroicons-chevron-down"
-        class="h-4 w-4 text-cyan-400 transition-transform duration-200"
+        class="h-5 w-5 text-cyan-400 transition-transform duration-200"
         :class="{ 'rotate-180': !collapsed }"
       />
     </button>
@@ -63,7 +63,7 @@ function formatFollowers(count: number): string {
       leave-from-class="opacity-100 max-h-[2000px]"
       leave-to-class="opacity-0 max-h-0"
     >
-      <div v-if="!collapsed" class="space-y-2 overflow-hidden">
+      <div v-if="!collapsed" class="mt-2 space-y-2 overflow-hidden">
         <SearchTrackCard
           v-for="(track, index) in artist.tracks"
           :key="`artist-${track.id}`"

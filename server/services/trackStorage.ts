@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { TrackEntry } from '~/types/track'
+import { logger } from '~/server/utils/logger'
 
 let supabaseClient: SupabaseClient | null = null
 
@@ -10,10 +11,7 @@ function getSupabaseClient(): SupabaseClient | null {
   const url = config.supabaseUrl as string
   const key = config.supabaseKey as string
 
-  console.log('[TrackStorage] Supabase config:', { url: url ? `${url.substring(0, 30)}...` : 'MISSING', key: key ? 'SET' : 'MISSING' })
-
   if (!url || !key) {
-    console.warn('[TrackStorage] Supabase not configured, skipping')
     return null
   }
 
@@ -27,7 +25,6 @@ interface DbTrack {
   permalink_url: string
   title: string
   artist: string
-  artist_id: number | null
   artwork: string | null
   duration: number
   genre: string | null
@@ -48,17 +45,13 @@ interface DbTrack {
   purchase_title: string | null
 }
 
-function trackEntryToDbTrack(track: TrackEntry, knownArtistIds: Set<number> = new Set()): DbTrack {
-  // Only set artist_id if we know the artist exists in the database
-  const artistId = track.artist_id && knownArtistIds.has(track.artist_id) ? track.artist_id : null
-
+function trackEntryToDbTrack(track: TrackEntry): DbTrack {
   return {
     soundcloud_id: track.id,
     urn: track.urn,
     permalink_url: track.permalink_url,
     title: track.title,
     artist: track.artist,
-    artist_id: artistId,
     artwork: track.artwork,
     duration: track.duration,
     genre: track.genre,
@@ -99,7 +92,9 @@ export async function upsertTrack(track: TrackEntry): Promise<void> {
     })
 
   if (error) {
-    console.error('[TrackStorage] Failed to upsert track:', error.message)
+    logger.db.error('tracks', error.message)
+  } else {
+    logger.db.upsert('track', 1)
   }
 }
 
@@ -108,47 +103,15 @@ export async function upsertTrack(track: TrackEntry): Promise<void> {
  * Uses batch upsert for efficiency
  * Deduplicates by soundcloud_id to avoid ON CONFLICT errors
  */
-export async function upsertTracks(tracks: TrackEntry[], knownArtistIds: Set<number> = new Set()): Promise<void> {
-  console.log(`[TrackStorage] upsertTracks called with ${tracks.length} tracks`)
-
-  if (tracks.length === 0) {
-    console.log('[TrackStorage] No tracks to upsert')
-    return
-  }
+export async function upsertTracks(tracks: TrackEntry[]): Promise<void> {
+  if (tracks.length === 0) return
 
   const supabase = getSupabaseClient()
-  if (!supabase) {
-    console.log('[TrackStorage] Supabase client not available, skipping')
-    return
-  }
-
-  // Get all unique artist IDs from tracks that we don't already know about
-  const artistIdsToCheck = [...new Set(
-    tracks
-      .map(t => t.artist_id)
-      .filter((id): id is number => id !== null && !knownArtistIds.has(id))
-  )]
-
-  // Check which artists exist in the database
-  if (artistIdsToCheck.length > 0) {
-    const { data: existingArtists } = await supabase
-      .from('artists')
-      .select('soundcloud_id')
-      .in('soundcloud_id', artistIdsToCheck)
-
-    if (existingArtists) {
-      for (const artist of existingArtists) {
-        knownArtistIds.add(artist.soundcloud_id)
-      }
-    }
-  }
+  if (!supabase) return
 
   // Deduplicate by soundcloud_id (keep last occurrence)
   const uniqueTracks = [...new Map(tracks.map(t => [t.id, t])).values()]
-  const dbTracks = uniqueTracks.map(t => trackEntryToDbTrack(t, knownArtistIds))
-
-  console.log(`[TrackStorage] Upserting ${uniqueTracks.length} unique tracks`)
-  console.log('[TrackStorage] First track sample:', JSON.stringify(dbTracks[0], null, 2))
+  const dbTracks = uniqueTracks.map(trackEntryToDbTrack)
 
   const { error, data } = await supabase
     .from('tracks')
@@ -159,9 +122,9 @@ export async function upsertTracks(tracks: TrackEntry[], knownArtistIds: Set<num
     .select('soundcloud_id')
 
   if (error) {
-    console.error('[TrackStorage] Failed to upsert tracks:', error.message, error.details, error.hint)
+    logger.db.error('tracks', error.message)
   } else {
-    console.log(`[TrackStorage] Successfully upserted ${data?.length || uniqueTracks.length} tracks`)
+    logger.db.upsert('tracks', data?.length || uniqueTracks.length)
   }
 }
 
@@ -180,7 +143,7 @@ export async function getTrackBySoundcloudId(soundcloudId: number): Promise<DbTr
 
   if (error) {
     if (error.code !== 'PGRST116') {
-      console.error('[TrackStorage] Failed to get track:', error.message)
+      logger.db.error('tracks', error.message)
     }
     return null
   }
@@ -202,7 +165,7 @@ export async function getStoredTracks(limit = 50, offset = 0): Promise<DbTrack[]
     .range(offset, offset + limit - 1)
 
   if (error) {
-    console.error('[TrackStorage] Failed to get tracks:', error.message)
+    logger.db.error('tracks', error.message)
     return []
   }
 
@@ -221,7 +184,7 @@ export async function getTrackCount(): Promise<number> {
     .select('*', { count: 'exact', head: true })
 
   if (error) {
-    console.error('[TrackStorage] Failed to count tracks:', error.message)
+    logger.db.error('tracks', error.message)
     return 0
   }
 

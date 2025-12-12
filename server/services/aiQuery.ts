@@ -1,41 +1,76 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages'
+import { logger } from '~/server/utils/logger'
 
-// Cached system prompt - optimized for token efficiency
-const SYSTEM_PROMPT = `SQL generator for music app. Output ONLY valid PostgreSQL, no markdown.
+// System prompt for SQL generation
+const SYSTEM_PROMPT = `You are a SQL generator for a music search app. Output ONLY valid PostgreSQL. No markdown, no explanation.
 
-TABLES:
-- tracks (soundcloud_id PK, title, artist, artist_id FK, genre, duration ms, download_status, downloadable, playback_count, likes_count, tags TEXT[], soundcloud_created_at, bpm INT, key TEXT)
-- artists (soundcloud_id PK, username, full_name, city, country, followers_count, track_count, genres TEXT[], labels TEXT[], verified BOOL, pro_user BOOL)
+SCHEMA:
+tracks(soundcloud_id PK, title, artist, genre, duration INT ms, download_status TEXT, downloadable BOOL, playback_count INT, likes_count INT, tags TEXT[], soundcloud_created_at TIMESTAMP, bpm INT, key TEXT, label)
 
-JOIN: tracks.artist_id = artists.soundcloud_id
+DEFAULTS:
+- Always SELECT * FROM tracks
+- Always use ILIKE for case-insensitive text matching
+- Default ORDER BY playback_count DESC
+- Default LIMIT 20 (max 50)
 
-RULES:
-- Default tracks: SELECT * FROM tracks, ILIKE for text, LIMIT 20 (max 50), ORDER BY playback_count DESC
-- Default artists: SELECT * FROM artists, ORDER BY followers_count DESC
+GENRES (use these exact values):
+dubstep, melodic dubstep, future bass, trap, house, techno, drum and bass, bass house, riddim, electronic, edm, progressive house, deep house, future house, hybrid trap, midtempo, color bass, lo-fi, ambient, hardcore, hardstyle, trance, psytrance, breakbeat, garage, uk garage, jungle, neurofunk, liquid dnb, minimal, industrial
 
-INTENT DETECTION:
-1) TRACK SEARCH (default): search in tracks table
-   "techno tracks" → SELECT * FROM tracks WHERE genre ILIKE '%techno%'
-2) ARTIST SEARCH ("artists", "producers", "DJs"): search in artists table
-   "french artists" → SELECT * FROM artists WHERE country ILIKE '%france%'
-   "verified dubstep artists" → SELECT * FROM artists WHERE verified = true AND 'dubstep' = ANY(genres)
-3) TRACKS BY ARTIST CRITERIA (join):
-   "tracks from french artists" → SELECT t.* FROM tracks t JOIN artists a ON t.artist_id = a.soundcloud_id WHERE a.country ILIKE '%france%'
-4) SIMILAR ARTISTS ("like X", "similar to"): EXCLUDE mentioned artist
-   "like Wooli" → WHERE genre ILIKE '%dubstep%' AND artist NOT ILIKE '%wooli%'
+SEARCH PATTERNS:
 
-CONTENT TYPES (1min=60000ms):
-- mix/dj set: duration > 900000 (15min+), title NOT ILIKE '%remix%'
-- remix: title ILIKE '%remix%' AND title NOT ILIKE '%original mix%'
-- bootleg/edit: title ILIKE '%bootleg%' OR title ILIKE '%edit%' OR title ILIKE '%flip%'
+1. Genre search:
+   WHERE genre ILIKE '%dubstep%'
 
-DOWNLOAD:
-- Free: download_status IN ('FreeDirectLink','FreeExternalLink')
-- Direct only: download_status = 'FreeDirectLink'
+2. Artist search:
+   WHERE artist ILIKE '%skrillex%'
 
-GENRE/TAG search: (genre ILIKE '%X%' OR EXISTS(SELECT 1 FROM unnest(tags) t WHERE t ILIKE '%X%'))
-ARTIST GENRE: 'X' = ANY(genres) OR EXISTS(SELECT 1 FROM unnest(labels) l WHERE l ILIKE '%X%')`
+3. Title search:
+   WHERE title ILIKE '%memories%'
+
+4. Similar to artist (exclude the artist, search by likely genres):
+   WHERE (genre ILIKE '%melodic dubstep%' OR genre ILIKE '%future bass%') AND artist NOT ILIKE '%artistname%'
+
+5. Free downloads only:
+   WHERE download_status IN ('FreeDirectLink', 'FreeExternalLink')
+
+6. BPM range:
+   WHERE bpm BETWEEN 140 AND 150
+
+7. Key search:
+   WHERE key ILIKE '%C minor%' OR key ILIKE '%Cm%'
+
+8. Recent tracks:
+   ORDER BY soundcloud_created_at DESC
+
+9. Popular tracks:
+   ORDER BY playback_count DESC
+
+10. Duration filters (ms):
+    - Short (<3min): duration < 180000
+    - Normal (3-7min): duration BETWEEN 180000 AND 420000
+    - Long/Mix (>15min): duration > 900000
+
+11. Content types:
+    - Remix: title ILIKE '%remix%'
+    - Original: title NOT ILIKE '%remix%' AND title NOT ILIKE '%bootleg%' AND title NOT ILIKE '%edit%'
+    - Bootleg/Edit: title ILIKE '%bootleg%' OR title ILIKE '%edit%' OR title ILIKE '%flip%'
+    - VIP: title ILIKE '%vip%'
+    - Mix/Set: duration > 900000 AND (title ILIKE '%mix%' OR title ILIKE '%set%')
+
+12. Tag search (combine with genre):
+    WHERE genre ILIKE '%X%' OR '%X%' = ANY(tags)
+
+13. Label search:
+    WHERE label ILIKE '%monstercat%'
+
+14. Combine multiple conditions with AND/OR as needed.
+
+IMPORTANT:
+- For "similar to" or "like [artist]" queries: identify the artist's typical genres and search those, excluding the artist
+- Never invent genres - use only from the list above
+- If unsure about genre, use broader terms like 'electronic' or 'bass'
+- For French queries, translate the intent to SQL (e.g., "morceaux récents" = recent tracks)`
 
 export async function generateSqlQuery(question: string): Promise<string> {
   const config = useRuntimeConfig()
@@ -64,6 +99,12 @@ export async function generateSqlQuery(question: string): Promise<string> {
     messages
   })
 
+  // Log token usage
+  const usage = message.usage
+  const cacheRead = (usage as { cache_read_input_tokens?: number }).cache_read_input_tokens || 0
+  const cacheCreation = (usage as { cache_creation_input_tokens?: number }).cache_creation_input_tokens || 0
+  logger.ai.tokens(usage.input_tokens, usage.output_tokens, cacheRead, cacheCreation)
+
   const content = message.content[0]
   if (content.type !== 'text') {
     throw new Error('Unexpected response type')
@@ -81,10 +122,7 @@ export async function executeAiQuery(question: string): Promise<{ sql: string; r
   const supabaseUrl = config.supabaseUrl as string
   const supabaseKey = config.supabaseKey as string
 
-  console.log('[AiQuery] Supabase config:', { url: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'MISSING', key: supabaseKey ? 'SET' : 'MISSING' })
-
   if (!supabaseUrl || !supabaseKey) {
-    console.warn('[AiQuery] Supabase not configured, skipping')
     return { sql: '', results: [], error: 'Supabase not configured' }
   }
 
@@ -109,5 +147,5 @@ export async function executeAiQuery(question: string): Promise<{ sql: string; r
     return { sql, results: [], error: error.message }
   }
 
-  return { sql, results: data || [] }
+  return { sql, results: Array.isArray(data) ? data : [] }
 }

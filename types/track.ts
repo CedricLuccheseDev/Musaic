@@ -13,7 +13,6 @@ export interface TrackEntry {
   // Basic info
   title: string
   artist: string
-  artist_id: number | null
   artwork: string | null
 
   // Metadata
