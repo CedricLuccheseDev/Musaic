@@ -106,7 +106,7 @@ function formatDuration(ms: number): string {
         >
           {{ track.artist }}
         </a>
-        <div class="mt-0.5 flex items-center gap-2 text-[10px] text-neutral-500 md:mt-1 md:gap-3 md:text-xs">
+        <div class="mt-0.5 flex flex-wrap items-center gap-2 text-[10px] text-neutral-500 md:mt-1 md:gap-3 md:text-xs">
           <span class="flex items-center gap-1">
             <UIcon name="i-heroicons-clock" class="h-3 w-3" />
             {{ formatDuration(track.duration) }}
@@ -114,6 +114,16 @@ function formatDuration(ms: number): string {
           <span v-if="track.playback_count" class="hidden items-center gap-1 sm:flex">
             <UIcon name="i-heroicons-play" class="h-3 w-3" />
             {{ track.playback_count.toLocaleString() }}
+          </span>
+          <!-- BPM -->
+          <span class="flex items-center gap-1" :class="track.bpm ? 'text-violet-400' : 'text-neutral-600'">
+            <span class="font-medium">BPM:</span>
+            {{ track.bpm || '—' }}
+          </span>
+          <!-- Key -->
+          <span class="flex items-center gap-1" :class="track.key ? 'text-cyan-400' : 'text-neutral-600'">
+            <span class="font-medium">Key:</span>
+            {{ track.key || '—' }}
           </span>
         </div>
       </div>

@@ -27,6 +27,7 @@ interface DbTrack {
   permalink_url: string
   title: string
   artist: string
+  artist_id: number | null
   artwork: string | null
   duration: number
   genre: string | null
@@ -34,6 +35,8 @@ interface DbTrack {
   soundcloud_created_at: string | null
   label: string | null
   tags: string[]
+  bpm: number | null
+  key: string | null
   playback_count: number
   likes_count: number
   reposts_count: number
@@ -45,13 +48,17 @@ interface DbTrack {
   purchase_title: string | null
 }
 
-function trackEntryToDbTrack(track: TrackEntry): DbTrack {
+function trackEntryToDbTrack(track: TrackEntry, knownArtistIds: Set<number> = new Set()): DbTrack {
+  // Only set artist_id if we know the artist exists in the database
+  const artistId = track.artist_id && knownArtistIds.has(track.artist_id) ? track.artist_id : null
+
   return {
     soundcloud_id: track.id,
     urn: track.urn,
     permalink_url: track.permalink_url,
     title: track.title,
     artist: track.artist,
+    artist_id: artistId,
     artwork: track.artwork,
     duration: track.duration,
     genre: track.genre,
@@ -59,6 +66,8 @@ function trackEntryToDbTrack(track: TrackEntry): DbTrack {
     soundcloud_created_at: track.created_at,
     label: track.label,
     tags: track.tags,
+    bpm: track.bpm,
+    key: track.key,
     playback_count: track.playback_count,
     likes_count: track.likes_count,
     reposts_count: track.reposts_count,
@@ -97,26 +106,62 @@ export async function upsertTrack(track: TrackEntry): Promise<void> {
 /**
  * Upsert multiple tracks into the database
  * Uses batch upsert for efficiency
+ * Deduplicates by soundcloud_id to avoid ON CONFLICT errors
  */
-export async function upsertTracks(tracks: TrackEntry[]): Promise<void> {
-  if (tracks.length === 0) return
+export async function upsertTracks(tracks: TrackEntry[], knownArtistIds: Set<number> = new Set()): Promise<void> {
+  console.log(`[TrackStorage] upsertTracks called with ${tracks.length} tracks`)
+
+  if (tracks.length === 0) {
+    console.log('[TrackStorage] No tracks to upsert')
+    return
+  }
 
   const supabase = getSupabaseClient()
-  if (!supabase) return
+  if (!supabase) {
+    console.log('[TrackStorage] Supabase client not available, skipping')
+    return
+  }
 
-  const dbTracks = tracks.map(trackEntryToDbTrack)
+  // Get all unique artist IDs from tracks that we don't already know about
+  const artistIdsToCheck = [...new Set(
+    tracks
+      .map(t => t.artist_id)
+      .filter((id): id is number => id !== null && !knownArtistIds.has(id))
+  )]
 
-  const { error } = await supabase
+  // Check which artists exist in the database
+  if (artistIdsToCheck.length > 0) {
+    const { data: existingArtists } = await supabase
+      .from('artists')
+      .select('soundcloud_id')
+      .in('soundcloud_id', artistIdsToCheck)
+
+    if (existingArtists) {
+      for (const artist of existingArtists) {
+        knownArtistIds.add(artist.soundcloud_id)
+      }
+    }
+  }
+
+  // Deduplicate by soundcloud_id (keep last occurrence)
+  const uniqueTracks = [...new Map(tracks.map(t => [t.id, t])).values()]
+  const dbTracks = uniqueTracks.map(t => trackEntryToDbTrack(t, knownArtistIds))
+
+  console.log(`[TrackStorage] Upserting ${uniqueTracks.length} unique tracks`)
+  console.log('[TrackStorage] First track sample:', JSON.stringify(dbTracks[0], null, 2))
+
+  const { error, data } = await supabase
     .from('tracks')
     .upsert(dbTracks, {
       onConflict: 'soundcloud_id',
       ignoreDuplicates: false
     })
+    .select('soundcloud_id')
 
   if (error) {
-    console.error('[TrackStorage] Failed to upsert tracks:', error.message)
+    console.error('[TrackStorage] Failed to upsert tracks:', error.message, error.details, error.hint)
   } else {
-    console.log(`[TrackStorage] Upserted ${tracks.length} tracks`)
+    console.log(`[TrackStorage] Successfully upserted ${data?.length || uniqueTracks.length} tracks`)
   }
 }
 

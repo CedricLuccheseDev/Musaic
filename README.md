@@ -6,70 +6,107 @@ L'outil de recherche musicale pour DJs et producteurs.
 
 ## Description
 
-Musaic permet de rechercher un titre et de savoir instantanément où le télécharger : gratuitement si disponible, ou via un lien d'achat sinon.
+Musaic permet de rechercher un titre et de savoir instantanément où le télécharger : gratuitement si disponible, ou via un lien d'achat sinon. L'application propose également une recherche intelligente par IA pour explorer la base de données avec des questions en langage naturel.
 
 ## Fonctionnalités
 
-### MVP
+### Recherche de tracks
 
 - Barre de recherche par titre ou artiste
-- Détection automatique des free downloads (SoundCloud)
-- Lien d'achat si pas de téléchargement gratuit
-- Lien YouTube Converter (utilisateurs privilégiés)
+- Résultats paginés avec scroll infini (500 résultats max)
+- Détection automatique des profils artistes
+- Filtres : afficher/masquer tracks ou artistes, filtrer par statut de téléchargement
 
-### V2
+### Détection des téléchargements
 
-- Authentification utilisateur
-- Historique de recherche
-- Base communautaire de free downloads + signalement liens morts
-- Métadonnées (BPM, Key, Genre, Camelot)
+- **Download direct** : Track téléchargeable gratuitement depuis SoundCloud
+- **Free Link** : Lien externe gratuit (Hypeddit, etc.)
+- **Achat** : Lien vers la plateforme d'achat
 
-### V3
+### Recherche IA
 
-- Rechercher par genre, BPM, Key
+- Questions en langage naturel ("Trouve-moi des remixes de Drake", "DJ mixes de plus de 30 minutes")
+- Conversion automatique en requêtes SQL via Claude AI
+- Distinction intelligente entre DJ mixes (15+ min) et remixes (3-7 min)
+- Recherche par genre, artiste, durée, statut de téléchargement
 
-## Utilisation
+### Profils artistes
 
-1. Rechercher un titre ou artiste
-2. Consulter les résultats avec leur statut :
-   - 🟢 Free Download disponible
-   - 🟡 Achat uniquement
-3. Cliquer sur le lien correspondant
+- Détection automatique si la recherche correspond à un artiste
+- Affichage de l'avatar, nombre de followers
+- Liste des 20 premiers tracks de l'artiste
+
+### Autres fonctionnalités
+
+- Authentification Google (Supabase Auth)
+- Interface bilingue FR/EN
+- Stockage automatique des tracks recherchés en base de données
 
 ## Stack technique
 
-- **Framework** : Nuxt
-- **Backend** : Firebase (Auth + Firestore)
-- **API** : soundcloud.ts (SoundCloud v2)
+- **Framework** : Nuxt 3
+- **UI** : Nuxt UI, Tailwind CSS
+- **Backend** : Supabase (Auth + PostgreSQL)
+- **APIs** :
+  - soundcloud.ts (SoundCloud v2)
+  - Anthropic Claude 3.5 Haiku (recherche IA)
+- **Langage** : TypeScript
 
 ## Architecture
 
 ```
 Recherche utilisateur
        ↓
-   SoundCloud API (soundcloud.ts)
-       ↓
-   Pour chaque track :
-       ├─ downloadable = true ? → 🟢 Free DL (download_url)
-       └─ purchase_url existe ?
-              ├─ purchase_title contient "free" → 🟢 Free DL
-              └─ Sinon → 🟡 Lien d'achat
+   ┌───────────────────────────────────────┐
+   │                                       │
+   ▼                                       ▼
+SoundCloud API                        Claude AI
+   │                                       │
+   ▼                                       ▼
+Tracks + Artistes détectés           SQL généré
+   │                                       │
+   └──────────────┬────────────────────────┘
+                  ▼
+            Supabase DB
+                  │
+   ┌──────────────┼──────────────┐
+   ▼              ▼              ▼
+🟢 Free DL   🟢 Free Link   🟡 Achat
 ```
 
-## Permissions
+### Détection du statut de téléchargement
 
-| Fonctionnalité | Public | Privilégié |
-|----------------|--------|------------|
-| Recherche | ✓ | ✓ |
-| Free Download | ✓ | ✓ |
-| Lien d'achat | ✓ | ✓ |
-| YouTube Converter | ✗ | ✓ |
+```
+Pour chaque track :
+    ├─ downloadable = true ? → 🟢 Free DL (download_url)
+    └─ purchase_url existe ?
+           ├─ purchase_title contient "free" → 🟢 Free Link
+           └─ Sinon → 🟡 Lien d'achat
+```
 
 ## Installation
 
 ```bash
 npm install
 npm run dev
+```
+
+## Scripts disponibles
+
+```bash
+npm run dev          # Serveur de développement
+npm run build        # Build production
+npm run lint         # Vérification ESLint
+npm run test         # Test API SoundCloud
+npm run test:supabase # Test API Supabase
+```
+
+## Variables d'environnement
+
+```env
+SUPABASE_URL=
+SUPABASE_KEY=
+ANTHROPIC_API_KEY=
 ```
 
 ## Licence

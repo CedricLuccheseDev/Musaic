@@ -1,5 +1,6 @@
 import SoundcloudModule from 'soundcloud.ts'
 import { DownloadStatus, type TrackEntry } from '~/types/track'
+import type { ArtistEntry } from '~/types/artist'
 
 // ============================================================================
 // Types
@@ -32,17 +33,33 @@ interface SoundcloudUserSearchResponse {
 interface SoundcloudUser {
   id: number
   username: string
-  avatar_url: string
-  followers_count: number
-  track_count: number
   permalink_url: string
+  avatar_url: string
+  full_name?: string
+  description?: string
+  city?: string
+  country_code?: string
+  followers_count: number
+  followings_count?: number
+  track_count: number
+  playlist_count?: number
+  likes_count?: number
+  reposts_count?: number
+  visuals?: {
+    visuals?: Array<{
+      visual_url?: string
+    }>
+  }
+  verified?: boolean
+  creator_subscriptions?: Array<{ product?: { id?: string } }>
+  created_at?: string
 }
 
 interface SoundcloudTrack {
   id: number
   urn: string
   title: string
-  user?: { username: string }
+  user?: { id: number; username: string }
   artwork_url?: string
   permalink_url: string
   duration: number
@@ -69,6 +86,31 @@ const SEARCH_LIMIT = 25
 const ARTIST_TRACKS_LIMIT = 20
 const FREE_KEYWORDS = ['free download', 'free dl', 'freedl', 'free']
 
+const FREE_DOWNLOAD_DOMAINS = [
+  'hypeddit.com',
+  'toneden.io',
+  'fanlink.to',
+  'linktr.ee',
+  'gate.fm',
+  'distrokid.com',
+  'smarturl.it',
+  'ffm.to',
+  'bfrnd.link',
+  'edmdisc.com'
+]
+
+const PURCHASE_DOMAINS = [
+  'beatport.com',
+  'bandcamp.com',
+  'traxsource.com',
+  'junodownload.com',
+  'amazon.com',
+  'itunes.apple.com',
+  'music.apple.com',
+  'spotify.com',
+  'deezer.com'
+]
+
 // ============================================================================
 // Client
 // ============================================================================
@@ -82,6 +124,26 @@ const Soundcloud = (
 // Helpers
 // ============================================================================
 
+function extractUrlsFromText(text: string): string[] {
+  const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi
+  return text.match(urlRegex) || []
+}
+
+function hasFreeDownloadLink(text: string): boolean {
+  const urls = extractUrlsFromText(text)
+  return urls.some(url =>
+    FREE_DOWNLOAD_DOMAINS.some(domain => url.toLowerCase().includes(domain))
+  )
+}
+
+function hasPurchaseLink(text: string): string | null {
+  const urls = extractUrlsFromText(text)
+  const purchaseUrl = urls.find(url =>
+    PURCHASE_DOMAINS.some(domain => url.toLowerCase().includes(domain))
+  )
+  return purchaseUrl || null
+}
+
 function getDownloadStatus(track: SoundcloudTrack): DownloadStatus {
   if (track.downloadable) {
     return DownloadStatus.FreeDirectLink
@@ -94,7 +156,27 @@ function getDownloadStatus(track: SoundcloudTrack): DownloadStatus {
     }
   }
 
+  if (track.purchase_url && FREE_DOWNLOAD_DOMAINS.some(domain => track.purchase_url!.toLowerCase().includes(domain))) {
+    return DownloadStatus.FreeExternalLink
+  }
+
+  if (track.description && hasFreeDownloadLink(track.description)) {
+    return DownloadStatus.FreeExternalLink
+  }
+
   return DownloadStatus.No
+}
+
+function extractPurchaseUrl(track: SoundcloudTrack): string | null {
+  if (track.purchase_url) {
+    return track.purchase_url
+  }
+
+  if (track.description) {
+    return hasPurchaseLink(track.description)
+  }
+
+  return null
 }
 
 function parseTags(tagList?: string): string[] {
@@ -102,13 +184,167 @@ function parseTags(tagList?: string): string[] {
   return tagList.split(' ').filter(tag => tag.length > 0)
 }
 
+const SOCIAL_PATTERNS = {
+  instagram: /(?:instagram\.com|instagr\.am)\/([a-zA-Z0-9_.]+)/i,
+  twitter: /(?:twitter\.com|x\.com)\/([a-zA-Z0-9_]+)/i,
+  facebook: /facebook\.com\/([a-zA-Z0-9.]+)/i,
+  spotify: /open\.spotify\.com\/artist\/([a-zA-Z0-9]+)/i,
+  youtube: /(?:youtube\.com\/(?:c\/|channel\/|user\/|@)?([a-zA-Z0-9_-]+))/i
+}
+
+const BPM_PATTERNS = [
+  /(\d{2,3})\s*bpm/i,
+  /bpm\s*[:|-]?\s*(\d{2,3})/i,
+  /tempo\s*[:|-]?\s*(\d{2,3})/i,
+  /(\d{2,3})\s*beats?\s*per\s*min/i
+]
+
+const KEY_PATTERNS = [
+  /\b([A-G][#b]?)\s*(maj|min|major|minor|m)?\b/i,
+  /key\s*[:|-]?\s*([A-G][#b]?)\s*(maj|min|major|minor|m)?/i,
+  /\b(\d{1,2}[AB])\b/i
+]
+
+const VALID_KEYS = [
+  'C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B',
+  'Cm', 'C#m', 'Dbm', 'Dm', 'D#m', 'Ebm', 'Em', 'Fm', 'F#m', 'Gbm', 'Gm', 'G#m', 'Abm', 'Am', 'A#m', 'Bbm', 'Bm',
+  '1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B', '5A', '5B', '6A', '6B',
+  '7A', '7B', '8A', '8B', '9A', '9B', '10A', '10B', '11A', '11B', '12A', '12B'
+]
+
+function extractBpm(text: string): number | null {
+  for (const pattern of BPM_PATTERNS) {
+    const match = text.match(pattern)
+    if (match) {
+      const bpm = parseInt(match[1], 10)
+      if (bpm >= 60 && bpm <= 200) {
+        return bpm
+      }
+    }
+  }
+  return null
+}
+
+function extractKey(text: string): string | null {
+  for (const pattern of KEY_PATTERNS) {
+    const match = text.match(pattern)
+    if (match) {
+      let key = match[1]
+      const modifier = match[2]?.toLowerCase()
+
+      if (modifier === 'min' || modifier === 'minor' || modifier === 'm') {
+        key = key + 'm'
+      }
+
+      if (VALID_KEYS.includes(key) || VALID_KEYS.includes(key.toUpperCase())) {
+        return key.toUpperCase()
+      }
+    }
+  }
+  return null
+}
+
+function extractAudioMetadata(track: SoundcloudTrack): { bpm: number | null; key: string | null } {
+  const searchText = [
+    track.title || '',
+    track.description || '',
+    track.tag_list || ''
+  ].join(' ')
+
+  return {
+    bpm: extractBpm(searchText),
+    key: extractKey(searchText)
+  }
+}
+
+function extractSocialLinks(description: string | undefined): {
+  website_url: string | null
+  instagram_url: string | null
+  twitter_url: string | null
+  facebook_url: string | null
+  spotify_url: string | null
+  youtube_url: string | null
+} {
+  const result = {
+    website_url: null as string | null,
+    instagram_url: null as string | null,
+    twitter_url: null as string | null,
+    facebook_url: null as string | null,
+    spotify_url: null as string | null,
+    youtube_url: null as string | null
+  }
+
+  if (!description) return result
+
+  const urls = extractUrlsFromText(description)
+
+  for (const url of urls) {
+    const lowerUrl = url.toLowerCase()
+
+    if (SOCIAL_PATTERNS.instagram.test(url) && !result.instagram_url) {
+      result.instagram_url = url
+    } else if (SOCIAL_PATTERNS.twitter.test(url) && !result.twitter_url) {
+      result.twitter_url = url
+    } else if (SOCIAL_PATTERNS.facebook.test(url) && !result.facebook_url) {
+      result.facebook_url = url
+    } else if (SOCIAL_PATTERNS.spotify.test(url) && !result.spotify_url) {
+      result.spotify_url = url
+    } else if (SOCIAL_PATTERNS.youtube.test(url) && !result.youtube_url) {
+      result.youtube_url = url
+    } else if (
+      !result.website_url &&
+      !FREE_DOWNLOAD_DOMAINS.some(d => lowerUrl.includes(d)) &&
+      !PURCHASE_DOMAINS.some(d => lowerUrl.includes(d)) &&
+      !lowerUrl.includes('soundcloud.com')
+    ) {
+      result.website_url = url
+    }
+  }
+
+  return result
+}
+
+export function mapToArtistEntry(user: SoundcloudUser): ArtistEntry {
+  const socialLinks = extractSocialLinks(user.description)
+  const bannerUrl = user.visuals?.visuals?.[0]?.visual_url || null
+  const isPro = user.creator_subscriptions?.some(sub => sub.product?.id) || false
+
+  return {
+    id: user.id,
+    permalink_url: user.permalink_url,
+    username: user.username,
+    full_name: user.full_name || null,
+    avatar_url: user.avatar_url || null,
+    banner_url: bannerUrl,
+    description: user.description || null,
+    city: user.city || null,
+    country: user.country_code || null,
+    followers_count: user.followers_count || 0,
+    followings_count: user.followings_count || 0,
+    track_count: user.track_count || 0,
+    playlist_count: user.playlist_count || 0,
+    likes_count: user.likes_count || 0,
+    reposts_count: user.reposts_count || 0,
+    ...socialLinks,
+    genres: [],
+    labels: [],
+    artist_type: null,
+    verified: user.verified || false,
+    pro_user: isPro,
+    created_at: user.created_at || null
+  }
+}
+
 function mapToTrackEntry(track: SoundcloudTrack): TrackEntry {
+  const audioMetadata = extractAudioMetadata(track)
+
   return {
     id: track.id,
     urn: track.urn || `soundcloud:tracks:${track.id}`,
     permalink_url: track.permalink_url,
     title: track.title,
     artist: track.user?.username || 'Unknown',
+    artist_id: track.user?.id || null,
     artwork: track.artwork_url?.replace('-large', '-t300x300') || null,
     duration: track.duration,
     genre: track.genre || null,
@@ -116,6 +352,8 @@ function mapToTrackEntry(track: SoundcloudTrack): TrackEntry {
     created_at: track.created_at || null,
     label: track.label_name || null,
     tags: parseTags(track.tag_list),
+    bpm: audioMetadata.bpm,
+    key: audioMetadata.key,
     playback_count: track.playback_count || 0,
     likes_count: track.likes_count || 0,
     reposts_count: track.reposts_count || 0,
@@ -123,7 +361,7 @@ function mapToTrackEntry(track: SoundcloudTrack): TrackEntry {
     downloadStatus: getDownloadStatus(track),
     downloadable: track.downloadable || false,
     download_url: track.download_url || null,
-    purchase_url: track.purchase_url || null,
+    purchase_url: extractPurchaseUrl(track),
     purchase_title: track.purchase_title || null
   }
 }

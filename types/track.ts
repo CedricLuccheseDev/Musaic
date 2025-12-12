@@ -13,6 +13,7 @@ export interface TrackEntry {
   // Basic info
   title: string
   artist: string
+  artist_id: number | null
   artwork: string | null
 
   // Metadata
@@ -22,6 +23,10 @@ export interface TrackEntry {
   created_at: string | null
   label: string | null
   tags: string[]
+
+  // Audio metadata (extracted from description/tags/title)
+  bpm: number | null
+  key: string | null
 
   // Stats
   playback_count: number

@@ -25,7 +25,7 @@ function onSearch() {
       <!-- Logo - Left -->
       <div class="flex justify-start">
         <NuxtLink to="/" class="group transition-transform hover:scale-105">
-          <Logo size="md" />
+          <AppLogo size="md" />
         </NuxtLink>
       </div>
 
@@ -53,7 +53,7 @@ function onSearch() {
       <!-- Top row: Logo + Profile -->
       <div class="flex items-center justify-between">
         <NuxtLink to="/">
-          <Logo size="sm" />
+          <AppLogo size="sm" />
         </NuxtLink>
         <div class="flex items-center gap-2">
           <LangSwitch size="sm" />
