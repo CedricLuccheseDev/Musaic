@@ -134,10 +134,18 @@ const Soundcloud = (
   SoundcloudModule
 ) as SoundcloudConstructorWithClientId
 
+// Proxy URL for production (bypasses IP blocking from datacenters)
+const PROXY_URL = 'https://corsproxy.io/?'
+
 function createSoundcloudClient(): SoundcloudInstance {
   const config = useRuntimeConfig()
-  if (config.soundcloudClientId) {
-    return new Soundcloud(config.soundcloudClientId)
+  const clientId = config.soundcloudClientId as string
+  const useProxy = !!clientId // Use proxy in production (when client ID is set)
+
+  console.log(`[SoundCloud] Client ID: ${clientId ? 'yes (' + clientId.slice(0, 8) + '...)' : 'NO'}, Proxy: ${useProxy ? 'yes' : 'no'}`)
+
+  if (clientId) {
+    return new Soundcloud(clientId, undefined, useProxy ? { proxy: PROXY_URL } : undefined)
   }
   // Fallback to auto-fetch (works in dev, may fail in prod)
   return new Soundcloud()
