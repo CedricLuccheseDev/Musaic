@@ -95,12 +95,12 @@ function formatDuration(ms: number): string {
       @click="handleCardClick"
     >
       <!-- Artist badge (when track is from detected artist) -->
-      <UTooltip v-if="isFromDetectedArtist && detectedArtist" :text="`Track de ${detectedArtist.username}`">
+      <UTooltip v-if="isFromDetectedArtist && props.detectedArtist" :text="`Track de ${props.detectedArtist.username}`">
         <div class="relative -mr-1 h-8 w-8 shrink-0 overflow-hidden rounded-full ring-2 ring-cyan-500/50 md:-mr-2 md:h-10 md:w-10">
           <img
-            v-if="detectedArtist.avatar_url"
-            :src="detectedArtist.avatar_url"
-            :alt="detectedArtist.username"
+            v-if="props.detectedArtist.avatar_url"
+            :src="props.detectedArtist.avatar_url"
+            :alt="props.detectedArtist.username"
             class="h-full w-full object-cover"
           >
           <div v-else class="flex h-full w-full items-center justify-center bg-cyan-900">

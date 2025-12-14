@@ -7,8 +7,7 @@ const filter = defineModel<FilterType>('filter', { default: 'all' })
 </script>
 
 <template>
-  <div class="flex items-center justify-end py-4">
-    <div class="flex items-center gap-1">
+  <div class="flex items-center gap-1">
       <button
         type="button"
         class="flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200"
@@ -41,6 +40,5 @@ const filter = defineModel<FilterType>('filter', { default: 'all' })
         <UIcon name="i-heroicons-shopping-cart" class="h-4 w-4" />
         {{ t.paid }}
       </button>
-    </div>
   </div>
 </template>
