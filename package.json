@@ -14,7 +14,10 @@
     "test": "npx tsx tests/soundcloud.test.ts",
     "test:supabase": "npx tsx --env-file=.env tests/supabase.test.ts",
     "test:all": "npm run test && npm run test:supabase",
-    "seed": "npx tsx --env-file=.env scripts/seed-database.ts"
+    "seed": "npx tsx --env-file=.env scripts/seed-database.ts",
+    "release": "npm version patch && git push && git push --tags",
+    "release:minor": "npm version minor && git push && git push --tags",
+    "release:major": "npm version major && git push && git push --tags"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

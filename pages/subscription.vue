@@ -29,14 +29,13 @@ watch(user, (u) => {
 
     <!-- Header -->
     <PageHeader class="relative z-10">
-      <template #left>
+      <template #back>
         <button
           type="button"
-          class="inline-flex cursor-pointer items-center gap-2 text-sm text-neutral-400 transition-colors hover:text-white"
+          class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-neutral-700 text-neutral-400 transition-all hover:border-violet-500 hover:text-white"
           @click="router.back()"
         >
           <UIcon name="i-heroicons-arrow-left" class="h-4 w-4" />
-          <span>{{ t.profileBack }}</span>
         </button>
       </template>
     </PageHeader>
