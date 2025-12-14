@@ -90,7 +90,7 @@ onMounted(() => {
       class="fixed inset-x-0 bottom-0 z-50"
     >
       <div class="border-t border-white/10 bg-neutral-950/95 backdrop-blur-xl">
-        <div class="flex items-center gap-4 px-4 py-3 sm:px-6">
+        <div class="flex items-center gap-2 px-3 py-2.5 sm:gap-4 sm:px-6 sm:py-3">
           <!-- Left: Track info (hidden on mobile) -->
           <div class="hidden shrink-0 items-center gap-3 sm:flex">
             <div class="h-10 w-10 shrink-0 overflow-hidden rounded-lg shadow-lg">
@@ -104,7 +104,7 @@ onMounted(() => {
                 <UIcon name="i-heroicons-musical-note" class="h-4 w-4 text-neutral-600" />
               </div>
             </div>
-            <div class="w-32 min-w-0 md:w-40 lg:w-48">
+            <div class="min-w-0 sm:w-28 md:w-40 lg:w-48">
               <p class="truncate text-sm font-medium text-white">{{ currentTrack.title }}</p>
               <p class="truncate text-xs text-neutral-500">{{ currentTrack.artist }}</p>
             </div>

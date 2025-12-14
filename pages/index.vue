@@ -21,7 +21,7 @@ async function search() {
       <div
         v-motion
         :initial="{ opacity: 0, scale: 0.8, filter: 'blur(10px)' }"
-        :enter="{ opacity: 1, scale: 1, filter: 'blur(0px)', transition: { type: 'spring', stiffness: 100, damping: 15, delay: 200 } }"
+        :enter="{ opacity: 1, scale: 1, filter: 'blur(0px)', transition: { type: 'spring', stiffness: 120, damping: 15, delay: 100 } }"
         class="mb-3 md:mb-4"
       >
         <AppLogo size="lg" />
@@ -31,7 +31,7 @@ async function search() {
       <p
         v-motion
         :initial="{ opacity: 0, y: 30 }"
-        :enter="{ opacity: 1, y: 0, transition: { type: 'spring', stiffness: 80, damping: 12, delay: 500 } }"
+        :enter="{ opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100, damping: 12, delay: 250 } }"
         class="mb-8 text-center text-base text-neutral-400 md:mb-12 md:text-lg"
       >
         {{ t.tagline }}
@@ -41,7 +41,7 @@ async function search() {
       <div
         v-motion
         :initial="{ opacity: 0, y: 40, scale: 0.9 }"
-        :enter="{ opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 100, damping: 15, delay: 700 } }"
+        :enter="{ opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 120, damping: 15, delay: 400 } }"
         class="w-full max-w-2xl px-2"
       >
         <SearchBar

@@ -140,9 +140,10 @@ const PROXY_URL = 'https://corsproxy.io/?'
 function createSoundcloudClient(): SoundcloudInstance {
   const config = useRuntimeConfig()
   const clientId = config.soundcloudClientId as string
-  const useProxy = !!clientId // Use proxy in production (when client ID is set)
+  const isDev = process.env.NODE_ENV === 'development'
+  const useProxy = !!clientId && !isDev // Use proxy in production only
 
-  console.log(`[SoundCloud] Client ID: ${clientId ? 'yes (' + clientId.slice(0, 8) + '...)' : 'NO'}, Proxy: ${useProxy ? 'yes' : 'no'}`)
+  console.log(`[SoundCloud] Client ID: ${clientId ? 'yes (' + clientId.slice(0, 8) + '...)' : 'NO'}, Proxy: ${useProxy ? 'yes' : 'no'}, Env: ${isDev ? 'dev' : 'prod'}`)
 
   if (clientId) {
     return new Soundcloud(clientId, undefined, useProxy ? { proxy: PROXY_URL } : undefined)
