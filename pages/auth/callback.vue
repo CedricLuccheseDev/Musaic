@@ -2,8 +2,10 @@
 // OAuth callback page - closes popup after auth completes
 import { createClient } from '@supabase/supabase-js'
 
+/* --- States --- */
 const config = useRuntimeConfig()
 
+/* --- Lifecycle --- */
 onMounted(async () => {
   const url = config.public.supabaseUrl
   const key = config.public.supabaseAnonKey

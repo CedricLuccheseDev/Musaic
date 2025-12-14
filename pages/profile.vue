@@ -1,18 +1,14 @@
 <script setup lang="ts">
+/* --- States --- */
 const { t } = useI18n()
 const { user, loading, signOut } = useAuth()
 const router = useRouter()
+const version = __APP_VERSION__
+const showTerms = ref(false)
+type Tab = 'profile' | 'contact'
+const activeTab = ref<Tab>('profile')
 
-// Redirect if not logged in
-watch(user, (u) => {
-  if (!loading.value && !u) router.push('/login')
-}, { immediate: true })
-
-async function handleSignOut() {
-  await signOut()
-  router.push('/')
-}
-
+/* --- Computed --- */
 const memberSince = computed(() => {
   if (!user.value?.created_at) return ''
   return new Date(user.value.created_at).toLocaleDateString()
@@ -22,11 +18,16 @@ const provider = computed(() => {
   return user.value?.app_metadata?.provider || 'email'
 })
 
-const version = __APP_VERSION__
-const showTerms = ref(false)
+/* --- Methods --- */
+async function handleSignOut() {
+  await signOut()
+  router.push('/')
+}
 
-type Tab = 'profile' | 'contact'
-const activeTab = ref<Tab>('profile')
+/* --- Watchers --- */
+watch(user, (u) => {
+  if (!loading.value && !u) router.push('/login')
+}, { immediate: true })
 </script>
 
 <template>
@@ -43,7 +44,7 @@ const activeTab = ref<Tab>('profile')
         <button
           type="button"
           class="inline-flex cursor-pointer items-center gap-2 text-sm text-neutral-400 transition-colors hover:text-white"
-          @click="navigateTo('/')"
+          @click="router.back()"
         >
           <UIcon name="i-heroicons-arrow-left" class="h-4 w-4" />
           <span>{{ t.profileBack }}</span>
@@ -52,54 +53,73 @@ const activeTab = ref<Tab>('profile')
     </PageHeader>
 
     <!-- Main -->
-    <main class="relative z-10 flex flex-1 items-center justify-center px-4 py-8">
+    <main class="relative z-10 flex flex-1 items-start justify-center px-4 py-8 md:pt-16">
       <div v-if="loading" class="flex items-center justify-center">
         <UIcon name="i-heroicons-arrow-path" class="h-8 w-8 animate-spin text-violet-500" />
       </div>
 
       <div v-else-if="user" class="mx-auto w-full max-w-3xl">
-        <div class="flex flex-col gap-6 md:flex-row md:items-start md:justify-center md:gap-8">
+        <div class="flex flex-col gap-6 md:flex-row md:items-stretch md:gap-8">
           <!-- Sidebar Menu -->
-          <nav class="flex flex-row justify-center gap-2 md:h-full md:w-48 md:shrink-0 md:flex-col md:justify-between">
-            <div class="flex flex-row gap-2 md:flex-col">
+          <nav class="flex flex-row justify-center gap-2 md:w-52 md:shrink-0 md:flex-col md:justify-between">
+            <div class="flex flex-row gap-1 rounded-xl border border-neutral-800/50 bg-neutral-900/50 p-1.5 backdrop-blur-sm md:flex-col md:gap-1">
               <button
                 type="button"
-                class="flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200"
-                :class="activeTab === 'profile' ? 'bg-violet-600/20 text-violet-400' : 'text-neutral-400 hover:text-white'"
+                class="group relative flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200"
+                :class="activeTab === 'profile' ? 'bg-violet-600/20 text-white shadow-lg shadow-violet-500/10' : 'text-neutral-400 hover:bg-neutral-800/50 hover:text-white'"
                 @click="activeTab = 'profile'"
               >
-                <UIcon name="i-heroicons-user" class="h-5 w-5" />
+                <div
+                  v-if="activeTab === 'profile'"
+                  class="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-violet-500 md:left-0"
+                />
+                <UIcon name="i-heroicons-user" class="h-5 w-5" :class="activeTab === 'profile' ? 'text-violet-400' : 'text-neutral-500 group-hover:text-neutral-300'" />
                 <span>{{ t.profileMenu }}</span>
               </button>
               <button
                 type="button"
-                class="flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200"
-                :class="activeTab === 'contact' ? 'bg-violet-600/20 text-violet-400' : 'text-neutral-400 hover:text-white'"
+                class="group relative flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200"
+                :class="activeTab === 'contact' ? 'bg-violet-600/20 text-white shadow-lg shadow-violet-500/10' : 'text-neutral-400 hover:bg-neutral-800/50 hover:text-white'"
                 @click="activeTab = 'contact'"
               >
-                <UIcon name="i-heroicons-envelope" class="h-5 w-5" />
+                <div
+                  v-if="activeTab === 'contact'"
+                  class="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-violet-500 md:left-0"
+                />
+                <UIcon name="i-heroicons-envelope" class="h-5 w-5" :class="activeTab === 'contact' ? 'text-violet-400' : 'text-neutral-500 group-hover:text-neutral-300'" />
                 <span>{{ t.contactTitle }}</span>
+              </button>
+              <button
+                type="button"
+                class="group relative flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 text-neutral-400 hover:bg-neutral-800/50 hover:text-white"
+                @click="navigateTo('/subscription')"
+              >
+                <UIcon name="i-heroicons-sparkles" class="h-5 w-5 text-amber-500" />
+                <span>{{ t.subscriptionTitle }}</span>
               </button>
             </div>
 
             <!-- Footer links in sidebar -->
-            <div class="hidden flex-col gap-2 md:flex">
+            <div class="hidden flex-col gap-3 pt-4 md:flex">
               <button
                 type="button"
-                class="flex cursor-pointer items-center gap-3 rounded-lg px-4 py-2 text-sm text-neutral-500 transition-colors hover:text-violet-400"
+                class="group flex cursor-pointer items-center gap-2 px-2 text-xs text-neutral-500 transition-colors hover:text-violet-400"
                 @click="showTerms = true"
               >
-                <UIcon name="i-heroicons-document-text" class="h-4 w-4" />
+                <UIcon name="i-heroicons-document-text" class="h-3.5 w-3.5" />
                 <span>{{ t.termsLink }}</span>
               </button>
-              <p class="px-4 text-xs text-neutral-600">
+              <p class="px-2 text-xs text-neutral-600">
                 v{{ version }}
               </p>
             </div>
           </nav>
 
+          <!-- Vertical Divider -->
+          <div class="hidden w-px bg-linear-to-b from-transparent via-violet-500/30 to-transparent md:block" />
+
           <!-- Content Section -->
-          <div class="flex-1 md:max-w-md">
+          <div class="min-h-[400px] flex-1 rounded-2xl border border-neutral-800/50 bg-neutral-900/30 p-6 backdrop-blur-sm md:max-w-md">
             <!-- Profile Section -->
             <div v-if="activeTab === 'profile'">
               <!-- Avatar -->

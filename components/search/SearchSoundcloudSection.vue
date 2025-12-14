@@ -2,6 +2,7 @@
 import type { TrackEntry } from '~/types/track'
 import type { ArtistInfo } from '~/server/services/soundcloud'
 
+/* --- Props --- */
 const props = defineProps<{
   loading: boolean
   results: TrackEntry[]
@@ -11,9 +12,17 @@ const props = defineProps<{
   detectedArtist?: ArtistInfo
 }>()
 
-const { t } = useI18n()
+/* --- Constants --- */
+const AD_INTERVAL = 10
 
+/* --- States --- */
+const { t } = useI18n()
 const collapsed = ref(false)
+
+/* --- Methods --- */
+function shouldShowAd(index: number): boolean {
+  return index > 0 && (index + 1) % AD_INTERVAL === 0
+}
 </script>
 
 <template>
@@ -65,14 +74,15 @@ const collapsed = ref(false)
         leave-to-class="opacity-0 max-h-0"
       >
         <div v-if="!collapsed" class="space-y-2 overflow-hidden pb-4 pt-2">
-          <SearchTrackCard
-            v-for="(track, index) in results"
-            :key="track.id"
-            :track="track"
-            :index="index"
-            :skip-animation="index >= props.initialBatchSize"
-            :detected-artist="props.detectedArtist"
-          />
+          <template v-for="(track, index) in results" :key="track.id">
+            <SearchTrackCard
+              :track="track"
+              :index="index"
+              :skip-animation="index >= props.initialBatchSize"
+              :detected-artist="props.detectedArtist"
+            />
+            <AdBanner v-if="shouldShowAd(index)" />
+          </template>
 
           <div v-if="hasMore || isLoadingMore" class="flex justify-center py-8">
             <UIcon name="i-heroicons-arrow-path" class="h-6 w-6 animate-spin text-muted" />

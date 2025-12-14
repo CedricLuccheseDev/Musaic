@@ -1,4 +1,5 @@
 <script setup lang="ts">
+/* --- Props --- */
 const props = withDefaults(defineProps<{
   size?: 'default' | 'large'
   loading?: boolean
@@ -7,23 +8,14 @@ const props = withDefaults(defineProps<{
   loading: false
 })
 
-const { t } = useI18n()
-
-const searchInput = defineModel<string>('modelValue', { default: '' })
-
+/* --- Emits --- */
 const emit = defineEmits<{
   search: []
 }>()
 
-function onSearch() {
-  if (!searchInput.value.trim()) return
-  emit('search')
-}
-
-const inputHeight = computed(() => props.size === 'large' ? 'h-14 md:h-16' : 'h-12')
-const inputText = computed(() => props.size === 'large' ? 'text-base md:text-lg' : 'text-base')
-
-// Animated placeholder
+/* --- States --- */
+const { t } = useI18n()
+const searchInput = defineModel<string>('modelValue', { default: '' })
 const placeholderPhrases = [
   'Find me some chill lofi beats',
   'Melodic dubstep with female vocals',
@@ -46,10 +38,23 @@ const placeholderPhrases = [
   'Bass house party tracks',
   'Atmospheric drum and bass'
 ]
-
 const animatedPlaceholder = ref('')
 const isInputFocused = ref(false)
 let animationTimeout: ReturnType<typeof setTimeout> | null = null
+
+/* --- Computed --- */
+const inputHeight = computed(() => props.size === 'large' ? 'h-14 md:h-16' : 'h-12')
+const inputText = computed(() => props.size === 'large' ? 'text-base md:text-lg' : 'text-base')
+const displayPlaceholder = computed(() => {
+  if (isInputFocused.value || searchInput.value) return t.value.searchPlaceholder
+  return animatedPlaceholder.value || t.value.searchPlaceholder
+})
+
+/* --- Methods --- */
+function onSearch() {
+  if (!searchInput.value.trim()) return
+  emit('search')
+}
 
 function getRandomPhrase(): string {
   return placeholderPhrases[Math.floor(Math.random() * placeholderPhrases.length)]
@@ -60,7 +65,6 @@ function typeWriter(text: string, index: number, callback: () => void) {
     animatedPlaceholder.value = ''
     return
   }
-
   if (index < text.length) {
     animatedPlaceholder.value = text.substring(0, index + 1)
     const delay = 50 + Math.random() * 80
@@ -75,7 +79,6 @@ function eraseText(callback: () => void) {
     animatedPlaceholder.value = ''
     return
   }
-
   const text = animatedPlaceholder.value
   if (text.length > 0) {
     animatedPlaceholder.value = text.substring(0, text.length - 1)
@@ -88,7 +91,6 @@ function eraseText(callback: () => void) {
 
 function startAnimation() {
   if (isInputFocused.value || searchInput.value) return
-
   const phrase = getRandomPhrase()
   typeWriter(phrase, 0, () => {
     eraseText(() => {
@@ -117,16 +119,7 @@ function onBlur() {
   }
 }
 
-onMounted(() => {
-  if (!searchInput.value) {
-    setTimeout(startAnimation, 1000)
-  }
-})
-
-onUnmounted(() => {
-  stopAnimation()
-})
-
+/* --- Watchers --- */
 watch(searchInput, (val) => {
   if (val) {
     stopAnimation()
@@ -135,9 +128,15 @@ watch(searchInput, (val) => {
   }
 })
 
-const displayPlaceholder = computed(() => {
-  if (isInputFocused.value || searchInput.value) return t.value.searchPlaceholder
-  return animatedPlaceholder.value || t.value.searchPlaceholder
+/* --- Lifecycle --- */
+onMounted(() => {
+  if (!searchInput.value) {
+    setTimeout(startAnimation, 1000)
+  }
+})
+
+onUnmounted(() => {
+  stopAnimation()
 })
 </script>
 

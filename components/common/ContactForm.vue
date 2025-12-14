@@ -1,6 +1,6 @@
 <script setup lang="ts">
+/* --- States --- */
 const { t } = useI18n()
-
 const email = ref('')
 const subject = ref('')
 const message = ref('')
@@ -8,12 +8,11 @@ const sending = ref(false)
 const sent = ref(false)
 const error = ref('')
 
+/* --- Methods --- */
 async function handleSubmit() {
   if (!email.value || !subject.value || !message.value) return
-
   sending.value = true
   error.value = ''
-
   try {
     await $fetch('/api/issues', {
       method: 'POST',

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+/* --- States --- */
 const { t } = useI18n()
 </script>
 

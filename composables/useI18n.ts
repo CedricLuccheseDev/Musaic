@@ -35,6 +35,10 @@ const translations = {
     noAiResults: 'Aucun résultat trouvé',
     showSql: 'Voir la requête SQL',
     exit: 'Quitter',
+    aiLimitReached: 'Limite IA atteinte',
+    aiLimitMessage: 'Tu as utilisé tes 5 recherches IA gratuites aujourd\'hui.',
+    aiLimitCta: 'Passe Premium pour des recherches IA illimitées !',
+    aiGenerationsLeft: 'recherches IA restantes',
 
     // TrackCard
     download: 'Télécharger',
@@ -93,6 +97,27 @@ const translations = {
     contactSent: 'Message envoyé ! Merci.',
     contactError: 'Erreur lors de l\'envoi',
 
+    // Subscription
+    subscriptionTitle: 'Abonnement',
+    subscriptionSubtitle: 'Choisis le plan qui te correspond',
+    planFree: 'Gratuit',
+    planPremium: 'Premium',
+    planFreePrice: '0€',
+    planPremiumPrice: '4.99€',
+    planPerMonth: '/mois',
+    planForever: 'pour toujours',
+    currentPlan: 'Plan actuel',
+    upgradePlan: 'Passer Premium',
+    featureSearch: 'Recherche de tracks',
+    featureFreeDl: 'Suivi des Free DL',
+    featureAds: 'Sans publicités',
+    featureWithAds: 'Avec publicités',
+    featureAiSearch: 'Recherche IA illimitée',
+    featureAiLimited: '5 recherches IA/jour',
+    included: 'Inclus',
+    notIncluded: 'Non inclus',
+    compareTitle: 'Comparaison détaillée',
+
     // Footer
     footer: '@ ClHub'
   },
@@ -130,6 +155,10 @@ const translations = {
     noAiResults: 'No results found',
     showSql: 'Show SQL query',
     exit: 'Exit',
+    aiLimitReached: 'AI limit reached',
+    aiLimitMessage: 'You\'ve used your 5 free AI searches today.',
+    aiLimitCta: 'Go Premium for unlimited AI searches!',
+    aiGenerationsLeft: 'AI searches left',
 
     // TrackCard
     download: 'Download',
@@ -187,6 +216,27 @@ const translations = {
     contactSend: 'Send',
     contactSent: 'Message sent! Thank you.',
     contactError: 'Error sending message',
+
+    // Subscription
+    subscriptionTitle: 'Subscription',
+    subscriptionSubtitle: 'Choose the plan that suits you',
+    planFree: 'Free',
+    planPremium: 'Premium',
+    planFreePrice: '$0',
+    planPremiumPrice: '$4.99',
+    planPerMonth: '/month',
+    planForever: 'forever',
+    currentPlan: 'Current plan',
+    upgradePlan: 'Upgrade to Premium',
+    featureSearch: 'Track search',
+    featureFreeDl: 'Free DL tracking',
+    featureAds: 'Ad-free',
+    featureWithAds: 'With ads',
+    featureAiSearch: 'Unlimited AI search',
+    featureAiLimited: '5 AI searches/day',
+    included: 'Included',
+    notIncluded: 'Not included',
+    compareTitle: 'Detailed comparison',
 
     // Footer
     footer: '@ ClHub'

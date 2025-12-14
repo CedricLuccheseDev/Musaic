@@ -1,4 +1,5 @@
 <script setup lang="ts">
+/* --- Props --- */
 withDefaults(defineProps<{
   showSearch?: boolean
   loading?: boolean
@@ -7,12 +8,15 @@ withDefaults(defineProps<{
   loading: false
 })
 
-const searchInput = defineModel<string>('modelValue', { default: '' })
-
+/* --- Emits --- */
 const emit = defineEmits<{
   search: []
 }>()
 
+/* --- States --- */
+const searchInput = defineModel<string>('modelValue', { default: '' })
+
+/* --- Methods --- */
 function onSearch() {
   emit('search')
 }

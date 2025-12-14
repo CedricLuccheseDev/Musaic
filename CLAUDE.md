@@ -9,6 +9,24 @@
 - No eslint-disable comments
 - Script above template in Vue files
 
+## Vue Script Sections
+
+In Vue `<script setup>` blocks, organize code with section comments in this order:
+
+```vue
+<script setup lang="ts">
+/* --- Props --- */
+/* --- Emits --- */
+/* --- States --- */
+/* --- Computed --- */
+/* --- Methods --- */
+/* --- Watchers --- */
+/* --- Lifecycle --- */
+</script>
+```
+
+Only include sections that are used. Skip empty sections.
+
 ## Components
 
 - Max 100 lines per component

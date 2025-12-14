@@ -1,29 +1,14 @@
-import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js'
-
-let supabaseClient: SupabaseClient | null = null
-
-function getSupabase(): SupabaseClient | null {
-  if (supabaseClient) return supabaseClient
-
-  const config = useRuntimeConfig()
-  const url = config.public.supabaseUrl
-  const key = config.public.supabaseAnonKey
-
-  if (!url || !key) {
-    return null
-  }
-
-  supabaseClient = createClient(url, key)
-  return supabaseClient
-}
+import type { User } from '@supabase/supabase-js'
 
 export const useAuth = () => {
+  /* --- State --- */
   const user = useState<User | null>('auth-user', () => null)
   const loading = useState<boolean>('auth-loading', () => true)
+  const { fetchProfile, clearProfile } = useSubscription()
 
-  const supabase = getSupabase()
+  const supabase = useSupabase()
 
-  // Initialize auth state
+  /* --- Methods --- */
   async function init() {
     if (!supabase) {
       loading.value = false
@@ -34,9 +19,19 @@ export const useAuth = () => {
       const { data: { session } } = await supabase.auth.getSession()
       user.value = session?.user ?? null
 
+      // Fetch profile if user is logged in
+      if (session?.user) {
+        fetchProfile(session.user.id)
+      }
+
       // Listen for auth changes
       supabase.auth.onAuthStateChange((_event, session) => {
         user.value = session?.user ?? null
+        if (session?.user) {
+          fetchProfile(session.user.id)
+        } else {
+          clearProfile()
+        }
       })
     } catch {
       // Init failed silently
@@ -45,7 +40,6 @@ export const useAuth = () => {
     }
   }
 
-  // Sign in with Google (opens popup that closes after auth)
   async function signInWithGoogle() {
     if (!supabase) {
       return { error: { message: 'Supabase not configured' } }
@@ -82,7 +76,6 @@ export const useAuth = () => {
     return { data, error }
   }
 
-  // Sign in with Apple (opens popup that closes after auth)
   async function signInWithApple() {
     if (!supabase) {
       return { error: { message: 'Supabase not configured' } }
@@ -119,7 +112,6 @@ export const useAuth = () => {
     return { data, error }
   }
 
-  // Sign out
   async function signOut() {
     if (!supabase) {
       return { error: { message: 'Supabase not configured' } }
@@ -130,7 +122,6 @@ export const useAuth = () => {
       if (error) {
         return { error }
       }
-      // Force clear user state (onAuthStateChange should also trigger)
       user.value = null
       return { error: null }
     } catch {

@@ -1,17 +1,13 @@
 <script setup lang="ts">
+/* --- States --- */
 const { t } = useI18n()
 const { user, signInWithGoogle, signInWithApple } = useAuth()
 const router = useRouter()
-
 const isLoadingGoogle = ref(false)
 const isLoadingApple = ref(false)
 const showTerms = ref(false)
 
-// Redirect if already logged in
-watch(user, (u) => {
-  if (u) router.push('/')
-}, { immediate: true })
-
+/* --- Methods --- */
 async function handleGoogle() {
   isLoadingGoogle.value = true
   await signInWithGoogle()
@@ -23,6 +19,11 @@ async function handleApple() {
   await signInWithApple()
   isLoadingApple.value = false
 }
+
+/* --- Watchers --- */
+watch(user, (u) => {
+  if (u) router.push('/')
+}, { immediate: true })
 </script>
 
 <template>
