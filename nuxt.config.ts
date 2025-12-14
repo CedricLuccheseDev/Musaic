@@ -1,4 +1,11 @@
+import pkg from './package.json'
+
 export default defineNuxtConfig({
+  vite: {
+    define: {
+      __APP_VERSION__: JSON.stringify(pkg.version)
+    }
+  },
   compatibilityDate: '2024-11-01',
   devtools: { enabled: true },
   css: ['~/assets/css/main.css'],

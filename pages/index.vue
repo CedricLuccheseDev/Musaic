@@ -12,7 +12,7 @@ async function search() {
 </script>
 
 <template>
-  <div class="relative flex min-h-screen flex-col bg-linear-to-b from-neutral-950 to-neutral-900">
+  <div class="relative flex min-h-screen flex-col bg-linear-to-b from-neutral-950 to-neutral-900 lg:p-8">
     <HomeBackground />
     <HomeHeader />
     <div class="relative flex flex-1 flex-col items-center justify-center px-4">
