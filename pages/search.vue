@@ -171,12 +171,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="relative min-h-screen bg-neutral-950 lg:p-8">
+  <div class="relative flex min-h-screen flex-col bg-neutral-950 lg:p-8">
     <SearchBackground />
     <SearchHeader v-model="searchInput" :loading="isLoading" @search="search" />
 
     <!-- Results -->
-    <main class="relative mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-10">
+    <main class="relative mx-auto w-full max-w-4xl flex-1 px-4 py-6 pb-32 md:px-6 md:py-10">
       <ClientOnly>
         <!-- Main results container -->
         <template v-if="query && (aiLoading || filteredAiResults.length || isLoading || filteredTracks.length)">
@@ -256,6 +256,13 @@ onUnmounted(() => {
         </template>
       </ClientOnly>
     </main>
-    <AppFooter />
+
+    <!-- Fixed blur overlay for fade effect -->
+    <div class="pointer-events-none fixed inset-x-0 bottom-0 z-10 h-28 backdrop-blur-md" style="mask-image: linear-gradient(to top, black 0%, transparent 100%); -webkit-mask-image: linear-gradient(to top, black 0%, transparent 100%);" />
+
+    <!-- Sticky footer -->
+    <footer class="sticky bottom-0 z-20">
+      <AppFooter />
+    </footer>
   </div>
 </template>

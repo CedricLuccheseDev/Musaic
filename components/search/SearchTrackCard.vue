@@ -134,7 +134,7 @@ onMounted(() => {
       </div>
 
       <!-- Info -->
-      <div class="min-w-0 flex-1 pr-12 md:pr-40">
+      <div class="min-w-0 flex-1 pr-14 sm:pr-28 md:pr-40">
         <!-- Title - opens SoundCloud -->
         <div class="truncate">
           <UTooltip :text="t.tooltipTrackPage">
@@ -186,7 +186,7 @@ onMounted(() => {
     </div>
 
     <!-- Action buttons - absolute positioned -->
-    <div class="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 md:right-4 md:gap-2" @click.stop>
+    <div class="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 sm:right-3 sm:gap-1.5 md:right-4 md:gap-2" @click.stop>
       <!-- Free Direct Download -->
       <UTooltip v-if="isDirectDownload" :text="t.tooltipDirectDownload">
         <a

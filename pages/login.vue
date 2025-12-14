@@ -37,9 +37,9 @@ watch(user, (u) => {
 
       <!-- Animated rings around the center -->
       <div class="absolute inset-0 flex items-center justify-center">
-        <div class="absolute h-[600px] w-[600px] animate-spin-very-slow rounded-full border border-violet-500/10" />
-        <div class="absolute h-[450px] w-[450px] animate-spin-slow-reverse rounded-full border border-purple-500/10" />
-        <div class="absolute h-[300px] w-[300px] animate-spin-very-slow rounded-full border border-pink-500/5" />
+        <div class="absolute h-[280px] w-[280px] animate-spin-very-slow rounded-full border border-violet-500/10 sm:h-[400px] sm:w-[400px] md:h-[600px] md:w-[600px]" />
+        <div class="absolute h-[200px] w-[200px] animate-spin-slow-reverse rounded-full border border-purple-500/10 sm:h-[300px] sm:w-[300px] md:h-[450px] md:w-[450px]" />
+        <div class="absolute h-[120px] w-[120px] animate-spin-very-slow rounded-full border border-pink-500/5 sm:h-[200px] sm:w-[200px] md:h-[300px] md:w-[300px]" />
       </div>
 
       <!-- Music note particles -->
