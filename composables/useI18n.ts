@@ -77,6 +77,22 @@ const translations = {
     termsSection5Title: 'Modifications',
     termsSection5Content: 'Nous nous réservons le droit de modifier ces conditions à tout moment. Les utilisateurs seront notifiés des changements importants.',
 
+    // Profile
+    profileMenu: 'Mon profil',
+    profileProvider: 'Connexion via',
+    profileMemberSince: 'Membre depuis',
+    profileSignOut: 'Se déconnecter',
+    profileBack: 'Retour',
+
+    // Contact
+    contactTitle: 'Nous contacter',
+    contactEmail: 'Ton email',
+    contactSubject: 'Sujet',
+    contactMessage: 'Message',
+    contactSend: 'Envoyer',
+    contactSent: 'Message envoyé ! Merci.',
+    contactError: 'Erreur lors de l\'envoi',
+
     // Footer
     footer: '@ ClHub'
   },
@@ -155,6 +171,22 @@ const translations = {
     termsSection4Content: 'We only collect data necessary for authentication (email, name). No data is shared with third parties.',
     termsSection5Title: 'Changes',
     termsSection5Content: 'We reserve the right to modify these terms at any time. Users will be notified of significant changes.',
+
+    // Profile
+    profileMenu: 'My profile',
+    profileProvider: 'Signed in with',
+    profileMemberSince: 'Member since',
+    profileSignOut: 'Sign out',
+    profileBack: 'Back',
+
+    // Contact
+    contactTitle: 'Contact us',
+    contactEmail: 'Your email',
+    contactSubject: 'Subject',
+    contactMessage: 'Message',
+    contactSend: 'Send',
+    contactSent: 'Message sent! Thank you.',
+    contactError: 'Error sending message',
 
     // Footer
     footer: '@ ClHub'

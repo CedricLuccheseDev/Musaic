@@ -7,6 +7,7 @@ withDefaults(defineProps<{
 
 const { t } = useI18n()
 const { user, loading, signOut } = useAuth()
+const router = useRouter()
 
 const sizeClasses = {
   sm: {
@@ -19,9 +20,10 @@ const sizeClasses = {
   }
 }
 
-async function handleSignOut() {
-  await signOut()
-}
+const dropdownItems = computed(() => [[
+  { label: t.value.profileMenu, icon: 'i-heroicons-user', onSelect: () => router.push('/profile'), class: 'cursor-pointer' },
+  { label: t.value.profileSignOut, icon: 'i-heroicons-arrow-right-on-rectangle', onSelect: () => signOut(), class: 'cursor-pointer' }
+]])
 </script>
 
 <template>
@@ -32,7 +34,7 @@ async function handleSignOut() {
     </div>
 
     <!-- Logged in: Avatar with dropdown -->
-    <UDropdownMenu v-else-if="user" :items="[[{ label: 'Se déconnecter', icon: 'i-heroicons-arrow-right-on-rectangle', onSelect: handleSignOut, class: 'cursor-pointer' }]]">
+    <UDropdownMenu v-else-if="user" :items="dropdownItems">
       <button
         type="button"
         :class="[sizeClasses[size].wrapper, 'cursor-pointer overflow-hidden rounded-full border-2 border-violet-500/50 transition-all hover:border-violet-500']"
