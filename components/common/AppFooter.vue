@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* --- States --- */
 const { t } = useI18n()
+const version = __APP_VERSION__
 </script>
 
 <template>
@@ -21,6 +22,7 @@ const { t } = useI18n()
         >
           {{ t.footer }}
         </a>
+        <span class="text-xs text-neutral-600">v{{ version }}</span>
       </div>
     </div>
   </footer>
