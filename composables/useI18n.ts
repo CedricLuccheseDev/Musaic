@@ -87,6 +87,13 @@ const translations = {
     profileMemberSince: 'Membre depuis',
     profileSignOut: 'Se déconnecter',
     profileBack: 'Retour',
+    profileSubscription: 'Abonnement',
+    profileCurrentPlan: 'Plan actuel',
+    profilePremiumUntil: 'Premium jusqu\'au',
+    profileHistory: 'Historique',
+    profileNoHistory: 'Aucun historique d\'abonnement',
+    profileCancelSubscription: 'Annuler l\'abonnement',
+    profileManageSubscription: 'Gérer l\'abonnement',
 
     // Contact
     contactTitle: 'Nous contacter',
@@ -117,6 +124,27 @@ const translations = {
     included: 'Inclus',
     notIncluded: 'Non inclus',
     compareTitle: 'Comparaison détaillée',
+
+    // How it works
+    hiwTitle: 'Comment ça marche ?',
+    hiwSubtitle: 'Découvre comment utiliser Musaic pour trouver et télécharger tes tracks préférés',
+    hiwSearchTitle: 'Recherche classique',
+    hiwSearchContent: 'Tape le nom d\'un artiste, d\'un track ou d\'un genre. Musaic interroge SoundCloud et affiche les résultats.',
+    hiwSearchFree: 'Téléchargement gratuit activé par l\'artiste',
+    hiwSearchLink: 'Lien externe de téléchargement',
+    hiwSearchPaid: 'Track disponible à l\'achat',
+    hiwAiTitle: 'Recherche IA',
+    hiwAiContent: 'Notre IA comprend tes demandes en langage naturel et fouille notre base de données.',
+    hiwAiExample1: '"Trouve-moi de la techno mélodique récente"',
+    hiwAiExample2: '"Des tracks de drum and bass énergiques"',
+    hiwAiExample3: '"Musique chill pour travailler"',
+    hiwFiltersTitle: 'Filtres',
+    hiwFiltersContent: 'Affine tes résultats : Tous, Gratuit ou Payant.',
+    hiwPremiumTitle: 'Avantages Premium',
+    hiwPremiumContent: 'Passe Premium pour profiter de tous les avantages.',
+    hiwRespectTitle: 'Respect des artistes',
+    hiwRespectContent: 'Musaic indexe uniquement le contenu public. Les téléchargements ne sont disponibles que lorsque l\'artiste les a autorisés.',
+    hiwBack: 'Retour',
 
     // Footer
     footer: '@ ClHub'
@@ -207,6 +235,13 @@ const translations = {
     profileMemberSince: 'Member since',
     profileSignOut: 'Sign out',
     profileBack: 'Back',
+    profileSubscription: 'Subscription',
+    profileCurrentPlan: 'Current plan',
+    profilePremiumUntil: 'Premium until',
+    profileHistory: 'History',
+    profileNoHistory: 'No subscription history',
+    profileCancelSubscription: 'Cancel subscription',
+    profileManageSubscription: 'Manage subscription',
 
     // Contact
     contactTitle: 'Contact us',
@@ -237,6 +272,27 @@ const translations = {
     included: 'Included',
     notIncluded: 'Not included',
     compareTitle: 'Detailed comparison',
+
+    // How it works
+    hiwTitle: 'How it works?',
+    hiwSubtitle: 'Learn how to use Musaic to find and download your favorite tracks',
+    hiwSearchTitle: 'Classic search',
+    hiwSearchContent: 'Type an artist name, track or genre. Musaic queries SoundCloud and displays the results.',
+    hiwSearchFree: 'Free download enabled by the artist',
+    hiwSearchLink: 'External download link',
+    hiwSearchPaid: 'Track available for purchase',
+    hiwAiTitle: 'AI Search',
+    hiwAiContent: 'Our AI understands your natural language requests and searches our database.',
+    hiwAiExample1: '"Find me some recent melodic techno"',
+    hiwAiExample2: '"Energetic drum and bass tracks"',
+    hiwAiExample3: '"Chill music for working"',
+    hiwFiltersTitle: 'Filters',
+    hiwFiltersContent: 'Refine your results: All, Free or Paid.',
+    hiwPremiumTitle: 'Premium benefits',
+    hiwPremiumContent: 'Go Premium to enjoy all the benefits.',
+    hiwRespectTitle: 'Respect for artists',
+    hiwRespectContent: 'Musaic only indexes public content. Downloads are only available when the artist has authorized them.',
+    hiwBack: 'Back',
 
     // Footer
     footer: '@ ClHub'

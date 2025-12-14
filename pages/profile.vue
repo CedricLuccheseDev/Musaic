@@ -2,10 +2,11 @@
 /* --- States --- */
 const { t } = useI18n()
 const { user, loading, signOut } = useAuth()
+const { isPremium, profile } = useSubscription()
 const router = useRouter()
 const version = __APP_VERSION__
 const showTerms = ref(false)
-type Tab = 'profile' | 'contact'
+type Tab = 'profile' | 'subscription' | 'contact'
 const activeTab = ref<Tab>('profile')
 
 /* --- Computed --- */
@@ -16,6 +17,11 @@ const memberSince = computed(() => {
 
 const provider = computed(() => {
   return user.value?.app_metadata?.provider || 'email'
+})
+
+const premiumUntil = computed(() => {
+  if (!profile.value?.premium_until) return null
+  return new Date(profile.value.premium_until).toLocaleDateString()
 })
 
 /* --- Methods --- */
@@ -40,14 +46,13 @@ watch(user, (u) => {
 
     <!-- Header -->
     <PageHeader class="relative z-10">
-      <template #left>
+      <template #back>
         <button
           type="button"
-          class="inline-flex cursor-pointer items-center gap-2 text-sm text-neutral-400 transition-colors hover:text-white"
+          class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-neutral-700 text-neutral-400 transition-all hover:border-violet-500 hover:text-white"
           @click="router.back()"
         >
           <UIcon name="i-heroicons-arrow-left" class="h-4 w-4" />
-          <span>{{ t.profileBack }}</span>
         </button>
       </template>
     </PageHeader>
@@ -79,6 +84,19 @@ watch(user, (u) => {
               <button
                 type="button"
                 class="group relative flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200"
+                :class="activeTab === 'subscription' ? 'bg-violet-600/20 text-white shadow-lg shadow-violet-500/10' : 'text-neutral-400 hover:bg-neutral-800/50 hover:text-white'"
+                @click="activeTab = 'subscription'"
+              >
+                <div
+                  v-if="activeTab === 'subscription'"
+                  class="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-violet-500 md:left-0"
+                />
+                <UIcon name="i-heroicons-sparkles" class="h-5 w-5" :class="activeTab === 'subscription' ? 'text-amber-400' : 'text-amber-500'" />
+                <span>{{ t.profileSubscription }}</span>
+              </button>
+              <button
+                type="button"
+                class="group relative flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200"
                 :class="activeTab === 'contact' ? 'bg-violet-600/20 text-white shadow-lg shadow-violet-500/10' : 'text-neutral-400 hover:bg-neutral-800/50 hover:text-white'"
                 @click="activeTab = 'contact'"
               >
@@ -88,14 +106,6 @@ watch(user, (u) => {
                 />
                 <UIcon name="i-heroicons-envelope" class="h-5 w-5" :class="activeTab === 'contact' ? 'text-violet-400' : 'text-neutral-500 group-hover:text-neutral-300'" />
                 <span>{{ t.contactTitle }}</span>
-              </button>
-              <button
-                type="button"
-                class="group relative flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 text-neutral-400 hover:bg-neutral-800/50 hover:text-white"
-                @click="navigateTo('/subscription')"
-              >
-                <UIcon name="i-heroicons-sparkles" class="h-5 w-5 text-amber-500" />
-                <span>{{ t.subscriptionTitle }}</span>
               </button>
             </div>
 
@@ -184,6 +194,67 @@ watch(user, (u) => {
                 <UIcon name="i-heroicons-arrow-right-on-rectangle" class="h-5 w-5" />
                 <span>{{ t.profileSignOut }}</span>
               </button>
+            </div>
+
+            <!-- Subscription Section -->
+            <div v-else-if="activeTab === 'subscription'">
+              <!-- Current Plan -->
+              <div class="mb-6">
+                <h3 class="mb-3 text-sm font-medium text-neutral-400">{{ t.profileCurrentPlan }}</h3>
+                <div class="flex items-center justify-between rounded-xl bg-neutral-800/30 px-4 py-3">
+                  <div class="flex items-center gap-3">
+                    <div
+                      class="flex h-10 w-10 items-center justify-center rounded-full"
+                      :class="isPremium ? 'bg-amber-500/20' : 'bg-neutral-700/50'"
+                    >
+                      <UIcon
+                        :name="isPremium ? 'i-heroicons-sparkles-solid' : 'i-heroicons-user'"
+                        class="h-5 w-5"
+                        :class="isPremium ? 'text-amber-400' : 'text-neutral-400'"
+                      />
+                    </div>
+                    <div>
+                      <p class="font-medium text-white">{{ isPremium ? t.planPremium : t.planFree }}</p>
+                      <p v-if="isPremium && premiumUntil" class="text-xs text-neutral-400">
+                        {{ t.profilePremiumUntil }} {{ premiumUntil }}
+                      </p>
+                    </div>
+                  </div>
+                  <NuxtLink
+                    v-if="!isPremium"
+                    to="/subscription"
+                    class="rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-black transition-all hover:bg-amber-400"
+                  >
+                    {{ t.upgradePlan }}
+                  </NuxtLink>
+                </div>
+              </div>
+
+              <!-- History -->
+              <div class="mb-6">
+                <h3 class="mb-3 text-sm font-medium text-neutral-400">{{ t.profileHistory }}</h3>
+                <div class="rounded-xl border border-neutral-800/50 bg-neutral-800/20 p-4 text-center text-sm text-neutral-500">
+                  {{ t.profileNoHistory }}
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div v-if="isPremium" class="space-y-3">
+                <button
+                  type="button"
+                  class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-neutral-700 bg-neutral-800/50 px-4 py-3 text-sm font-medium text-neutral-300 transition-all hover:border-neutral-600 hover:bg-neutral-800"
+                >
+                  <UIcon name="i-heroicons-cog-6-tooth" class="h-5 w-5" />
+                  <span>{{ t.profileManageSubscription }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-400 transition-all hover:border-red-500/50 hover:bg-red-500/20"
+                >
+                  <UIcon name="i-heroicons-x-circle" class="h-5 w-5" />
+                  <span>{{ t.profileCancelSubscription }}</span>
+                </button>
+              </div>
             </div>
 
             <!-- Contact Section -->

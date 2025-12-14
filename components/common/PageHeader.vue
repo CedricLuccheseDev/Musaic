@@ -15,7 +15,8 @@ withDefaults(defineProps<{
     <!-- Desktop layout -->
     <div class="hidden md:grid md:grid-cols-3 md:items-start md:px-6 md:py-4">
       <!-- Left -->
-      <div class="flex items-center justify-start">
+      <div class="flex items-center justify-start gap-4">
+        <slot name="back" />
         <slot name="left">
           <NuxtLink to="/" class="group transition-transform hover:scale-105">
             <AppLogo size="md" />
@@ -31,6 +32,7 @@ withDefaults(defineProps<{
       <!-- Right -->
       <div class="flex items-center justify-end gap-3">
         <slot name="right">
+          <PremiumButton />
           <LangSwitch />
           <ProfileButtons />
         </slot>
@@ -41,15 +43,19 @@ withDefaults(defineProps<{
     <div class="flex flex-col gap-3 px-4 py-3 md:hidden">
       <!-- Top row -->
       <div class="flex items-center justify-between">
-        <slot name="left-mobile">
-          <slot name="left">
-            <NuxtLink to="/">
-              <AppLogo size="sm" />
-            </NuxtLink>
+        <div class="flex items-center gap-3">
+          <slot name="back" />
+          <slot name="left-mobile">
+            <slot name="left">
+              <NuxtLink to="/">
+                <AppLogo size="sm" />
+              </NuxtLink>
+            </slot>
           </slot>
-        </slot>
+        </div>
         <div class="flex items-center gap-2">
           <slot name="right-mobile">
+            <PremiumButton size="sm" />
             <LangSwitch size="sm" />
             <ProfileButtons size="sm" />
           </slot>
