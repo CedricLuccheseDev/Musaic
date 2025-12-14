@@ -53,6 +53,29 @@ const translations = {
     // Auth
     login: 'Connexion',
     signup: 'Inscription',
+    loginTitle: 'Bienvenue',
+    loginSubtitle: 'Connecte-toi pour accéder à toutes les fonctionnalités',
+    continueWithGoogle: 'Continuer avec Google',
+    continueWithApple: 'Continuer avec Apple',
+    orContinueWith: 'ou continuer avec',
+    termsNotice: 'En continuant, tu acceptes nos',
+    termsLink: 'conditions d\'utilisation',
+    tooltipLogin: 'Se connecter',
+
+    // Terms modal
+    termsTitle: 'Conditions d\'utilisation',
+    termsClose: 'Fermer',
+    termsIntro: 'En utilisant Musaic, vous acceptez les conditions suivantes :',
+    termsSection1Title: 'Utilisation du service',
+    termsSection1Content: 'Musaic est un moteur de recherche qui indexe du contenu audio disponible publiquement sur SoundCloud. Nous ne stockons pas les fichiers audio sur nos serveurs.',
+    termsSection2Title: 'Contenu tiers',
+    termsSection2Content: 'Tout le contenu audio est la propriété de ses créateurs respectifs. Les téléchargements sont uniquement disponibles lorsque l\'artiste les a explicitement autorisés sur SoundCloud.',
+    termsSection3Title: 'Respect des droits d\'auteur',
+    termsSection3Content: 'Les utilisateurs s\'engagent à respecter les droits d\'auteur et à n\'utiliser le contenu téléchargé qu\'à des fins personnelles et non commerciales.',
+    termsSection4Title: 'Données personnelles',
+    termsSection4Content: 'Nous collectons uniquement les données nécessaires à l\'authentification (email, nom). Aucune donnée n\'est partagée avec des tiers.',
+    termsSection5Title: 'Modifications',
+    termsSection5Content: 'Nous nous réservons le droit de modifier ces conditions à tout moment. Les utilisateurs seront notifiés des changements importants.',
 
     // Footer
     footer: '@ ClHub'
@@ -109,6 +132,29 @@ const translations = {
     // Auth
     login: 'Login',
     signup: 'Sign up',
+    loginTitle: 'Welcome',
+    loginSubtitle: 'Sign in to access all features',
+    continueWithGoogle: 'Continue with Google',
+    continueWithApple: 'Continue with Apple',
+    orContinueWith: 'or continue with',
+    termsNotice: 'By continuing, you agree to our',
+    termsLink: 'terms of service',
+    tooltipLogin: 'Sign in',
+
+    // Terms modal
+    termsTitle: 'Terms of Service',
+    termsClose: 'Close',
+    termsIntro: 'By using Musaic, you agree to the following terms:',
+    termsSection1Title: 'Service Usage',
+    termsSection1Content: 'Musaic is a search engine that indexes publicly available audio content on SoundCloud. We do not store audio files on our servers.',
+    termsSection2Title: 'Third-Party Content',
+    termsSection2Content: 'All audio content is the property of its respective creators. Downloads are only available when the artist has explicitly authorized them on SoundCloud.',
+    termsSection3Title: 'Copyright Compliance',
+    termsSection3Content: 'Users agree to respect copyright and to use downloaded content only for personal, non-commercial purposes.',
+    termsSection4Title: 'Personal Data',
+    termsSection4Content: 'We only collect data necessary for authentication (email, name). No data is shared with third parties.',
+    termsSection5Title: 'Changes',
+    termsSection5Content: 'We reserve the right to modify these terms at any time. Users will be notified of significant changes.',
 
     // Footer
     footer: '@ ClHub'

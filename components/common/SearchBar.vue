@@ -22,6 +22,123 @@ function onSearch() {
 
 const inputHeight = computed(() => props.size === 'large' ? 'h-14 md:h-16' : 'h-12')
 const inputText = computed(() => props.size === 'large' ? 'text-base md:text-lg' : 'text-base')
+
+// Animated placeholder
+const placeholderPhrases = [
+  'Find me some chill lofi beats',
+  'Melodic dubstep with female vocals',
+  'Dark techno for late night coding',
+  'Uplifting trance from 2024',
+  'Heavy bass music like Excision',
+  'Tracks similar to Subtronics',
+  'Deep house for summer vibes',
+  'Emotional dnb with piano',
+  'Hard riddim under 3 minutes',
+  'Ambient music for focus',
+  'Progressive house bangers',
+  'Free download dubstep tracks',
+  'Melodic bass with drops',
+  'Tracks with 140 BPM',
+  'Chill electronic for studying',
+  'Festival trap anthems',
+  'Underground techno gems',
+  'Synthwave with retro vibes',
+  'Bass house party tracks',
+  'Atmospheric drum and bass'
+]
+
+const animatedPlaceholder = ref('')
+const isInputFocused = ref(false)
+let animationTimeout: ReturnType<typeof setTimeout> | null = null
+
+function getRandomPhrase(): string {
+  return placeholderPhrases[Math.floor(Math.random() * placeholderPhrases.length)]
+}
+
+function typeWriter(text: string, index: number, callback: () => void) {
+  if (isInputFocused.value || searchInput.value) {
+    animatedPlaceholder.value = ''
+    return
+  }
+
+  if (index < text.length) {
+    animatedPlaceholder.value = text.substring(0, index + 1)
+    const delay = 50 + Math.random() * 80
+    animationTimeout = setTimeout(() => typeWriter(text, index + 1, callback), delay)
+  } else {
+    animationTimeout = setTimeout(callback, 2000)
+  }
+}
+
+function eraseText(callback: () => void) {
+  if (isInputFocused.value || searchInput.value) {
+    animatedPlaceholder.value = ''
+    return
+  }
+
+  const text = animatedPlaceholder.value
+  if (text.length > 0) {
+    animatedPlaceholder.value = text.substring(0, text.length - 1)
+    const delay = 30 + Math.random() * 40
+    animationTimeout = setTimeout(() => eraseText(callback), delay)
+  } else {
+    animationTimeout = setTimeout(callback, 500)
+  }
+}
+
+function startAnimation() {
+  if (isInputFocused.value || searchInput.value) return
+
+  const phrase = getRandomPhrase()
+  typeWriter(phrase, 0, () => {
+    eraseText(() => {
+      startAnimation()
+    })
+  })
+}
+
+function stopAnimation() {
+  if (animationTimeout) {
+    clearTimeout(animationTimeout)
+    animationTimeout = null
+  }
+  animatedPlaceholder.value = ''
+}
+
+function onFocus() {
+  isInputFocused.value = true
+  stopAnimation()
+}
+
+function onBlur() {
+  isInputFocused.value = false
+  if (!searchInput.value) {
+    startAnimation()
+  }
+}
+
+onMounted(() => {
+  if (!searchInput.value) {
+    setTimeout(startAnimation, 1000)
+  }
+})
+
+onUnmounted(() => {
+  stopAnimation()
+})
+
+watch(searchInput, (val) => {
+  if (val) {
+    stopAnimation()
+  } else if (!isInputFocused.value) {
+    startAnimation()
+  }
+})
+
+const displayPlaceholder = computed(() => {
+  if (isInputFocused.value || searchInput.value) return t.value.searchPlaceholder
+  return animatedPlaceholder.value || t.value.searchPlaceholder
+})
 </script>
 
 <template>
@@ -39,41 +156,47 @@ const inputText = computed(() => props.size === 'large' ? 'text-base md:text-lg'
       <input
         v-model="searchInput"
         type="text"
-        :placeholder="t.searchPlaceholder"
+        :placeholder="displayPlaceholder"
         class="min-w-0 flex-1 bg-transparent px-2 text-white placeholder-neutral-500 outline-none md:px-3"
         :class="[inputHeight, inputText]"
         @keyup.enter="onSearch"
+        @focus="onFocus"
+        @blur="onBlur"
       >
 
-      <!-- Search button with AI glow -->
-      <button
-        type="button"
-        class="group relative m-1.5 flex shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-linear-to-r from-violet-600 via-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-purple-500/40 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
-        :class="size === 'large' ? 'p-2.5 md:p-3 md:hover:pr-5' : 'p-2.5 hover:pr-4'"
-        :disabled="loading"
-        @click="onSearch"
-      >
-        <!-- Animated background gradient -->
-        <span class="absolute inset-0 bg-linear-to-r from-pink-600 via-purple-600 to-violet-600 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+      <!-- Search button -->
+      <UTooltip :text="t.search">
+        <button
+          type="button"
+          class="search-btn group relative m-1.5 flex shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl p-2.5 text-white transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-70"
+          :class="size === 'large' ? 'md:p-3' : ''"
+          :disabled="loading"
+          @click="onSearch"
+        >
+          <!-- Animated gradient background -->
+          <span class="absolute inset-0 bg-linear-to-r from-violet-600 via-purple-600 to-pink-600 transition-all duration-500" />
+          <span class="absolute inset-0 bg-linear-to-r from-pink-600 via-fuchsia-600 to-violet-600 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
 
-        <!-- Glow pulse effect -->
-        <span class="absolute inset-0 animate-pulse bg-linear-to-r from-violet-400/20 via-purple-400/20 to-pink-400/20 opacity-0 blur-xl transition-opacity duration-300 group-hover:opacity-100" />
+          <!-- Shimmer effect -->
+          <span class="absolute inset-0 -translate-x-full bg-linear-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
 
-        <!-- Loading spinner -->
-        <div v-if="loading" class="relative z-10 h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+          <!-- Glow effect -->
+          <span class="absolute -inset-1 rounded-xl bg-linear-to-r from-violet-600 via-purple-600 to-pink-600 opacity-0 blur-lg transition-opacity duration-300 group-hover:opacity-50" />
 
-        <!-- Icon with rotation -->
-        <UIcon
-          v-else
-          name="i-heroicons-sparkles"
-          class="relative z-10 h-5 w-5 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110"
-        />
+          <!-- Loading spinner -->
+          <template v-if="loading">
+            <div class="relative z-10 h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+          </template>
 
-        <!-- Text that appears on hover -->
-        <span class="font-logo relative z-10 ml-0 max-w-0 overflow-hidden whitespace-nowrap text-sm transition-all duration-300 group-hover:ml-2 group-hover:max-w-24">
-          {{ loading ? '' : t.search }}
-        </span>
-      </button>
+          <!-- Icon -->
+          <template v-else>
+            <UIcon
+              name="i-heroicons-sparkles"
+              class="relative z-10 h-5 w-5 transition-all duration-300 group-hover:rotate-12 group-hover:scale-110"
+            />
+          </template>
+        </button>
+      </UTooltip>
     </div>
   </div>
 </template>

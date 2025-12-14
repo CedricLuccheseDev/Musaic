@@ -82,6 +82,43 @@ export const useAuth = () => {
     return { data, error }
   }
 
+  // Sign in with Apple (opens popup that closes after auth)
+  async function signInWithApple() {
+    if (!supabase) {
+      return { error: { message: 'Supabase not configured' } }
+    }
+
+    const redirectUrl = `${window.location.origin}/auth/callback`
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'apple',
+      options: {
+        redirectTo: redirectUrl,
+        skipBrowserRedirect: true
+      }
+    })
+
+    if (error) {
+      return { data, error }
+    }
+
+    // Open OAuth in popup instead of redirect
+    if (data?.url) {
+      const width = 500
+      const height = 600
+      const left = window.screenX + (window.outerWidth - width) / 2
+      const top = window.screenY + (window.outerHeight - height) / 2
+
+      window.open(
+        data.url,
+        'apple-oauth',
+        `width=${width},height=${height},left=${left},top=${top},popup=true`
+      )
+    }
+
+    return { data, error }
+  }
+
   // Sign out
   async function signOut() {
     if (!supabase) {
@@ -106,6 +143,7 @@ export const useAuth = () => {
     loading: readonly(loading),
     init,
     signInWithGoogle,
+    signInWithApple,
     signOut
   }
 }

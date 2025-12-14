@@ -2,75 +2,60 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages'
 import { logger } from '~/server/utils/logger'
 
-// System prompt for SQL generation
-const SYSTEM_PROMPT = `You are a SQL generator for a music search app. Output ONLY valid PostgreSQL. No markdown, no explanation.
+// System prompt for response generation
+const RESPONSE_SYSTEM_PROMPT = `You generate short, friendly responses for a music search app. Respond in the same language as the user query.
 
-SCHEMA:
-tracks(soundcloud_id PK, title, artist, genre, duration INT ms, download_status TEXT, downloadable BOOL, playback_count INT, likes_count INT, tags TEXT[], soundcloud_created_at TIMESTAMP, bpm INT, key TEXT, label)
+Rules:
+- Keep responses under 15 words
+- Be conversational and helpful
+- Reference what the user asked for
+- Use music-related terms naturally
+- No emojis, no markdown
 
-DEFAULTS:
-- Always SELECT * FROM tracks
-- Always use ILIKE for case-insensitive text matching
-- Default ORDER BY playback_count DESC
-- Default LIMIT 20 (max 50)
+Examples:
+User: "Find me chill dubstep" (12 results)
+Response: "Here are 12 chill dubstep tracks for you"
 
-GENRES (use these exact values):
-dubstep, melodic dubstep, future bass, trap, house, techno, drum and bass, bass house, riddim, electronic, edm, progressive house, deep house, future house, hybrid trap, midtempo, color bass, lo-fi, ambient, hardcore, hardstyle, trance, psytrance, breakbeat, garage, uk garage, jungle, neurofunk, liquid dnb, minimal, industrial
+User: "Cherche moi de la techno récente" (8 results)
+Response: "Voici 8 tracks techno récentes pour toi"
 
-SEARCH PATTERNS:
+User: "Tracks like Excision" (15 results)
+Response: "Found 15 heavy bass tracks similar to Excision"
 
-1. Genre search:
-   WHERE genre ILIKE '%dubstep%'
+User: "Melodic dubstep with vocals" (0 results)
+Response: "No melodic dubstep with vocals found in your library"
 
-2. Artist search:
-   WHERE artist ILIKE '%skrillex%'
+User: "20 sons bass music" (20 results)
+Response: "Voici 20 sons bass music comme demandé"`
 
-3. Title search:
-   WHERE title ILIKE '%memories%'
+// System prompt for SQL generation (optimized)
+const SYSTEM_PROMPT = `SQL generator for music search. Output ONLY PostgreSQL, no markdown.
 
-4. Similar to artist (exclude the artist, search by likely genres):
-   WHERE (genre ILIKE '%melodic dubstep%' OR genre ILIKE '%future bass%') AND artist NOT ILIKE '%artistname%'
+SCHEMA: tracks(soundcloud_id PK, title, artist, genre, duration ms, download_status, downloadable, playback_count, likes_count, tags[], soundcloud_created_at, bpm, key, label)
 
-5. Free downloads only:
-   WHERE download_status IN ('FreeDirectLink', 'FreeExternalLink')
+DEFAULTS: SELECT * FROM tracks, ILIKE for text, ORDER BY playback_count DESC, LIMIT 20 (max 50)
 
-6. BPM range:
-   WHERE bpm BETWEEN 140 AND 150
+GENRES: dubstep, melodic dubstep, future bass, trap, house, techno, drum and bass, bass house, riddim, electronic, edm, progressive house, deep house, future house, hybrid trap, midtempo, color bass, lo-fi, ambient, hardcore, hardstyle, trance, psytrance, breakbeat, garage, uk garage, jungle, neurofunk, liquid dnb, minimal, industrial
 
-7. Key search:
-   WHERE key ILIKE '%C minor%' OR key ILIKE '%Cm%'
+PATTERNS:
+- genre: WHERE genre ILIKE '%dubstep%'
+- artist: WHERE artist ILIKE '%skrillex%'
+- title: WHERE title ILIKE '%memories%'
+- similar to artist: WHERE (genre ILIKE '%melodic dubstep%' OR genre ILIKE '%future bass%') AND artist NOT ILIKE '%artistname%'
+- free: WHERE download_status IN ('FreeDirectLink','FreeExternalLink')
+- bpm: WHERE bpm BETWEEN 140 AND 150
+- key: WHERE key ILIKE '%C minor%' OR key ILIKE '%Cm%'
+- recent: ORDER BY soundcloud_created_at DESC
+- duration: <3min=<180000, 3-7min=180000-420000, >15min=>900000
+- remix: title ILIKE '%remix%'
+- original: title NOT ILIKE '%remix%' AND title NOT ILIKE '%bootleg%' AND title NOT ILIKE '%edit%'
+- bootleg/edit: title ILIKE '%bootleg%' OR title ILIKE '%edit%' OR title ILIKE '%flip%'
+- vip: title ILIKE '%vip%'
+- mix/set: duration > 900000 AND (title ILIKE '%mix%' OR title ILIKE '%set%')
+- tags: '%x%'=ANY(tags)
+- label: WHERE label ILIKE '%monstercat%'
 
-8. Recent tracks:
-   ORDER BY soundcloud_created_at DESC
-
-9. Popular tracks:
-   ORDER BY playback_count DESC
-
-10. Duration filters (ms):
-    - Short (<3min): duration < 180000
-    - Normal (3-7min): duration BETWEEN 180000 AND 420000
-    - Long/Mix (>15min): duration > 900000
-
-11. Content types:
-    - Remix: title ILIKE '%remix%'
-    - Original: title NOT ILIKE '%remix%' AND title NOT ILIKE '%bootleg%' AND title NOT ILIKE '%edit%'
-    - Bootleg/Edit: title ILIKE '%bootleg%' OR title ILIKE '%edit%' OR title ILIKE '%flip%'
-    - VIP: title ILIKE '%vip%'
-    - Mix/Set: duration > 900000 AND (title ILIKE '%mix%' OR title ILIKE '%set%')
-
-12. Tag search (combine with genre):
-    WHERE genre ILIKE '%X%' OR '%X%' = ANY(tags)
-
-13. Label search:
-    WHERE label ILIKE '%monstercat%'
-
-14. Combine multiple conditions with AND/OR as needed.
-
-IMPORTANT:
-- For "similar to" or "like [artist]" queries: identify the artist's typical genres and search those, excluding the artist
-- Never invent genres - use only from the list above
-- If unsure about genre, use broader terms like 'electronic' or 'bass'
-- For French queries, translate the intent to SQL (e.g., "morceaux récents" = recent tracks)`
+For French queries, translate intent to SQL.`
 
 export async function generateSqlQuery(question: string): Promise<string> {
   const config = useRuntimeConfig()
@@ -115,6 +100,39 @@ export async function generateSqlQuery(question: string): Promise<string> {
   sql = sql.replace(/^```sql\n?/i, '').replace(/\n?```$/i, '')
 
   return sql
+}
+
+export async function generateAiResponse(question: string, resultCount: number): Promise<string> {
+  const config = useRuntimeConfig()
+  const apiKey = config.anthropicApiKey
+
+  if (!apiKey) {
+    return resultCount > 0 ? `Found ${resultCount} tracks` : 'No results found'
+  }
+
+  const anthropic = new Anthropic({ apiKey })
+
+  const messages: MessageParam[] = [
+    { role: 'user', content: `User: "${question}" (${resultCount} results)` }
+  ]
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-3-5-haiku-latest',
+      max_tokens: 64,
+      system: RESPONSE_SYSTEM_PROMPT,
+      messages
+    })
+
+    const content = message.content[0]
+    if (content.type !== 'text') {
+      return resultCount > 0 ? `Found ${resultCount} tracks` : 'No results found'
+    }
+
+    return content.text.trim()
+  } catch {
+    return resultCount > 0 ? `Found ${resultCount} tracks` : 'No results found'
+  }
 }
 
 export async function executeAiQuery(question: string): Promise<{ sql: string; results: unknown[]; error?: string }> {

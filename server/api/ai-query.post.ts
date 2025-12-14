@@ -1,4 +1,4 @@
-import { generateSqlQuery } from '~/server/services/aiQuery'
+import { generateSqlQuery, generateAiResponse } from '~/server/services/aiQuery'
 import { createClient } from '@supabase/supabase-js'
 import type { DownloadStatus, TrackEntry } from '~/types/track'
 import { logger } from '~/server/utils/logger'
@@ -115,9 +115,13 @@ export default defineEventHandler(async (event) => {
 
     logger.ai.result(results.length)
 
+    // Generate AI response phrase
+    const response = await generateAiResponse(question, results.length)
+
     return {
       sql: isDev ? sql : undefined,
-      results
+      results,
+      response
     }
   } catch (err) {
     logger.ai.error(err instanceof Error ? err.message : 'Unknown error')

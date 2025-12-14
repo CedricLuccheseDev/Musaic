@@ -11,12 +11,30 @@ const { lang, toggleLang } = useI18n()
 <template>
   <button
     type="button"
-    class="flex cursor-pointer items-center gap-1 rounded-lg bg-neutral-800 font-medium text-neutral-400 transition-all duration-200 hover:bg-neutral-700 hover:text-white"
-    :class="size === 'sm' ? 'px-2 py-1.5 text-xs' : 'px-2.5 py-2 text-sm'"
+    class="group relative flex cursor-pointer items-center overflow-hidden rounded-full border border-neutral-700/50 bg-neutral-800/50 transition-all duration-300 hover:border-violet-500/50"
+    :class="size === 'sm' ? 'h-8 w-16 text-xs' : 'h-10 w-20 text-sm'"
     @click="toggleLang"
   >
-    <span :class="lang === 'fr' ? 'text-white' : 'text-neutral-500'">FR</span>
-    <span class="text-neutral-600">/</span>
-    <span :class="lang === 'en' ? 'text-white' : 'text-neutral-500'">EN</span>
+    <!-- Sliding background -->
+    <span
+      class="absolute top-1 h-[calc(100%-8px)] w-[calc(50%-4px)] rounded-full bg-violet-600 transition-all duration-300"
+      :class="lang === 'fr' ? 'left-1' : 'left-[calc(50%+2px)]'"
+    />
+
+    <!-- FR -->
+    <span
+      class="relative z-10 flex flex-1 items-center justify-center font-medium transition-colors duration-300"
+      :class="lang === 'fr' ? 'text-white' : 'text-neutral-500 group-hover:text-neutral-300'"
+    >
+      FR
+    </span>
+
+    <!-- EN -->
+    <span
+      class="relative z-10 flex flex-1 items-center justify-center font-medium transition-colors duration-300"
+      :class="lang === 'en' ? 'text-white' : 'text-neutral-500 group-hover:text-neutral-300'"
+    >
+      EN
+    </span>
   </button>
 </template>

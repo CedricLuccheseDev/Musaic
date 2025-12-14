@@ -15,13 +15,11 @@ const searchInput = ref(query.value)
 // Filter state
 const activeFilter = ref<FilterType>('all')
 
-// Collapsable sections
-const tracksExpanded = ref(true)
-
 // AI search state
 const aiLoading = ref(false)
 const aiSql = ref('')
 const aiResults = ref<TrackEntry[]>([])
+const aiResponse = ref('')
 
 // Main search
 const { data: searchResult, status, refresh: refreshSearch } = await useFetch<SearchResult>('/api/search', {
@@ -79,7 +77,6 @@ watch(query, () => {
   allTracks.value = []
   hasMoreFromApi.value = false
   nextOffset.value = undefined
-  tracksExpanded.value = true
   runAiSearch()
 })
 
@@ -156,15 +153,17 @@ async function runAiSearch() {
   aiLoading.value = true
   aiSql.value = ''
   aiResults.value = []
+  aiResponse.value = ''
 
   try {
-    const response = await $fetch<{ sql: string; results: TrackEntry[] }>('/api/ai-query', {
+    const result = await $fetch<{ sql: string; results: TrackEntry[]; response: string }>('/api/ai-query', {
       method: 'POST',
       body: { question: searchInput.value }
     })
 
-    aiSql.value = response.sql
-    aiResults.value = response.results || []
+    aiSql.value = result.sql
+    aiResults.value = result.results || []
+    aiResponse.value = result.response || ''
   } catch (err) {
     console.error('[AI Search] Error:', err)
   } finally {
@@ -188,96 +187,42 @@ async function search() {
     <!-- Results -->
     <main class="relative mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-10">
       <ClientOnly>
-        <!-- Filters -->
-        <SearchFilters v-model:filter="activeFilter" />
-
-        <!-- AI Section -->
-        <SearchAiSection
-          v-if="aiLoading || filteredAiResults.length"
-          :loading="aiLoading"
-          :results="filteredAiResults"
-          :sql="aiSql"
-        />
-
-        <!-- SoundCloud Results Section (collapsable) -->
-        <section>
-          <!-- Loading -->
-          <div v-if="isLoading" class="flex flex-col items-center justify-center gap-4 py-16">
-            <div class="relative flex items-center justify-center">
-              <div class="absolute h-16 w-16 animate-ping rounded-full bg-violet-500/20" />
-              <div class="absolute h-12 w-12 animate-pulse rounded-full bg-purple-500/30" />
-              <div class="relative flex h-10 w-10 items-center justify-center rounded-full bg-linear-to-r from-violet-600 to-purple-600 shadow-lg shadow-purple-500/30">
-                <UIcon name="i-heroicons-musical-note" class="h-5 w-5 animate-bounce text-white" />
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-sm text-neutral-400">{{ t.searching }}</span>
-              <span class="flex gap-1">
-                <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-500" style="animation-delay: 0ms" />
-                <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-purple-500" style="animation-delay: 150ms" />
-                <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-pink-500" style="animation-delay: 300ms" />
-              </span>
-            </div>
+        <!-- Main results container -->
+        <template v-if="query && (aiLoading || filteredAiResults.length || isLoading || filteredTracks.length)">
+          <!-- Main title with filters -->
+          <div class="flex items-center gap-3 pb-2">
+            <UIcon name="i-heroicons-magnifying-glass" class="h-6 w-6 text-violet-400" />
+            <h2 class="flex-1 text-lg font-semibold text-white">
+              {{ t.resultsFor }} "{{ query }}"
+            </h2>
+            <SearchFilters v-model:filter="activeFilter" />
           </div>
 
-          <!-- Results list (collapsable) -->
-          <template v-else-if="filteredTracks.length">
-            <button
-              type="button"
-              class="flex w-full cursor-pointer items-center gap-3 py-4 text-left"
-              @click="tracksExpanded = !tracksExpanded"
-            >
-              <UIcon name="i-heroicons-magnifying-glass" class="h-6 w-6 text-violet-400" />
-              <h2 class="flex-1 text-lg font-semibold text-white">
-                {{ t.resultsFor }} "{{ query }}"
-              </h2>
-              <span class="text-sm text-neutral-500">{{ filteredTracks.length }} {{ t.results }}</span>
-              <UIcon
-                name="i-heroicons-chevron-down"
-                class="h-5 w-5 text-violet-400 transition-transform duration-200"
-                :class="{ 'rotate-180': !tracksExpanded }"
-              />
-            </button>
+          <!-- AI Section -->
+          <SearchAiSection
+            v-if="aiLoading || filteredAiResults.length"
+            :loading="aiLoading"
+            :results="filteredAiResults"
+            :sql="aiSql"
+            :response="aiResponse"
+          />
 
-            <Transition
-              enter-active-class="transition-all duration-300 ease-out"
-              enter-from-class="opacity-0 max-h-0"
-              enter-to-class="opacity-100 max-h-[5000px]"
-              leave-active-class="transition-all duration-200 ease-in"
-              leave-from-class="opacity-100 max-h-[5000px]"
-              leave-to-class="opacity-0 max-h-0"
-            >
-              <div v-if="tracksExpanded" class="mt-2 space-y-2 overflow-hidden">
-                <SearchTrackCard
-                  v-for="(track, index) in filteredTracks"
-                  :key="track.id"
-                  :track="track"
-                  :index="index"
-                  :skip-animation="index >= initialBatchSize"
-                  :detected-artist="detectedArtist"
-                />
+          <!-- SoundCloud Section -->
+          <SearchSoundcloudSection
+            v-if="isLoading || filteredTracks.length || (allTracks.length && !filteredTracks.length)"
+            :loading="isLoading"
+            :results="filteredTracks"
+            :has-more="hasMore"
+            :is-loading-more="isLoadingMore"
+            :initial-batch-size="initialBatchSize"
+            :detected-artist="detectedArtist"
+          />
+        </template>
 
-                <div v-if="hasMore || isLoadingMore" class="flex justify-center py-8">
-                  <UIcon name="i-heroicons-arrow-path" class="h-6 w-6 animate-spin text-muted" />
-                </div>
-
-                <div v-else class="py-8 text-center text-sm text-neutral-500">
-                  {{ t.endOfResults }}
-                </div>
-              </div>
-            </Transition>
-          </template>
-
-          <!-- No results after filter -->
-          <div v-else-if="allTracks.length && !filteredTracks.length" class="py-12 text-center">
-            <p class="text-neutral-500">{{ t.noFilterResults }}</p>
-          </div>
-
-          <!-- Empty state -->
-          <div v-else-if="query && !isLoading" class="py-12 text-center">
-            <p class="text-muted">{{ t.noResults }} "{{ query }}"</p>
-          </div>
-        </section>
+        <!-- Empty state (when no results at all) -->
+        <div v-else-if="query && !isLoading && !aiLoading" class="py-12 text-center">
+          <p class="text-muted">{{ t.noResults }} "{{ query }}"</p>
+        </div>
 
         <!-- Fallback on server -->
         <template #fallback>

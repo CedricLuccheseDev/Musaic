@@ -138,18 +138,142 @@
   animation: magic-gradient 4s ease-in-out infinite;
 }
 
-/* Page transitions */
+/* Login page animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+  }
+  25% {
+    transform: translateY(-20px) translateX(10px);
+  }
+  50% {
+    transform: translateY(-10px) translateX(-5px);
+  }
+  75% {
+    transform: translateY(-25px) translateX(5px);
+  }
+}
+
+@keyframes float-delayed {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+  }
+  25% {
+    transform: translateY(-15px) translateX(-10px);
+  }
+  50% {
+    transform: translateY(-25px) translateX(5px);
+  }
+  75% {
+    transform: translateY(-10px) translateX(-5px);
+  }
+}
+
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+  }
+  33% {
+    transform: translateY(-30px) translateX(15px);
+  }
+  66% {
+    transform: translateY(-15px) translateX(-10px);
+  }
+}
+
+@keyframes float-particle {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translateY(-40px) rotate(15deg);
+    opacity: 0.4;
+  }
+}
+
+@keyframes float-particle-delayed {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.15;
+  }
+  50% {
+    transform: translateY(-30px) rotate(-10deg);
+    opacity: 0.3;
+  }
+}
+
+@keyframes float-particle-slow {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.15;
+  }
+  50% {
+    transform: translateY(-50px) rotate(20deg);
+    opacity: 0.25;
+  }
+}
+
+@keyframes spin-very-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spin-slow-reverse {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+.animate-float {
+  animation: float 8s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float-delayed 10s ease-in-out infinite;
+  animation-delay: 2s;
+}
+
+.animate-float-slow {
+  animation: float-slow 12s ease-in-out infinite;
+}
+
+.animate-float-particle {
+  animation: float-particle 6s ease-in-out infinite;
+}
+
+.animate-float-particle-delayed {
+  animation: float-particle-delayed 8s ease-in-out infinite;
+  animation-delay: 1s;
+}
+
+.animate-float-particle-slow {
+  animation: float-particle-slow 10s ease-in-out infinite;
+  animation-delay: 3s;
+}
+
+.animate-spin-very-slow {
+  animation: spin-very-slow 60s linear infinite;
+}
+
+.animate-spin-slow-reverse {
+  animation: spin-slow-reverse 45s linear infinite;
+}
+
+/* Page transitions - fade only (no transform to avoid scrollbar) */
 .page-enter-active,
 .page-leave-active {
-  transition: all 0.3s ease-out;
+  transition: opacity 0.25s ease-out;
 }
 
-.page-enter-from {
-  opacity: 0;
-  transform: translateY(20px);
-}
-
+.page-enter-from,
 .page-leave-to {
   opacity: 0;
-  transform: translateY(-20px);
 }
