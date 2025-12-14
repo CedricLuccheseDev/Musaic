@@ -12,7 +12,18 @@ export default defineEventHandler(async (event): Promise<SearchResult> => {
   }
 
   const offsetNum = typeof offset === 'string' ? parseInt(offset, 10) : 0
-  const result = await searchWithArtistDetection(q, 25, offsetNum)
+
+  let result: SearchResult
+  try {
+    result = await searchWithArtistDetection(q, 25, offsetNum)
+    console.log(`[Search API] Query: "${q}", Found: ${result.tracks.length} tracks`)
+  } catch (err) {
+    console.error('[Search API] SoundCloud error:', err)
+    throw createError({
+      statusCode: 500,
+      message: `SoundCloud API error: ${err instanceof Error ? err.message : 'Unknown error'}`
+    })
+  }
 
   // Store tracks in database (non-blocking)
   const allTracks = [...result.tracks, ...(result.artist?.tracks || [])]

@@ -5,10 +5,6 @@ import { DownloadStatus, type TrackEntry } from '~/types/track'
 // Types
 // ============================================================================
 
-interface SoundcloudConstructor {
-  new (): SoundcloudInstance
-}
-
 interface SoundcloudInstance {
   tracks: {
     search: (params: { q: string; limit?: number; offset?: number }) => Promise<SoundcloudSearchResponse>
@@ -121,10 +117,31 @@ const PURCHASE_DOMAINS = [
 // Client
 // ============================================================================
 
+// SoundCloud client ID - needed because the auto-fetch is blocked from production servers
+// This ID may need to be updated periodically if SoundCloud invalidates it
+// Use NUXT_SOUNDCLOUD_CLIENT_ID in production env vars
+
+interface SoundcloudOptions {
+  proxy?: string
+}
+
+interface SoundcloudConstructorWithClientId {
+  new (clientId?: string, oauthToken?: string, options?: SoundcloudOptions): SoundcloudInstance
+}
+
 const Soundcloud = (
-  (SoundcloudModule as { default?: SoundcloudConstructor }).default ||
+  (SoundcloudModule as { default?: SoundcloudConstructorWithClientId }).default ||
   SoundcloudModule
-) as SoundcloudConstructor
+) as SoundcloudConstructorWithClientId
+
+function createSoundcloudClient(): SoundcloudInstance {
+  const config = useRuntimeConfig()
+  if (config.soundcloudClientId) {
+    return new Soundcloud(config.soundcloudClientId)
+  }
+  // Fallback to auto-fetch (works in dev, may fail in prod)
+  return new Soundcloud()
+}
 
 // ============================================================================
 // Helpers
@@ -326,7 +343,7 @@ export interface SearchResult {
 }
 
 export async function searchTracks(query: string, limit = SEARCH_LIMIT): Promise<TrackEntry[]> {
-  const soundcloud = new Soundcloud()
+  const soundcloud = createSoundcloudClient()
   const response = await soundcloud.tracks.search({ q: query, limit })
   const tracks = response.collection || []
 
@@ -334,7 +351,7 @@ export async function searchTracks(query: string, limit = SEARCH_LIMIT): Promise
 }
 
 export async function searchWithArtistDetection(query: string, limit = SEARCH_LIMIT, offset = 0): Promise<SearchResult> {
-  const soundcloud = new Soundcloud()
+  const soundcloud = createSoundcloudClient()
 
   // Search tracks and users in parallel with error handling
   const [tracksResult, usersResult] = await Promise.allSettled([
@@ -343,8 +360,12 @@ export async function searchWithArtistDetection(query: string, limit = SEARCH_LI
   ])
 
   // Handle tracks search result
+  if (tracksResult.status === 'rejected') {
+    console.error('[SoundCloud] Track search failed:', tracksResult.reason)
+  }
   const tracksResponse = tracksResult.status === 'fulfilled' ? tracksResult.value : { collection: [], next_href: null }
   const tracks = (tracksResponse.collection || []).map(mapToTrackEntry)
+  console.log(`[SoundCloud] Query: "${query}", Raw tracks: ${tracksResponse.collection?.length || 0}`)
   const hasMore = !!tracksResponse.next_href
   const nextOffset = hasMore ? offset + limit : undefined
 
