@@ -1,59 +1,17 @@
 <script setup lang="ts">
 import { DownloadStatus } from '~/types/track'
 
+/* --- States --- */
 const { t } = useI18n()
 const { currentTrack, stop, onWidgetReady, setWidget, setVolume, volume } = useSoundCloudEmbed()
-
 const iframeRef = ref<HTMLIFrameElement | null>(null)
+let widgetInstance: ReturnType<NonNullable<typeof window.SC>['Widget']> | null = null
 
+/* --- Computed --- */
 const embedUrl = computed(() => {
   if (!currentTrack.value) return ''
   const trackUrl = encodeURIComponent(currentTrack.value.permalink_url)
   return `https://w.soundcloud.com/player/?url=${trackUrl}&color=%238b5cf6&auto_play=true&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false&visual=false`
-})
-
-let widgetInstance: ReturnType<NonNullable<typeof window.SC>['Widget']> | null = null
-
-function initWidget() {
-  if (!iframeRef.value || !window.SC?.Widget) return
-
-  widgetInstance = window.SC.Widget(iframeRef.value)
-  setWidget(widgetInstance)
-
-  widgetInstance.bind(window.SC.Widget.Events.READY, () => {
-    widgetInstance?.setVolume(volume.value)
-  })
-}
-
-function handleIframeLoad() {
-  onWidgetReady()
-  // Wait for SC API script to be loaded
-  const checkSC = setInterval(() => {
-    if (window.SC?.Widget) {
-      clearInterval(checkSC)
-      initWidget()
-    }
-  }, 50)
-  // Timeout after 3s
-  setTimeout(() => clearInterval(checkSC), 3000)
-}
-
-function onVolumeChange(event: Event) {
-  const target = event.target as HTMLInputElement
-  const newVolume = Number(target.value)
-  setVolume(newVolume)
-  // Also directly control widget
-  widgetInstance?.setVolume(newVolume)
-}
-
-// Load SoundCloud Widget API script
-onMounted(() => {
-  if (!document.getElementById('sc-widget-api')) {
-    const script = document.createElement('script')
-    script.id = 'sc-widget-api'
-    script.src = 'https://w.soundcloud.com/player/api.js'
-    document.head.appendChild(script)
-  }
 })
 
 const downloadUrl = computed(() => {
@@ -77,6 +35,44 @@ const isFreeDownload = computed(() => {
 
 const hasPurchaseUrl = computed(() => {
   return currentTrack.value?.purchase_url && !isFreeDownload.value
+})
+
+/* --- Methods --- */
+function initWidget() {
+  if (!iframeRef.value || !window.SC?.Widget) return
+  widgetInstance = window.SC.Widget(iframeRef.value)
+  setWidget(widgetInstance)
+  widgetInstance.bind(window.SC.Widget.Events.READY, () => {
+    widgetInstance?.setVolume(volume.value)
+  })
+}
+
+function handleIframeLoad() {
+  onWidgetReady()
+  const checkSC = setInterval(() => {
+    if (window.SC?.Widget) {
+      clearInterval(checkSC)
+      initWidget()
+    }
+  }, 50)
+  setTimeout(() => clearInterval(checkSC), 3000)
+}
+
+function onVolumeChange(event: Event) {
+  const target = event.target as HTMLInputElement
+  const newVolume = Number(target.value)
+  setVolume(newVolume)
+  widgetInstance?.setVolume(newVolume)
+}
+
+/* --- Lifecycle --- */
+onMounted(() => {
+  if (!document.getElementById('sc-widget-api')) {
+    const script = document.createElement('script')
+    script.id = 'sc-widget-api'
+    script.src = 'https://w.soundcloud.com/player/api.js'
+    document.head.appendChild(script)
+  }
 })
 </script>
 

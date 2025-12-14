@@ -1,6 +1,6 @@
 <script setup lang="ts">
+/* --- States --- */
 const { t } = useI18n()
-
 const open = defineModel<boolean>({ default: false })
 </script>
 

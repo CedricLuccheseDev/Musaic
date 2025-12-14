@@ -2,6 +2,7 @@
 import { DownloadStatus, type TrackEntry } from '~/types/track'
 import type { ArtistInfo } from '~/server/services/soundcloud'
 
+/* --- Props --- */
 const props = withDefaults(defineProps<{
   track: TrackEntry
   index?: number
@@ -13,24 +14,48 @@ const props = withDefaults(defineProps<{
   detectedArtist: null
 })
 
+/* --- States --- */
+const { t } = useI18n()
+const config = useRuntimeConfig()
+const { play, isTrackPlaying, isLoading, isCurrentTrack } = useSoundCloudEmbed()
+const isVisible = ref(props.skipAnimation)
+
+/* --- Computed --- */
 const isFromDetectedArtist = computed(() => {
   if (!props.detectedArtist) return false
   return props.track.artist.toLowerCase() === props.detectedArtist.username.toLowerCase()
 })
 
-const { t } = useI18n()
-const config = useRuntimeConfig()
-const { play, isTrackPlaying, isLoading, isCurrentTrack } = useSoundCloudEmbed()
+const isFreeDownload = computed(() => props.track.downloadStatus !== DownloadStatus.No)
+const isDirectDownload = computed(() => props.track.downloadStatus === DownloadStatus.FreeDirectLink)
+const isPlaying = computed(() => isTrackPlaying(props.track.id))
+const isCurrentlyLoading = computed(() => isCurrentTrack(props.track.id) && isLoading.value)
 
-const isVisible = ref(props.skipAnimation)
-
-onMounted(() => {
-  if (props.skipAnimation) return
-  setTimeout(() => {
-    isVisible.value = true
-  }, props.index * 50)
+const artistUrl = computed(() => {
+  const url = props.track.permalink_url
+  const match = url.match(/^(https:\/\/soundcloud\.com\/[^/]+)/)
+  return match ? match[1] : `https://soundcloud.com/search?q=${encodeURIComponent(props.track.artist)}`
 })
 
+const mp3DownloadUrl = computed(() => {
+  const query = encodeURIComponent(`${props.track.artist} ${props.track.title}`)
+  return `https://soundcloudmp3.org/search?q=${query}`
+})
+
+const cardClass = computed(() => {
+  if (isCurrentTrack(props.track.id)) {
+    return 'bg-violet-950/50 hover:bg-violet-950/60 border-violet-500/50 ring-1 ring-violet-500/30'
+  }
+  if (props.track.downloadStatus === DownloadStatus.FreeDirectLink) {
+    return 'bg-emerald-950/40 hover:bg-emerald-950/40 border-emerald-800/30'
+  }
+  if (props.track.downloadStatus === DownloadStatus.FreeExternalLink) {
+    return 'bg-emerald-950/30 hover:bg-emerald-950/60 border-emerald-700/40'
+  }
+  return 'bg-neutral-900/80 hover:bg-neutral-800/80 border-neutral-800/50'
+})
+
+/* --- Methods --- */
 function handleCardClick() {
   play(props.track)
 }
@@ -45,43 +70,19 @@ function getDownloadUrl(): string | null {
   return null
 }
 
-const isFreeDownload = computed(() => props.track.downloadStatus !== DownloadStatus.No)
-const isDirectDownload = computed(() => props.track.downloadStatus === DownloadStatus.FreeDirectLink)
-const isPlaying = computed(() => isTrackPlaying(props.track.id))
-const isCurrentlyLoading = computed(() => isCurrentTrack(props.track.id) && isLoading.value)
-
-// Extract artist URL from track permalink (e.g., https://soundcloud.com/artist-name/track -> https://soundcloud.com/artist-name)
-const artistUrl = computed(() => {
-  const url = props.track.permalink_url
-  const match = url.match(/^(https:\/\/soundcloud\.com\/[^/]+)/)
-  return match ? match[1] : `https://soundcloud.com/search?q=${encodeURIComponent(props.track.artist)}`
-})
-
-// Generate soundcloudmp3.org URL with track title as query
-const mp3DownloadUrl = computed(() => {
-  const query = encodeURIComponent(`${props.track.artist} ${props.track.title}`)
-  return `https://soundcloudmp3.org/search?q=${query}`
-})
-
-const cardClass = computed(() => {
-  // Currently playing highlight
-  if (isCurrentTrack(props.track.id)) {
-    return 'bg-violet-950/50 hover:bg-violet-950/60 border-violet-500/50 ring-1 ring-violet-500/30'
-  }
-  if (props.track.downloadStatus === DownloadStatus.FreeDirectLink) {
-    return 'bg-emerald-950/40 hover:bg-emerald-950/40 border-emerald-800/30'
-  }
-  if (props.track.downloadStatus === DownloadStatus.FreeExternalLink) {
-    return 'bg-emerald-950/30 hover:bg-emerald-950/60 border-emerald-700/40'
-  }
-  return 'bg-neutral-900/80 hover:bg-neutral-800/80 border-neutral-800/50'
-})
-
 function formatDuration(ms: number): string {
   const minutes = Math.floor(ms / 60000)
   const seconds = Math.floor((ms % 60000) / 1000)
   return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
+
+/* --- Lifecycle --- */
+onMounted(() => {
+  if (props.skipAnimation) return
+  setTimeout(() => {
+    isVisible.value = true
+  }, props.index * 50)
+})
 </script>
 
 <template>

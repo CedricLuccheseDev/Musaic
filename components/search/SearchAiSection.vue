@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { TrackEntry } from '~/types/track'
 
+/* --- Props --- */
 const props = defineProps<{
   loading: boolean
   results: TrackEntry[]
@@ -8,22 +9,12 @@ const props = defineProps<{
   response: string
 }>()
 
+/* --- States --- */
 const { t } = useI18n()
-
 const collapsed = ref(false)
-
-// Track collapsed state for each artist subsection
 const artistCollapsed = ref<Record<string, boolean>>({})
 
-function toggleArtist(artist: string) {
-  artistCollapsed.value[artist] = !artistCollapsed.value[artist]
-}
-
-function isArtistCollapsed(artist: string): boolean {
-  return artistCollapsed.value[artist] ?? false
-}
-
-// Always group results by artist
+/* --- Computed --- */
 const resultsByArtist = computed(() => {
   const groups: Record<string, TrackEntry[]> = {}
   for (const track of props.results) {
@@ -37,6 +28,15 @@ const resultsByArtist = computed(() => {
 })
 
 const artistCount = computed(() => Object.keys(resultsByArtist.value).length)
+
+/* --- Methods --- */
+function toggleArtist(artist: string) {
+  artistCollapsed.value[artist] = !artistCollapsed.value[artist]
+}
+
+function isArtistCollapsed(artist: string): boolean {
+  return artistCollapsed.value[artist] ?? false
+}
 </script>
 
 <template>

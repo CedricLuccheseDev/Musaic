@@ -1,10 +1,12 @@
 <script setup lang="ts">
+/* --- Props --- */
 withDefaults(defineProps<{
   size?: 'sm' | 'md' | 'lg'
 }>(), {
   size: 'md'
 })
 
+/* --- States --- */
 const sizeClasses = {
   sm: {
     icon: 'h-8 w-8 rounded-lg',

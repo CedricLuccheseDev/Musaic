@@ -1,6 +1,8 @@
 <script setup lang="ts">
+/* --- States --- */
 const { init } = useAuth()
 
+/* --- Lifecycle --- */
 onMounted(() => {
   init()
 })

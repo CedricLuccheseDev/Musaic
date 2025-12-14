@@ -1,8 +1,7 @@
 <script setup lang="ts">
+/* --- States --- */
 const { t } = useI18n()
-
 type FilterType = 'all' | 'free' | 'paid'
-
 const filter = defineModel<FilterType>('filter', { default: 'all' })
 </script>
 

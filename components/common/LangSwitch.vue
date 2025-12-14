@@ -1,10 +1,12 @@
 <script setup lang="ts">
+/* --- Props --- */
 withDefaults(defineProps<{
   size?: 'sm' | 'md'
 }>(), {
   size: 'md'
 })
 
+/* --- States --- */
 const { lang, toggleLang } = useI18n()
 </script>
 

@@ -2,7 +2,10 @@
   <div class="pointer-events-none absolute inset-0 overflow-hidden">
     <!-- Top wave -->
     <svg
-      class="absolute -top-1/4 left-0 h-1/2 w-full opacity-30"
+      v-motion
+      :initial="{ opacity: 0, y: -50 }"
+      :enter="{ opacity: 0.3, y: 0, transition: { duration: 1200, delay: 200 } }"
+      class="absolute -top-1/4 left-0 h-1/2 w-full"
       xmlns="http://www.w3.org/2000/svg"
       preserveAspectRatio="none"
       viewBox="0 0 1440 400"
@@ -22,7 +25,10 @@
 
     <!-- Bottom wave -->
     <svg
-      class="absolute -bottom-1/4 left-0 h-1/2 w-full opacity-40"
+      v-motion
+      :initial="{ opacity: 0, y: 50 }"
+      :enter="{ opacity: 0.4, y: 0, transition: { duration: 1200, delay: 400 } }"
+      class="absolute -bottom-1/4 left-0 h-1/2 w-full"
       xmlns="http://www.w3.org/2000/svg"
       preserveAspectRatio="none"
       viewBox="0 0 1440 400"
@@ -50,6 +56,11 @@
     </svg>
 
     <!-- Center glow -->
-    <div class="absolute left-1/2 top-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-600/5 blur-3xl" />
+    <div
+      v-motion
+      :initial="{ opacity: 0, scale: 0.5 }"
+      :enter="{ opacity: 1, scale: 1, transition: { duration: 1500, delay: 100 } }"
+      class="absolute left-1/2 top-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-600/5 blur-3xl"
+    />
   </div>
 </template>
