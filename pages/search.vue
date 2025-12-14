@@ -21,10 +21,16 @@ const nextOffset = ref<number | undefined>(undefined)
 const isLoadingMore = ref(false)
 const initialBatchSize = ref(0)
 
+const searchError = ref<string | null>(null)
 const { data: searchResult, status, refresh: refreshSearch } = await useFetch<SearchResult>('/api/search', {
   query: { q: computed(() => (route.query.q as string) || '') },
   watch: [() => route.query.q],
-  server: false
+  server: false,
+  onResponseError({ response }) {
+    const errorData = response._data as { message?: string } | undefined
+    searchError.value = errorData?.message || `Error ${response.status}`
+    console.error('[Search] API Error:', response.status, response._data)
+  }
 })
 
 /* --- Computed --- */
@@ -230,6 +236,12 @@ onUnmounted(() => {
             :detected-artist="detectedArtist"
           />
         </template>
+
+        <!-- Error state -->
+        <div v-else-if="searchError" class="py-12 text-center">
+          <UIcon name="i-heroicons-exclamation-triangle" class="mx-auto mb-4 h-12 w-12 text-red-500" />
+          <p class="text-red-400">{{ searchError }}</p>
+        </div>
 
         <!-- Empty state (when no results at all) -->
         <div v-else-if="query && !isLoading && !aiLoading" class="py-12 text-center">
