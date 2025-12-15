@@ -26,6 +26,7 @@ dotenv.config()
 
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_KEY
+const analyzerUrl = process.env.ANALYZER_URL
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('❌ Missing SUPABASE_URL or SUPABASE_KEY in .env')
@@ -109,9 +110,24 @@ function trackToDbFormat(track: TrackEntry) {
     comment_count: track.comment_count,
     download_status: track.downloadStatus,
     downloadable: track.downloadable,
-    download_url: track.download_url,
     purchase_url: track.purchase_url,
     purchase_title: track.purchase_title
+  }
+}
+
+// Trigger analysis for tracks via musaic-analyzer
+async function triggerAnalysis(soundcloudIds: number[]): Promise<void> {
+  if (!analyzerUrl || soundcloudIds.length === 0) return
+
+  try {
+    await fetch(`${analyzerUrl}/analyze/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ soundcloud_ids: soundcloudIds })
+    })
+    console.log(`   🔬 Triggered analysis for ${soundcloudIds.length} tracks`)
+  } catch {
+    // Silent fail - analyzer might be down
   }
 }
 
@@ -222,6 +238,9 @@ async function main() {
     const count = await upsertTracks(batch)
     inserted += count
     console.log(`   ✅ ${inserted}/${tracksArray.length}`)
+
+    // Trigger analysis for this batch
+    await triggerAnalysis(batch.map(t => t.id))
     await delay(500)
   }
 

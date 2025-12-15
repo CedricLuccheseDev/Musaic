@@ -318,13 +318,43 @@ function mapToTrackEntry(track: SoundcloudTrack): TrackEntry {
     tags: parseTags(track.tag_list),
     bpm: audioMetadata.bpm,
     key: audioMetadata.key,
+    // Audio analysis fields (populated by musaic-analyzer)
+    // Rhythm
+    bpm_detected: null,
+    bpm_confidence: null,
+    beats_count: null,
+    onset_rate: null,
+    // Tonal
+    key_detected: null,
+    key_confidence: null,
+    tuning_frequency: null,
+    // Dynamics
+    energy: null,
+    loudness: null,
+    dynamic_complexity: null,
+    // Timbre
+    spectral_centroid: null,
+    spectral_complexity: null,
+    dissonance: null,
+    pitch_salience: null,
+    // High-level
+    danceability: null,
+    speechiness: null,
+    instrumentalness: null,
+    acousticness: null,
+    valence: null,
+    liveness: null,
+    // Status
+    analysis_status: null,
+    analysis_error: null,
+    analyzed_at: null,
+    // Stats
     playback_count: track.playback_count || 0,
     likes_count: track.likes_count || 0,
     reposts_count: track.reposts_count || 0,
     comment_count: track.comment_count || 0,
     downloadStatus: getDownloadStatus(track),
     downloadable: track.downloadable || false,
-    download_url: track.download_url || null,
     purchase_url: extractPurchaseUrl(track),
     purchase_title: track.purchase_title || null
   }

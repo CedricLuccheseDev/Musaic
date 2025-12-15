@@ -4,6 +4,23 @@ import { logger } from '~/server/utils/logger'
 
 let supabaseClient: SupabaseClient | null = null
 
+// Trigger analysis for new tracks via musaic-analyzer
+export async function triggerAnalysis(soundcloudIds: number[]): Promise<void> {
+  const config = useRuntimeConfig()
+  const analyzerUrl = config.analyzerUrl as string
+
+  if (!analyzerUrl || soundcloudIds.length === 0) return
+
+  // Fire and forget - don't block the upsert
+  fetch(`${analyzerUrl}/analyze/batch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ soundcloud_ids: soundcloudIds })
+  }).catch(() => {
+    // Silent fail - analyzer might be down
+  })
+}
+
 function getSupabaseClient(): SupabaseClient | null {
   if (supabaseClient) return supabaseClient
 
@@ -40,7 +57,6 @@ interface DbTrack {
   comment_count: number
   download_status: string
   downloadable: boolean
-  download_url: string | null
   purchase_url: string | null
   purchase_title: string | null
 }
@@ -67,7 +83,6 @@ function trackEntryToDbTrack(track: TrackEntry): DbTrack {
     comment_count: track.comment_count,
     download_status: track.downloadStatus,
     downloadable: track.downloadable,
-    download_url: track.download_url,
     purchase_url: track.purchase_url,
     purchase_title: track.purchase_title
   }
@@ -96,6 +111,7 @@ export async function upsertTrack(track: TrackEntry): Promise<void> {
   } else {
     const totalCount = await getTrackCount()
     logger.db.upsert(1, totalCount)
+    triggerAnalysis([track.id])
   }
 }
 
@@ -127,6 +143,7 @@ export async function upsertTracks(tracks: TrackEntry[]): Promise<void> {
   } else {
     const totalCount = await getTrackCount()
     logger.db.upsert(data?.length || uniqueTracks.length, totalCount)
+    triggerAnalysis(uniqueTracks.map(t => t.id))
   }
 }
 

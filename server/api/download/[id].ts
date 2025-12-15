@@ -41,8 +41,12 @@ function sanitizeFilename(name: string): string {
   return name.replace(/[/\\?%*:|"<>]/g, '-').trim()
 }
 
+interface SoundcloudOptions {
+  proxy?: string
+}
+
 interface SoundcloudConstructor {
-  new (): SoundcloudInstance
+  new (clientId?: string, oauthToken?: string, options?: SoundcloudOptions): SoundcloudInstance
 }
 
 interface SoundcloudInstance {
@@ -59,6 +63,21 @@ const Soundcloud = (
   SoundcloudModule
 ) as SoundcloudConstructor
 
+// Proxy URL for production (bypasses IP blocking from datacenters)
+const PROXY_URL = 'https://corsproxy.io/?'
+
+function createSoundcloudClient(): SoundcloudInstance {
+  const config = useRuntimeConfig()
+  const clientId = config.soundcloudClientId as string
+  const isDev = process.env.NODE_ENV === 'development'
+  const useProxy = !!clientId && !isDev
+
+  if (clientId) {
+    return new Soundcloud(clientId, undefined, useProxy ? { proxy: PROXY_URL } : undefined)
+  }
+  return new Soundcloud()
+}
+
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
 
@@ -70,7 +89,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const soundcloud = new Soundcloud()
+    const soundcloud = createSoundcloudClient()
 
     // First fetch the full track object
     const track = await soundcloud.tracks.get(Number(id))

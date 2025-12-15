@@ -33,6 +33,7 @@ export default defineNuxtConfig({
     supabaseUrl: process.env.SUPABASE_URL || '',
     supabaseKey: process.env.SUPABASE_KEY || '',
     soundcloudClientId: process.env.SOUNDCLOUD_CLIENT_ID || '',
+    analyzerUrl: process.env.ANALYZER_URL || '',
     public: {
       isDev: process.env.NODE_ENV === 'development',
       supabaseUrl: process.env.SUPABASE_URL || '',

@@ -28,7 +28,13 @@ Musaic permet de rechercher un titre et de savoir instantanément où le téléc
 - Questions en langage naturel ("Trouve-moi des remixes de Drake", "DJ mixes de plus de 30 minutes")
 - Conversion automatique en requêtes SQL via Claude AI
 - Distinction intelligente entre DJ mixes (15+ min) et remixes (3-7 min)
-- Recherche par genre, artiste, durée, statut de téléchargement
+- Recherche par genre, artiste, durée, BPM, key, statut de téléchargement
+
+### Analyse audio (via musaic-analyzer)
+
+- Détection automatique du BPM et de la tonalité
+- Analyse de l'énergie et de la danceability
+- Appel API direct à chaque ajout de track (fire-and-forget)
 
 ### Profils artistes
 
@@ -38,7 +44,7 @@ Musaic permet de rechercher un titre et de savoir instantanément où le téléc
 
 ### Autres fonctionnalités
 
-- Authentification Google (Supabase Auth)
+- Authentification Google/Apple (Supabase Auth)
 - Interface bilingue FR/EN
 - Stockage automatique des tracks recherchés en base de données
 
@@ -50,6 +56,7 @@ Musaic permet de rechercher un titre et de savoir instantanément où le téléc
 - **APIs** :
   - soundcloud.ts (SoundCloud v2)
   - Anthropic Claude 3.5 Haiku (recherche IA)
+- **Analyse audio** : musaic-analyzer (microservice Python + Essentia)
 - **Langage** : TypeScript
 
 ## Architecture
@@ -72,13 +79,19 @@ Tracks + Artistes détectés           SQL généré
    ┌──────────────┼──────────────┐
    ▼              ▼              ▼
 🟢 Free DL   🟢 Free Link   🟡 Achat
+                  │
+                  │ (appel API fire-and-forget)
+                  ▼
+          musaic-analyzer ──► BPM, Key, Energy...
+                  │
+                  └──► UPDATE Supabase
 ```
 
 ### Détection du statut de téléchargement
 
 ```
 Pour chaque track :
-    ├─ downloadable = true ? → 🟢 Free DL (download_url)
+    ├─ downloadable = true ? → 🟢 Free DL (streaming API)
     └─ purchase_url existe ?
            ├─ purchase_title contient "free" → 🟢 Free Link
            └─ Sinon → 🟡 Lien d'achat
@@ -94,11 +107,17 @@ npm run dev
 ## Scripts disponibles
 
 ```bash
-npm run dev          # Serveur de développement
-npm run build        # Build production
-npm run lint         # Vérification ESLint
-npm run test         # Test API SoundCloud
-npm run test:supabase # Test API Supabase
+npm run dev           # Serveur de développement
+npm run build         # Build production
+npm run lint          # Vérification ESLint
+npm run test          # Test API SoundCloud
+npm run test:supabase # Test connexion Supabase
+```
+
+### Population de la base
+
+```bash
+npx tsx scripts/populateTracks.ts '{"queries":["artist1","artist2"],"targetCount":200}'
 ```
 
 ## Variables d'environnement
@@ -107,7 +126,19 @@ npm run test:supabase # Test API Supabase
 SUPABASE_URL=
 SUPABASE_KEY=
 ANTHROPIC_API_KEY=
+ANALYZER_URL=          # URL du microservice musaic-analyzer (optionnel)
 ```
+
+## CI/CD
+
+- **Tests** : Lint, SoundCloud, Supabase, AI, Database, TypeCheck
+- **Build** : Vérifié à chaque push
+- **Versioning** : Tags automatiques (v1.0.x) sur main
+- **Déploiement** : Dokploy (trigger sur tag)
+
+## Projets liés
+
+- [musaic-analyzer](./docs/ANALYZER_BRIEF.md) - Microservice d'analyse audio (Python/Essentia)
 
 ## Licence
 
