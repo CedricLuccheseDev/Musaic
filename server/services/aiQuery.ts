@@ -2,34 +2,11 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages'
 import { logger } from '~/server/utils/logger'
 
-// System prompt for response generation
-const RESPONSE_SYSTEM_PROMPT = `You generate short, friendly responses for a music search app. Respond in the same language as the user query.
+// System prompt for SQL + response generation in one call
+const SYSTEM_PROMPT = `SQL and response generator for music search. Output JSON only.
 
-Rules:
-- Keep responses under 15 words
-- Be conversational and helpful
-- Reference what the user asked for
-- Use music-related terms naturally
-- No emojis, no markdown
-
-Examples:
-User: "Find me chill dubstep" (12 results)
-Response: "Here are 12 chill dubstep tracks for you"
-
-User: "Cherche moi de la techno récente" (8 results)
-Response: "Voici 8 tracks techno récentes pour toi"
-
-User: "Tracks like Excision" (15 results)
-Response: "Found 15 heavy bass tracks similar to Excision"
-
-User: "Melodic dubstep with vocals" (0 results)
-Response: "No melodic dubstep with vocals found in your library"
-
-User: "20 sons bass music" (20 results)
-Response: "Voici 20 sons bass music comme demandé"`
-
-// System prompt for SQL generation (optimized)
-const SYSTEM_PROMPT = `SQL generator for music search. Output ONLY PostgreSQL, no markdown.
+OUTPUT FORMAT (strict JSON, no markdown):
+{"sql":"SELECT ...","phrase":"Short response in user's language"}
 
 SCHEMA: tracks(soundcloud_id PK, title, artist, genre, duration ms, download_status, downloadable, playback_count, likes_count, tags[], soundcloud_created_at, bpm, key, label)
 
@@ -55,9 +32,23 @@ PATTERNS:
 - tags: '%x%'=ANY(tags)
 - label: WHERE label ILIKE '%monstercat%'
 
-For French queries, translate intent to SQL.`
+PHRASE RULES:
+- Under 15 words, same language as query
+- Conversational, music-related
+- No emojis
 
-export async function generateSqlQuery(question: string): Promise<string> {
+EXAMPLES:
+User: "chill dubstep" → {"sql":"SELECT * FROM tracks WHERE genre ILIKE '%dubstep%' ORDER BY playback_count DESC LIMIT 20","phrase":"Voici du dubstep chill pour toi"}
+User: "tracks like Excision" → {"sql":"SELECT * FROM tracks WHERE (genre ILIKE '%dubstep%' OR genre ILIKE '%riddim%') AND artist NOT ILIKE '%excision%' ORDER BY playback_count DESC LIMIT 20","phrase":"Heavy bass tracks similar to Excision"}
+
+For French queries, translate intent to SQL and respond in French.`
+
+export interface AiQueryResult {
+  sql: string
+  phrase: string
+}
+
+export async function generateSqlAndPhrase(question: string): Promise<AiQueryResult> {
   const config = useRuntimeConfig()
   const apiKey = config.anthropicApiKey
 
@@ -73,7 +64,7 @@ export async function generateSqlQuery(question: string): Promise<string> {
 
   const message = await anthropic.messages.create({
     model: 'claude-3-5-haiku-latest',
-    max_tokens: 256,
+    max_tokens: 300,
     system: [
       {
         type: 'text',
@@ -95,75 +86,23 @@ export async function generateSqlQuery(question: string): Promise<string> {
     throw new Error('Unexpected response type')
   }
 
-  // Clean up the response (remove markdown if present)
-  let sql = content.text.trim()
-  sql = sql.replace(/^```sql\n?/i, '').replace(/\n?```$/i, '')
-
-  return sql
-}
-
-export async function generateAiResponse(question: string, resultCount: number): Promise<string> {
-  const config = useRuntimeConfig()
-  const apiKey = config.anthropicApiKey
-
-  if (!apiKey) {
-    return resultCount > 0 ? `Found ${resultCount} tracks` : 'No results found'
-  }
-
-  const anthropic = new Anthropic({ apiKey })
-
-  const messages: MessageParam[] = [
-    { role: 'user', content: `User: "${question}" (${resultCount} results)` }
-  ]
+  // Parse JSON response
+  let text = content.text.trim()
+  // Remove markdown if present
+  text = text.replace(/^```json\n?/i, '').replace(/\n?```$/i, '')
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-latest',
-      max_tokens: 64,
-      system: RESPONSE_SYSTEM_PROMPT,
-      messages
-    })
-
-    const content = message.content[0]
-    if (content.type !== 'text') {
-      return resultCount > 0 ? `Found ${resultCount} tracks` : 'No results found'
+    const result = JSON.parse(text) as AiQueryResult
+    return {
+      sql: result.sql || '',
+      phrase: result.phrase || ''
     }
-
-    return content.text.trim()
   } catch {
-    return resultCount > 0 ? `Found ${resultCount} tracks` : 'No results found'
+    // Fallback: try to extract SQL if JSON parsing fails
+    const sqlMatch = text.match(/SELECT[\s\S]+?(?:LIMIT \d+|$)/i)
+    return {
+      sql: sqlMatch ? sqlMatch[0] : text,
+      phrase: ''
+    }
   }
-}
-
-export async function executeAiQuery(question: string): Promise<{ sql: string; results: unknown[]; error?: string }> {
-  const config = useRuntimeConfig()
-  const supabaseUrl = config.supabaseUrl as string
-  const supabaseKey = config.supabaseKey as string
-
-  if (!supabaseUrl || !supabaseKey) {
-    return { sql: '', results: [], error: 'Supabase not configured' }
-  }
-
-  // Generate SQL from question
-  const sql = await generateSqlQuery(question)
-
-  // Validate SQL (basic security check)
-  const sqlLower = sql.toLowerCase()
-  if (sqlLower.includes('drop') || sqlLower.includes('delete') || sqlLower.includes('update') || sqlLower.includes('insert') || sqlLower.includes('alter')) {
-    return { sql, results: [], error: 'Only SELECT queries are allowed' }
-  }
-
-  // Execute the query
-  const { createClient } = await import('@supabase/supabase-js')
-  const supabase = createClient(supabaseUrl, supabaseKey)
-
-  const { data, error } = await supabase.rpc('exec', { query: sql }).single()
-
-  if (error) {
-    // If RPC doesn't exist, try raw query via PostgREST
-    // For now, return the SQL and let frontend handle it
-    return { sql, results: [], error: error.message }
-  }
-
-  return { sql, results: Array.isArray(data) ? data : [] }
 }

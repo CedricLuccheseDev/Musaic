@@ -25,7 +25,7 @@ const sizeClasses = {
 
 /* --- Computed --- */
 const dropdownItems = computed(() => [[
-  { label: t.value.profileMenu, icon: 'i-heroicons-user', onSelect: () => router.push('/profile'), class: 'cursor-pointer' },
+  { label: t.value.profileMenu, icon: 'i-heroicons-cog-6-tooth', onSelect: () => router.push('/settings'), class: 'cursor-pointer' },
   { label: t.value.profileSignOut, icon: 'i-heroicons-arrow-right-on-rectangle', onSelect: () => signOut(), class: 'cursor-pointer' }
 ]])
 
@@ -54,7 +54,6 @@ watch(() => user.value?.id, () => {
         >
           <img
             v-if="showAvatar"
-            :key="user.id"
             :src="user.user_metadata.avatar_url"
             :alt="user.user_metadata?.full_name || 'Avatar'"
             class="h-full w-full object-cover"

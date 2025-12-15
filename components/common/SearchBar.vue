@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { placeholderPhrases } from '~/config/search'
+
 /* --- Props --- */
 const props = withDefaults(defineProps<{
   size?: 'default' | 'large'
@@ -16,28 +18,6 @@ const emit = defineEmits<{
 /* --- States --- */
 const { t } = useI18n()
 const searchInput = defineModel<string>('modelValue', { default: '' })
-const placeholderPhrases = [
-  'Find me some chill lofi beats',
-  'Melodic dubstep with female vocals',
-  'Dark techno for late night coding',
-  'Uplifting trance from 2024',
-  'Heavy bass music like Excision',
-  'Tracks similar to Subtronics',
-  'Deep house for summer vibes',
-  'Emotional dnb with piano',
-  'Hard riddim under 3 minutes',
-  'Ambient music for focus',
-  'Progressive house bangers',
-  'Free download dubstep tracks',
-  'Melodic bass with drops',
-  'Tracks with 140 BPM',
-  'Chill electronic for studying',
-  'Festival trap anthems',
-  'Underground techno gems',
-  'Synthwave with retro vibes',
-  'Bass house party tracks',
-  'Atmospheric drum and bass'
-]
 const animatedPlaceholder = ref('')
 const isInputFocused = ref(false)
 let animationTimeout: ReturnType<typeof setTimeout> | null = null
@@ -168,7 +148,11 @@ onUnmounted(() => {
         <button
           type="button"
           class="search-btn group relative m-1.5 flex shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl p-2.5 text-white transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-70"
-          :class="size === 'large' ? 'md:p-3' : ''"
+          :class="[
+            size === 'large' ? 'md:p-3' : '',
+            !loading && !searchInput ? 'opacity-50' : '',
+            !loading && searchInput ? 'opacity-80 hover:opacity-100' : ''
+          ]"
           :disabled="loading"
           @click="onSearch"
         >

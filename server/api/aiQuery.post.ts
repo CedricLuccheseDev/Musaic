@@ -1,4 +1,4 @@
-import { generateSqlQuery, generateAiResponse } from '~/server/services/aiQuery'
+import { generateSqlAndPhrase } from '~/server/services/aiQuery'
 import { createClient } from '@supabase/supabase-js'
 import type { DownloadStatus, TrackEntry } from '~/types/track'
 import { logger } from '~/server/utils/logger'
@@ -71,13 +71,13 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    // Generate SQL from natural language
-    let sql = await generateSqlQuery(question)
+    // Generate SQL and phrase from natural language (single AI call)
+    const aiResult = await generateSqlAndPhrase(question)
+    const sql = aiResult.sql.trim().replace(/;+$/, '')
+    const phrase = aiResult.phrase
 
-    // Clean up SQL (remove trailing semicolons that break the RPC)
-    sql = sql.trim().replace(/;+$/, '')
-
-    logger.ai.query(question, sql)
+    logger.ai.query(question)
+    logger.ai.sql(sql)
 
     // Validate SQL (security check)
     const sqlLower = sql.toLowerCase().trim()
@@ -113,15 +113,12 @@ export default defineEventHandler(async (event) => {
     // Transform DB results to TrackEntry format
     const results = (data || []).map((row: DbTrack) => dbTrackToTrackEntry(row))
 
-    logger.ai.result(results.length)
-
-    // Generate AI response phrase
-    const response = await generateAiResponse(question, results.length)
+    logger.ai.result(results.length, phrase)
 
     return {
       sql: isDev ? sql : undefined,
       results,
-      response
+      response: phrase
     }
   } catch (err) {
     logger.ai.error(err instanceof Error ? err.message : 'Unknown error')

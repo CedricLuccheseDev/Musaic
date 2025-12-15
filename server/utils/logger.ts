@@ -1,32 +1,31 @@
 // ANSI color codes for terminal output
-const colors = {
+const c = {
   reset: '\x1b[0m',
-  bright: '\x1b[1m',
+  bold: '\x1b[1m',
   dim: '\x1b[2m',
-
-  // Foreground colors
   red: '\x1b[31m',
   green: '\x1b[32m',
   yellow: '\x1b[33m',
   blue: '\x1b[34m',
   magenta: '\x1b[35m',
   cyan: '\x1b[36m',
-  white: '\x1b[37m',
-  gray: '\x1b[90m'
+  orange: '\x1b[38;5;208m',
+  gray: '\x1b[90m',
+  bgGray: '\x1b[48;5;236m'
 }
 
 type LogLevel = 'info' | 'success' | 'warn' | 'error' | 'debug'
 
 const levelConfig: Record<LogLevel, { color: string; icon: string }> = {
-  info: { color: colors.blue, icon: 'ℹ' },
-  success: { color: colors.green, icon: '✓' },
-  warn: { color: colors.yellow, icon: '⚠' },
-  error: { color: colors.red, icon: '✗' },
-  debug: { color: colors.gray, icon: '●' }
+  info: { color: c.blue, icon: '●' },
+  success: { color: c.green, icon: '✓' },
+  warn: { color: c.yellow, icon: '⚠' },
+  error: { color: c.red, icon: '✗' },
+  debug: { color: c.gray, icon: '·' }
 }
 
-// Stats tracking
-interface Stats {
+// Stats tracking (session only, for AI tokens)
+interface SessionStats {
   haiku: {
     inputTokens: number
     outputTokens: number
@@ -34,44 +33,39 @@ interface Stats {
     cacheCreation: number
     requests: number
   }
-  db: {
-    tracks: number
-  }
 }
 
-const stats: Stats = {
-  haiku: { inputTokens: 0, outputTokens: 0, cacheRead: 0, cacheCreation: 0, requests: 0 },
-  db: { tracks: 0 }
+const sessionStats: SessionStats = {
+  haiku: { inputTokens: 0, outputTokens: 0, cacheRead: 0, cacheCreation: 0, requests: 0 }
 }
 
-function formatTime(): string {
-  const now = new Date()
-  return `${colors.gray}${now.toLocaleTimeString('fr-FR')}${colors.reset}`
+function time(): string {
+  return `${c.gray}${new Date().toLocaleTimeString('fr-FR')}${c.reset}`
 }
 
 function log(level: LogLevel, tag: string, message: string, data?: unknown): void {
-  const config = levelConfig[level]
-  const tagColor = colors.cyan
+  const cfg = levelConfig[level]
+  const tagColors: Record<string, string> = {
+    AI: c.magenta,
+    DB: c.green,
+    SC: c.orange,
+    Security: c.yellow
+  }
+  const tagColor = tagColors[tag] || c.cyan
 
-  const formatted = `${formatTime()} ${config.color}${config.icon}${colors.reset} ${tagColor}[${tag}]${colors.reset} ${message}`
+  const line = `${time()} ${cfg.color}${cfg.icon}${c.reset} ${tagColor}${c.bold}${tag}${c.reset} ${message}`
 
   if (level === 'error') {
-    console.error(formatted, data !== undefined ? data : '')
+    console.error(line, data !== undefined ? data : '')
   } else if (level === 'warn') {
-    console.warn(formatted, data !== undefined ? data : '')
+    console.warn(line, data !== undefined ? data : '')
   } else {
-    console.log(formatted, data !== undefined ? data : '')
+    console.log(line, data !== undefined ? data : '')
   }
 }
 
-function formatTokens(): string {
-  const h = stats.haiku
-  const cached = h.cacheRead > 0 ? ` ${colors.green}(${h.cacheRead} cached)${colors.reset}` : ''
-  return `${colors.yellow}${h.inputTokens}${colors.reset}in/${colors.yellow}${h.outputTokens}${colors.reset}out${cached}`
-}
-
-function formatDbStats(): string {
-  return `${colors.magenta}${stats.db.tracks}${colors.reset} tracks`
+function num(n: number, color = c.yellow): string {
+  return `${color}${n.toLocaleString()}${c.reset}`
 }
 
 export const logger = {
@@ -81,33 +75,55 @@ export const logger = {
   error: (tag: string, message: string, data?: unknown) => log('error', tag, message, data),
   debug: (tag: string, message: string, data?: unknown) => log('debug', tag, message, data),
 
-  // Shorthand for database operations
+  // Database operations
   db: {
-    upsert: (table: string, count: number) => {
-      if (table.includes('track')) stats.db.tracks += count
-      log('success', 'DB', `${table}: ${count} upserted | Total: ${formatDbStats()}`)
+    upsert: (count: number, totalInDb: number) => {
+      log('success', 'DB', `+${num(count, c.green)} tracks ${c.dim}│${c.reset} Total: ${num(totalInDb, c.magenta)}`)
     },
-    error: (table: string, error: string) => log('error', 'DB', `${table}: ${error}`)
+    query: (resultCount: number, query: string) => {
+      const shortQuery = query.length > 60 ? query.substring(0, 60) + '...' : query
+      log('info', 'DB', `${num(resultCount)} results ${c.dim}│${c.reset} ${c.gray}${shortQuery}${c.reset}`)
+    },
+    error: (error: string) => log('error', 'DB', error)
   },
 
-  // Shorthand for AI Query with token tracking
+  // SoundCloud operations
+  sc: {
+    search: (query: string, count: number) => {
+      log('info', 'SC', `"${c.cyan}${query}${c.reset}" → ${num(count)} tracks`)
+    },
+    error: (error: string) => log('error', 'SC', error)
+  },
+
+  // AI operations
   ai: {
-    query: (question: string, sql: string) => {
-      log('info', 'AI', `"${question}"`)
-      log('debug', 'AI', `SQL: ${colors.magenta}${sql}${colors.reset}`)
+    query: (question: string) => {
+      log('info', 'AI', `"${c.cyan}${question}${c.reset}"`)
+    },
+    sql: (sql: string) => {
+      const shortSql = sql.length > 80 ? sql.substring(0, 80) + '...' : sql
+      log('debug', 'AI', `${c.gray}${shortSql}${c.reset}`)
     },
     tokens: (input: number, output: number, cacheRead = 0, cacheCreation = 0) => {
-      stats.haiku.inputTokens += input
-      stats.haiku.outputTokens += output
-      stats.haiku.cacheRead += cacheRead
-      stats.haiku.cacheCreation += cacheCreation
-      stats.haiku.requests++
-      log('info', 'AI', `Tokens: ${formatTokens()} | Requests: ${colors.cyan}${stats.haiku.requests}${colors.reset}`)
+      sessionStats.haiku.inputTokens += input
+      sessionStats.haiku.outputTokens += output
+      sessionStats.haiku.cacheRead += cacheRead
+      sessionStats.haiku.cacheCreation += cacheCreation
+      sessionStats.haiku.requests++
+
+      const h = sessionStats.haiku
+      const cache = cacheRead > 0 ? ` ${c.green}(${cacheRead} cached)${c.reset}` : ''
+      log('debug', 'AI', `${num(input)}in/${num(output)}out${cache} ${c.dim}│${c.reset} Session: ${num(h.requests, c.cyan)} req`)
     },
-    result: (count: number) => log('success', 'AI', `${count} results`),
+    result: (count: number, phrase?: string) => {
+      const msg = phrase
+        ? `${num(count)} results ${c.dim}│${c.reset} "${c.gray}${phrase}${c.reset}"`
+        : `${num(count)} results`
+      log('success', 'AI', msg)
+    },
     error: (error: string) => log('error', 'AI', error)
   },
 
-  // Get current stats
-  getStats: () => ({ ...stats })
+  // Get session stats
+  getStats: () => ({ ...sessionStats })
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { TrackEntry } from '~/types/track'
 import type { ArtistInfo } from '~/server/services/soundcloud'
+import { AD_INTERVAL } from '~/config/search'
 
 /* --- Props --- */
 const props = defineProps<{
@@ -11,9 +12,6 @@ const props = defineProps<{
   initialBatchSize: number
   detectedArtist?: ArtistInfo
 }>()
-
-/* --- Constants --- */
-const AD_INTERVAL = 10
 
 /* --- States --- */
 const { t } = useI18n()
@@ -28,21 +26,15 @@ function shouldShowAd(index: number): boolean {
 <template>
   <section class="mt-4 px-3 md:px-4">
     <!-- Loading -->
-    <div v-if="loading" class="flex flex-col items-center justify-center gap-4 py-16">
-      <div class="relative flex items-center justify-center">
-        <div class="absolute h-16 w-16 animate-ping rounded-full bg-violet-500/20" />
-        <div class="absolute h-12 w-12 animate-pulse rounded-full bg-purple-500/30" />
-        <div class="relative flex h-10 w-10 items-center justify-center rounded-full bg-linear-to-r from-violet-600 to-purple-600 shadow-lg shadow-purple-500/30">
-          <UIcon name="i-heroicons-musical-note" class="h-5 w-5 animate-bounce text-white" />
-        </div>
-      </div>
-      <div class="flex items-center gap-2">
-        <span class="text-sm text-neutral-400">{{ t.searching }}</span>
-        <span class="flex gap-1">
-          <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-500" style="animation-delay: 0ms" />
-          <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-purple-500" style="animation-delay: 150ms" />
-          <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-pink-500" style="animation-delay: 300ms" />
-        </span>
+    <div v-if="loading" class="flex items-center gap-3 py-4">
+      <UIcon name="i-simple-icons-soundcloud" class="h-5 w-5 animate-pulse text-orange-400" />
+      <span class="text-base font-medium text-orange-400">
+        {{ t.searching }}
+      </span>
+      <div class="flex gap-1">
+        <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-orange-500" style="animation-delay: 0ms" />
+        <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-orange-400" style="animation-delay: 150ms" />
+        <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-400" style="animation-delay: 300ms" />
       </div>
     </div>
 
