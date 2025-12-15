@@ -2,8 +2,10 @@
 /* --- Props --- */
 withDefaults(defineProps<{
   sticky?: boolean
+  hideLogo?: boolean
 }>(), {
-  sticky: false
+  sticky: false,
+  hideLogo: false
 })
 </script>
 
@@ -17,25 +19,58 @@ withDefaults(defineProps<{
       <!-- Left -->
       <div class="flex items-center justify-start gap-4">
         <slot name="back" />
-        <slot name="left">
-          <NuxtLink to="/" class="group transition-transform hover:scale-105">
-            <AppLogo size="md" />
-          </NuxtLink>
-        </slot>
+        <Transition
+          enter-active-class="transition-all duration-300 ease-out"
+          enter-from-class="opacity-0 scale-90 -translate-x-2"
+          enter-to-class="opacity-100 scale-100 translate-x-0"
+          leave-active-class="transition-all duration-200 ease-in"
+          leave-from-class="opacity-100 scale-100 translate-x-0"
+          leave-to-class="opacity-0 scale-90 -translate-x-2"
+          mode="out-in"
+        >
+          <slot v-if="!hideLogo" name="left">
+            <NuxtLink to="/" class="group transition-transform hover:scale-105">
+              <AppLogo size="md" />
+            </NuxtLink>
+          </slot>
+          <div v-else />
+        </Transition>
       </div>
 
       <!-- Center -->
-      <div class="flex justify-center">
-        <slot name="center" />
+      <div id="header-center-desktop" class="flex justify-center">
+        <Transition
+          enter-active-class="transition-all duration-300 ease-out"
+          enter-from-class="opacity-0 scale-95 translate-y-2"
+          enter-to-class="opacity-100 scale-100 translate-y-0"
+          leave-active-class="transition-all duration-200 ease-in"
+          leave-from-class="opacity-100 scale-100 translate-y-0"
+          leave-to-class="opacity-0 scale-95 translate-y-2"
+          mode="out-in"
+        >
+          <slot name="center" />
+        </Transition>
       </div>
 
       <!-- Right -->
       <div class="flex items-center justify-end gap-3">
-        <slot name="right">
-          <PremiumButton />
-          <LangSwitch />
-          <ProfileButtons />
-        </slot>
+        <Transition
+          enter-active-class="transition-all duration-300 ease-out"
+          enter-from-class="opacity-0 scale-90 translate-x-2"
+          enter-to-class="opacity-100 scale-100 translate-x-0"
+          leave-active-class="transition-all duration-200 ease-in"
+          leave-from-class="opacity-100 scale-100 translate-x-0"
+          leave-to-class="opacity-0 scale-90 translate-x-2"
+          mode="out-in"
+        >
+          <slot name="right">
+            <div class="flex items-center gap-3">
+              <PremiumButton />
+              <LangSwitch />
+              <ProfileButtons />
+            </div>
+          </slot>
+        </Transition>
       </div>
     </div>
 
@@ -45,27 +80,62 @@ withDefaults(defineProps<{
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
           <slot name="back" />
-          <slot name="left-mobile">
-            <slot name="left">
-              <NuxtLink to="/">
-                <AppLogo size="sm" />
-              </NuxtLink>
+          <Transition
+            enter-active-class="transition-all duration-300 ease-out"
+            enter-from-class="opacity-0 scale-90 -translate-x-2"
+            enter-to-class="opacity-100 scale-100 translate-x-0"
+            leave-active-class="transition-all duration-200 ease-in"
+            leave-from-class="opacity-100 scale-100 translate-x-0"
+            leave-to-class="opacity-0 scale-90 -translate-x-2"
+            mode="out-in"
+          >
+            <slot v-if="!hideLogo" name="left-mobile">
+              <slot name="left">
+                <NuxtLink to="/">
+                  <AppLogo size="sm" />
+                </NuxtLink>
+              </slot>
             </slot>
-          </slot>
+            <div v-else />
+          </Transition>
         </div>
         <div class="flex items-center gap-2">
-          <slot name="right-mobile">
-            <PremiumButton size="sm" />
-            <LangSwitch size="sm" />
-            <ProfileButtons size="sm" />
-          </slot>
+          <Transition
+            enter-active-class="transition-all duration-300 ease-out"
+            enter-from-class="opacity-0 scale-90 translate-x-2"
+            enter-to-class="opacity-100 scale-100 translate-x-0"
+            leave-active-class="transition-all duration-200 ease-in"
+            leave-from-class="opacity-100 scale-100 translate-x-0"
+            leave-to-class="opacity-0 scale-90 translate-x-2"
+            mode="out-in"
+          >
+            <slot name="right-mobile">
+              <div class="flex items-center gap-2">
+                <PremiumButton size="sm" />
+                <LangSwitch size="sm" />
+                <ProfileButtons size="sm" />
+              </div>
+            </slot>
+          </Transition>
         </div>
       </div>
 
       <!-- Center row (mobile) -->
-      <slot name="center-mobile">
-        <slot name="center" />
-      </slot>
+      <div id="header-center-mobile">
+        <Transition
+          enter-active-class="transition-all duration-300 ease-out"
+          enter-from-class="opacity-0 scale-95 translate-y-2"
+          enter-to-class="opacity-100 scale-100 translate-y-0"
+          leave-active-class="transition-all duration-200 ease-in"
+          leave-from-class="opacity-100 scale-100 translate-y-0"
+          leave-to-class="opacity-0 scale-95 translate-y-2"
+          mode="out-in"
+        >
+          <slot name="center-mobile">
+            <slot name="center" />
+          </slot>
+        </Transition>
+      </div>
     </div>
   </header>
 </template>

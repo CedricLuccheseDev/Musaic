@@ -92,9 +92,10 @@ export async function upsertTrack(track: TrackEntry): Promise<void> {
     })
 
   if (error) {
-    logger.db.error('tracks', error.message)
+    logger.db.error(error.message)
   } else {
-    logger.db.upsert('track', 1)
+    const totalCount = await getTrackCount()
+    logger.db.upsert(1, totalCount)
   }
 }
 
@@ -122,9 +123,10 @@ export async function upsertTracks(tracks: TrackEntry[]): Promise<void> {
     .select('soundcloud_id')
 
   if (error) {
-    logger.db.error('tracks', error.message)
+    logger.db.error(error.message)
   } else {
-    logger.db.upsert('tracks', data?.length || uniqueTracks.length)
+    const totalCount = await getTrackCount()
+    logger.db.upsert(data?.length || uniqueTracks.length, totalCount)
   }
 }
 
@@ -143,7 +145,7 @@ export async function getTrackBySoundcloudId(soundcloudId: number): Promise<DbTr
 
   if (error) {
     if (error.code !== 'PGRST116') {
-      logger.db.error('tracks', error.message)
+      logger.db.error(error.message)
     }
     return null
   }
@@ -165,7 +167,7 @@ export async function getStoredTracks(limit = 50, offset = 0): Promise<DbTrack[]
     .range(offset, offset + limit - 1)
 
   if (error) {
-    logger.db.error('tracks', error.message)
+    logger.db.error(error.message)
     return []
   }
 
@@ -184,7 +186,7 @@ export async function getTrackCount(): Promise<number> {
     .select('*', { count: 'exact', head: true })
 
   if (error) {
-    logger.db.error('tracks', error.message)
+    logger.db.error(error.message)
     return 0
   }
 

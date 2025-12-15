@@ -1,21 +1,26 @@
 <script setup lang="ts">
+/* --- Meta --- */
+definePageMeta({
+  layoutConfig: {
+    hideLogo: true
+  }
+})
+
 /* --- States --- */
 const { t } = useI18n()
 const query = ref('')
-const isSearching = ref(false)
 
 /* --- Methods --- */
-async function search() {
+function search() {
   if (!query.value.trim()) return
-  isSearching.value = true
-  await navigateTo({ path: '/search', query: { q: query.value } })
+  navigateTo({ path: '/search', query: { q: query.value } })
 }
 </script>
 
 <template>
-  <div class="relative flex min-h-screen flex-col bg-linear-to-b from-neutral-950 to-neutral-900 lg:p-8">
+  <div class="flex flex-1 flex-col">
     <HomeBackground />
-    <HomeHeader />
+
     <div class="relative flex flex-1 flex-col items-center justify-center px-4">
       <!-- Logo -->
       <div
@@ -47,11 +52,9 @@ async function search() {
         <SearchBar
           v-model="query"
           size="large"
-          :loading="isSearching"
           @search="search"
         />
       </div>
     </div>
-    <AppFooter />
   </div>
 </template>

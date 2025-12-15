@@ -9,7 +9,7 @@ const version = __APP_VERSION__
     <div class="flex flex-col items-center gap-2 sm:gap-3">
       <div class="flex items-center gap-2 sm:gap-4">
         <NuxtLink
-          to="/how-it-works"
+          to="/howItWorks"
           class="flex h-7 w-7 items-center justify-center rounded-full border border-neutral-700 text-neutral-500 transition-all hover:border-violet-500 hover:text-violet-400 sm:h-8 sm:w-8"
         >
           <UIcon name="i-heroicons-question-mark-circle" class="h-4 w-4 sm:h-5 sm:w-5" />

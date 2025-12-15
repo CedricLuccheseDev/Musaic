@@ -1,5 +1,6 @@
 import { searchWithArtistDetection, type SearchResult } from '~/server/services/soundcloud'
 import { upsertTracks } from '~/server/services/trackStorage'
+import { logger } from '~/server/utils/logger'
 
 export default defineEventHandler(async (event): Promise<SearchResult> => {
   const { q, offset } = getQuery(event)
@@ -16,9 +17,9 @@ export default defineEventHandler(async (event): Promise<SearchResult> => {
   let result: SearchResult
   try {
     result = await searchWithArtistDetection(q, 25, offsetNum)
-    console.log(`[Search API] Query: "${q}", Found: ${result.tracks.length} tracks`)
+    logger.sc.search(q, result.tracks.length)
   } catch (err) {
-    console.error('[Search API] SoundCloud error:', err)
+    logger.sc.error(err instanceof Error ? err.message : 'Unknown error')
     throw createError({
       statusCode: 500,
       message: `SoundCloud API error: ${err instanceof Error ? err.message : 'Unknown error'}`
@@ -29,7 +30,7 @@ export default defineEventHandler(async (event): Promise<SearchResult> => {
   const allTracks = [...result.tracks, ...(result.artist?.tracks || [])]
 
   upsertTracks(allTracks).catch(err => {
-    console.error('[Search API] Failed to store tracks:', err)
+    logger.db.error(err instanceof Error ? err.message : 'Failed to store tracks')
   })
 
   return result

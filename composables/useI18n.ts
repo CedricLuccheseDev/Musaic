@@ -82,7 +82,7 @@ const translations = {
     termsSection5Content: 'Nous nous réservons le droit de modifier ces conditions à tout moment. Les utilisateurs seront notifiés des changements importants.',
 
     // Profile
-    profileMenu: 'Mon profil',
+    profileMenu: 'Paramètres',
     profileProvider: 'Connexion via',
     profileMemberSince: 'Membre depuis',
     profileSignOut: 'Se déconnecter',
@@ -230,7 +230,7 @@ const translations = {
     termsSection5Content: 'We reserve the right to modify these terms at any time. Users will be notified of significant changes.',
 
     // Profile
-    profileMenu: 'My profile',
+    profileMenu: 'Settings',
     profileProvider: 'Signed in with',
     profileMemberSince: 'Member since',
     profileSignOut: 'Sign out',

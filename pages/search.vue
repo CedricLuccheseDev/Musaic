@@ -2,9 +2,17 @@
 import { DownloadStatus, type TrackEntry } from '~/types/track'
 import type { SearchResult } from '~/server/services/soundcloud'
 
+/* --- Meta --- */
+definePageMeta({
+  layoutConfig: {
+    stickyFooter: true
+  }
+})
+
 /* --- States --- */
 const { t } = useI18n()
 const { canUseAi, aiGenerationsLeft, isPremium, incrementAiUsage } = useSubscription()
+const headerMounted = ref(false)
 type FilterType = 'all' | 'free' | 'paid'
 const MAX_RESULTS = 500
 const route = useRoute()
@@ -22,10 +30,11 @@ const isLoadingMore = ref(false)
 const initialBatchSize = ref(0)
 
 const searchError = ref<string | null>(null)
-const { data: searchResult, status, refresh: refreshSearch } = await useFetch<SearchResult>('/api/search', {
+const { data: searchResult, status, refresh: refreshSearch } = useFetch<SearchResult>('/api/search', {
   query: { q: computed(() => (route.query.q as string) || '') },
   watch: [() => route.query.q],
   server: false,
+  lazy: true,
   onResponseError({ response }) {
     const errorData = response._data as { message?: string } | undefined
     searchError.value = errorData?.message || `Error ${response.status}`
@@ -110,7 +119,7 @@ async function runAiSearch() {
   aiResponse.value = ''
 
   try {
-    const result = await $fetch<{ sql: string; results: TrackEntry[]; response: string }>('/api/ai-query', {
+    const result = await $fetch<{ sql: string; results: TrackEntry[]; response: string }>('/api/aiQuery', {
       method: 'POST',
       body: { question: searchInput.value }
     })
@@ -158,6 +167,7 @@ watch(filteredTracks, () => {
 
 /* --- Lifecycle --- */
 onMounted(() => {
+  headerMounted.value = true
   window.addEventListener('scroll', handleScroll, { passive: true })
   checkInitialLoad()
   if (query.value) {
@@ -171,98 +181,99 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="relative flex min-h-screen flex-col bg-neutral-950 lg:p-8">
+  <div class="flex flex-1 flex-col">
     <SearchBackground />
-    <SearchHeader v-model="searchInput" :loading="isLoading" @search="search" />
 
-    <!-- Results -->
-    <main class="relative mx-auto w-full max-w-4xl flex-1 px-4 py-6 pb-32 md:px-6 md:py-10">
-      <ClientOnly>
-        <!-- Main results container -->
-        <template v-if="query && (aiLoading || filteredAiResults.length || isLoading || filteredTracks.length)">
-          <!-- Main title with filters -->
-          <div class="flex items-center gap-3 pb-2">
-            <UIcon name="i-heroicons-magnifying-glass" class="h-6 w-6 text-violet-400" />
-            <h2 class="flex-1 text-lg font-semibold text-white">
-              {{ t.resultsFor }} "{{ query }}"
-            </h2>
-            <SearchFilters v-model:filter="activeFilter" />
-          </div>
+    <!-- Teleport SearchBar to header center slots -->
+    <Teleport v-if="headerMounted" to="#header-center-desktop">
+      <div class="w-full max-w-xl">
+        <SearchBar v-model="searchInput" :loading="isLoading" @search="search" />
+      </div>
+    </Teleport>
+    <Teleport v-if="headerMounted" to="#header-center-mobile">
+      <SearchBar v-model="searchInput" :loading="isLoading" @search="search" />
+    </Teleport>
 
-          <!-- AI Limit CTA -->
-          <section v-if="aiLimitReached" class="mt-4 rounded-xl border border-amber-500/30 bg-amber-900/10 p-4">
-            <div class="flex flex-col items-center gap-3 text-center sm:flex-row sm:text-left">
-              <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/20">
-                <UIcon name="i-heroicons-sparkles" class="h-6 w-6 text-amber-400" />
-              </div>
-              <div class="flex-1">
-                <h3 class="font-semibold text-amber-400">{{ t.aiLimitReached }}</h3>
-                <p class="text-sm text-neutral-400">{{ t.aiLimitMessage }}</p>
-                <p class="text-sm text-neutral-300">{{ t.aiLimitCta }}</p>
-              </div>
-              <NuxtLink
-                to="/subscription"
-                class="flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-linear-to-r from-amber-500 to-amber-600 px-4 py-2 text-sm font-semibold text-black shadow-lg shadow-amber-500/20 transition-all hover:from-amber-400 hover:to-amber-500"
-              >
-                <UIcon name="i-heroicons-sparkles" class="h-4 w-4" />
-                {{ t.upgradePlan }}
-              </NuxtLink>
+  <!-- Results -->
+  <main class="relative mx-auto w-full max-w-4xl flex-1 px-4 py-6 pb-32 md:px-6 md:py-10">
+    <ClientOnly>
+      <!-- Main results container -->
+      <template v-if="query && (aiLoading || filteredAiResults.length || isLoading || filteredTracks.length)">
+        <!-- Main title with filters -->
+        <div class="flex items-center gap-3 pb-2">
+          <UIcon name="i-heroicons-magnifying-glass" class="h-6 w-6 text-violet-400" />
+          <h2 class="flex-1 text-lg font-semibold text-white">
+            {{ t.resultsFor }} "{{ query }}"
+          </h2>
+          <SearchFilters v-model:filter="activeFilter" />
+        </div>
+
+        <!-- AI Limit CTA -->
+        <section v-if="aiLimitReached" class="mt-4 rounded-xl border border-amber-500/30 bg-amber-900/10 p-4">
+          <div class="flex flex-col items-center gap-3 text-center sm:flex-row sm:text-left">
+            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/20">
+              <UIcon name="i-heroicons-sparkles" class="h-6 w-6 text-amber-400" />
             </div>
-          </section>
-
-          <!-- AI Counter (for non-premium users) -->
-          <div v-else-if="!isPremium && aiGenerationsLeft < Infinity" class="mt-4 flex items-center justify-end gap-2 text-xs text-neutral-500">
-            <UIcon name="i-heroicons-sparkles" class="h-3.5 w-3.5" />
-            <span>{{ aiGenerationsLeft }} {{ t.aiGenerationsLeft }}</span>
+            <div class="flex-1">
+              <h3 class="font-semibold text-amber-400">{{ t.aiLimitReached }}</h3>
+              <p class="text-sm text-neutral-400">{{ t.aiLimitMessage }}</p>
+              <p class="text-sm text-neutral-300">{{ t.aiLimitCta }}</p>
+            </div>
+            <NuxtLink
+              to="/subscription"
+              class="flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-linear-to-r from-amber-500 to-amber-600 px-4 py-2 text-sm font-semibold text-black shadow-lg shadow-amber-500/20 transition-all hover:from-amber-400 hover:to-amber-500"
+            >
+              <UIcon name="i-heroicons-sparkles" class="h-4 w-4" />
+              {{ t.upgradePlan }}
+            </NuxtLink>
           </div>
+        </section>
 
-          <!-- AI Section -->
-          <SearchAiSection
-            v-if="!aiLimitReached && (aiLoading || filteredAiResults.length)"
-            :loading="aiLoading"
-            :results="filteredAiResults"
-            :sql="aiSql"
-            :response="aiResponse"
-          />
-
-          <!-- SoundCloud Section -->
-          <SearchSoundcloudSection
-            v-if="isLoading || filteredTracks.length || (allTracks.length && !filteredTracks.length)"
-            :loading="isLoading"
-            :results="filteredTracks"
-            :has-more="hasMore"
-            :is-loading-more="isLoadingMore"
-            :initial-batch-size="initialBatchSize"
-            :detected-artist="detectedArtist"
-          />
-        </template>
-
-        <!-- Error state -->
-        <div v-else-if="searchError" class="py-12 text-center">
-          <UIcon name="i-heroicons-exclamation-triangle" class="mx-auto mb-4 h-12 w-12 text-red-500" />
-          <p class="text-red-400">{{ searchError }}</p>
+        <!-- AI Counter (for non-premium users) -->
+        <div v-else-if="!isPremium && aiGenerationsLeft < Infinity" class="mt-4 flex items-center justify-end gap-2 text-xs text-neutral-500">
+          <UIcon name="i-heroicons-sparkles" class="h-3.5 w-3.5" />
+          <span>{{ aiGenerationsLeft }} {{ t.aiGenerationsLeft }}</span>
         </div>
 
-        <!-- Empty state (when no results at all) -->
-        <div v-else-if="query && !isLoading && !aiLoading" class="py-12 text-center">
-          <p class="text-muted">{{ t.noResults }} "{{ query }}"</p>
+        <!-- AI Section -->
+        <SearchAiSection
+          v-if="!aiLimitReached && (aiLoading || filteredAiResults.length)"
+          :loading="aiLoading"
+          :results="filteredAiResults"
+          :sql="aiSql"
+          :response="aiResponse"
+        />
+
+        <!-- SoundCloud Section -->
+        <SearchSoundcloudSection
+          v-if="isLoading || filteredTracks.length || (allTracks.length && !filteredTracks.length)"
+          :loading="isLoading"
+          :results="filteredTracks"
+          :has-more="hasMore"
+          :is-loading-more="isLoadingMore"
+          :initial-batch-size="initialBatchSize"
+          :detected-artist="detectedArtist"
+        />
+      </template>
+
+      <!-- Error state -->
+      <div v-else-if="searchError" class="py-12 text-center">
+        <UIcon name="i-heroicons-exclamation-triangle" class="mx-auto mb-4 h-12 w-12 text-red-500" />
+        <p class="text-red-400">{{ searchError }}</p>
+      </div>
+
+      <!-- Empty state (when no results at all) -->
+      <div v-else-if="query && !isLoading && !aiLoading" class="py-12 text-center">
+        <p class="text-muted">{{ t.noResults }} "{{ query }}"</p>
+      </div>
+
+      <!-- Fallback on server -->
+      <template #fallback>
+        <div class="flex justify-center py-12">
+          <UIcon name="i-heroicons-arrow-path" class="h-8 w-8 animate-spin text-muted" />
         </div>
-
-        <!-- Fallback on server -->
-        <template #fallback>
-          <div class="flex justify-center py-12">
-            <UIcon name="i-heroicons-arrow-path" class="h-8 w-8 animate-spin text-muted" />
-          </div>
-        </template>
-      </ClientOnly>
-    </main>
-
-    <!-- Fixed blur overlay for fade effect -->
-    <div class="pointer-events-none fixed inset-x-0 bottom-0 z-10 h-28 backdrop-blur-md" style="mask-image: linear-gradient(to top, black 0%, transparent 100%); -webkit-mask-image: linear-gradient(to top, black 0%, transparent 100%);" />
-
-    <!-- Sticky footer -->
-    <footer class="sticky bottom-0 z-20">
-      <AppFooter />
-    </footer>
+      </template>
+    </ClientOnly>
+  </main>
   </div>
 </template>
