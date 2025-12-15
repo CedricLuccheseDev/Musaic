@@ -1,9 +1,18 @@
+import { execSync } from 'child_process'
 import pkg from './package.json'
+
+function getVersion(): string {
+  try {
+    return execSync('git describe --tags --abbrev=0 2>/dev/null').toString().trim()
+  } catch {
+    return `v${pkg.version}`
+  }
+}
 
 export default defineNuxtConfig({
   vite: {
     define: {
-      __APP_VERSION__: JSON.stringify(pkg.version)
+      __APP_VERSION__: JSON.stringify(getVersion())
     }
   },
   compatibilityDate: '2024-11-01',
