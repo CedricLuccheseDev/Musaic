@@ -235,74 +235,7 @@ function parseTags(tagList?: string): string[] {
   return tagList.split(' ').filter(tag => tag.length > 0)
 }
 
-const BPM_PATTERNS = [
-  /(\d{2,3})\s*bpm/i,
-  /bpm\s*[:|-]?\s*(\d{2,3})/i,
-  /tempo\s*[:|-]?\s*(\d{2,3})/i,
-  /(\d{2,3})\s*beats?\s*per\s*min/i
-]
-
-const KEY_PATTERNS = [
-  /\b([A-G][#b]?)\s*(maj|min|major|minor|m)?\b/i,
-  /key\s*[:|-]?\s*([A-G][#b]?)\s*(maj|min|major|minor|m)?/i,
-  /\b(\d{1,2}[AB])\b/i
-]
-
-const VALID_KEYS = [
-  'C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B',
-  'Cm', 'C#m', 'Dbm', 'Dm', 'D#m', 'Ebm', 'Em', 'Fm', 'F#m', 'Gbm', 'Gm', 'G#m', 'Abm', 'Am', 'A#m', 'Bbm', 'Bm',
-  '1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B', '5A', '5B', '6A', '6B',
-  '7A', '7B', '8A', '8B', '9A', '9B', '10A', '10B', '11A', '11B', '12A', '12B'
-]
-
-function extractBpm(text: string): number | null {
-  for (const pattern of BPM_PATTERNS) {
-    const match = text.match(pattern)
-    if (match) {
-      const bpm = parseInt(match[1], 10)
-      if (bpm >= 60 && bpm <= 200) {
-        return bpm
-      }
-    }
-  }
-  return null
-}
-
-function extractKey(text: string): string | null {
-  for (const pattern of KEY_PATTERNS) {
-    const match = text.match(pattern)
-    if (match) {
-      let key = match[1]
-      const modifier = match[2]?.toLowerCase()
-
-      if (modifier === 'min' || modifier === 'minor' || modifier === 'm') {
-        key = key + 'm'
-      }
-
-      if (VALID_KEYS.includes(key) || VALID_KEYS.includes(key.toUpperCase())) {
-        return key.toUpperCase()
-      }
-    }
-  }
-  return null
-}
-
-function extractAudioMetadata(track: SoundcloudTrack): { bpm: number | null; key: string | null } {
-  const searchText = [
-    track.title || '',
-    track.description || '',
-    track.tag_list || ''
-  ].join(' ')
-
-  return {
-    bpm: extractBpm(searchText),
-    key: extractKey(searchText)
-  }
-}
-
 function mapToTrackEntry(track: SoundcloudTrack): TrackEntry {
-  const audioMetadata = extractAudioMetadata(track)
-
   return {
     id: track.id,
     urn: track.urn || `soundcloud:tracks:${track.id}`,
@@ -316,8 +249,6 @@ function mapToTrackEntry(track: SoundcloudTrack): TrackEntry {
     created_at: track.created_at || null,
     label: track.label_name || null,
     tags: parseTags(track.tag_list),
-    bpm: audioMetadata.bpm,
-    key: audioMetadata.key,
     // Audio analysis fields (populated by musaic-analyzer)
     // Rhythm
     bpm_detected: null,

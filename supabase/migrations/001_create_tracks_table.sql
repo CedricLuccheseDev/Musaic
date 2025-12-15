@@ -32,10 +32,6 @@ CREATE TABLE IF NOT EXISTS tracks (
   reposts_count INTEGER DEFAULT 0,
   comment_count INTEGER DEFAULT 0,
 
-  -- Audio metadata (extracted from description/tags/title)
-  bpm INTEGER,
-  key TEXT,
-
   -- =====================================================
   -- AUDIO ANALYSIS (from Essentia via musaic-analyzer)
   -- =====================================================

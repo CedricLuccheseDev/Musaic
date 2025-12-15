@@ -23,10 +23,6 @@ export interface TrackEntry {
   label: string | null
   tags: string[]
 
-  // Audio metadata (extracted from description/tags/title)
-  bpm: number | null
-  key: string | null
-
   // Audio analysis (from Essentia via musaic-analyzer)
   // Rhythm
   bpm_detected: number | null

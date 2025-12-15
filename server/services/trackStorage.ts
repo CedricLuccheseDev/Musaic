@@ -4,6 +4,10 @@ import { logger } from '~/server/utils/logger'
 
 let supabaseClient: SupabaseClient | null = null
 
+// Track duration limits (in ms)
+const MIN_TRACK_DURATION = 2 * 60 * 1000 // 2 minutes
+const MAX_TRACK_DURATION = 8 * 60 * 1000 // 8 minutes
+
 // Trigger analysis for new tracks via musaic-analyzer
 export async function triggerAnalysis(soundcloudIds: number[]): Promise<void> {
   const config = useRuntimeConfig()
@@ -49,8 +53,6 @@ interface DbTrack {
   soundcloud_created_at: string | null
   label: string | null
   tags: string[]
-  bpm: number | null
-  key: string | null
   playback_count: number
   likes_count: number
   reposts_count: number
@@ -75,8 +77,6 @@ function trackEntryToDbTrack(track: TrackEntry): DbTrack {
     soundcloud_created_at: track.created_at,
     label: track.label,
     tags: track.tags,
-    bpm: track.bpm,
-    key: track.key,
     playback_count: track.playback_count,
     likes_count: track.likes_count,
     reposts_count: track.reposts_count,
@@ -92,10 +92,14 @@ function trackEntryToDbTrack(track: TrackEntry): DbTrack {
  * Upsert a single track into the database
  * If track with same soundcloud_id exists, update it
  * Otherwise, insert a new record
+ * Skips tracks longer than 8 minutes
  */
 export async function upsertTrack(track: TrackEntry): Promise<void> {
   const supabase = getSupabaseClient()
   if (!supabase) return
+
+  // Skip tracks outside duration limits (1-8 minutes)
+  if (track.duration < MIN_TRACK_DURATION || track.duration > MAX_TRACK_DURATION) return
 
   const dbTrack = trackEntryToDbTrack(track)
 
@@ -119,6 +123,7 @@ export async function upsertTrack(track: TrackEntry): Promise<void> {
  * Upsert multiple tracks into the database
  * Uses batch upsert for efficiency
  * Deduplicates by soundcloud_id to avoid ON CONFLICT errors
+ * Filters out tracks outside duration limits (1-8 minutes)
  */
 export async function upsertTracks(tracks: TrackEntry[]): Promise<void> {
   if (tracks.length === 0) return
@@ -126,8 +131,11 @@ export async function upsertTracks(tracks: TrackEntry[]): Promise<void> {
   const supabase = getSupabaseClient()
   if (!supabase) return
 
-  // Deduplicate by soundcloud_id (keep last occurrence)
-  const uniqueTracks = [...new Map(tracks.map(t => [t.id, t])).values()]
+  // Filter by duration and deduplicate by soundcloud_id (keep last occurrence)
+  const validTracks = tracks.filter(t => t.duration >= MIN_TRACK_DURATION && t.duration <= MAX_TRACK_DURATION)
+  if (validTracks.length === 0) return
+
+  const uniqueTracks = [...new Map(validTracks.map(t => [t.id, t])).values()]
   const dbTracks = uniqueTracks.map(trackEntryToDbTrack)
 
   const { error, data } = await supabase

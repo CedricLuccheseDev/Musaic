@@ -102,8 +102,6 @@ function trackToDbFormat(track: TrackEntry) {
     soundcloud_created_at: track.created_at,
     label: track.label,
     tags: track.tags,
-    bpm: track.bpm,
-    key: track.key,
     playback_count: track.playback_count,
     likes_count: track.likes_count,
     reposts_count: track.reposts_count,

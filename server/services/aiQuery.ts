@@ -8,13 +8,13 @@ const SYSTEM_PROMPT = `SQL and response generator for music search. Output JSON 
 OUTPUT FORMAT (strict JSON, no markdown):
 {"sql":"SELECT ...","phrase":"Short response in user's language"}
 
-SCHEMA: tracks(soundcloud_id PK, title, artist, genre, duration ms, download_status, downloadable, playback_count, likes_count, tags[], soundcloud_created_at, bpm, key, label,
-  -- Audio analysis (from Essentia)
+SCHEMA: tracks(soundcloud_id PK, title, artist, genre, duration ms, download_status, downloadable, playback_count, likes_count, tags[], soundcloud_created_at, label,
+  -- Audio analysis (from Essentia via musaic-analyzer)
   bpm_detected, bpm_confidence, key_detected, key_confidence,
   energy, loudness, dynamic_complexity,
   danceability, speechiness, instrumentalness, acousticness, valence, liveness,
   spectral_centroid, dissonance,
-  analysis_status)
+  analysis_status TEXT: pending/processing/completed/failed)
 
 DEFAULTS: SELECT * FROM tracks, ILIKE for text, ORDER BY playback_count DESC, LIMIT 20 (max 50)
 
@@ -26,10 +26,8 @@ PATTERNS:
 - title: WHERE title ILIKE '%memories%'
 - similar to artist: WHERE (genre ILIKE '%melodic dubstep%' OR genre ILIKE '%future bass%') AND artist NOT ILIKE '%artistname%'
 - free: WHERE download_status IN ('FreeDirectLink','FreeExternalLink')
-- bpm (text): WHERE bpm BETWEEN 140 AND 150
-- bpm (detected): WHERE bpm_detected BETWEEN 140 AND 150 AND analysis_status='completed'
-- key (text): WHERE key ILIKE '%C minor%' OR key ILIKE '%Cm%'
-- key (detected): WHERE key_detected ILIKE '%A minor%' AND analysis_status='completed'
+- bpm: WHERE bpm_detected BETWEEN 140 AND 150 AND analysis_status='completed'
+- key: WHERE key_detected ILIKE '%A minor%' AND analysis_status='completed'
 - energetic: WHERE energy > 0.7 AND analysis_status='completed'
 - chill/relaxed: WHERE energy < 0.4 AND analysis_status='completed'
 - danceable: WHERE danceability > 0.7 AND analysis_status='completed'
@@ -52,16 +50,18 @@ PATTERNS:
 - tags: '%x%'=ANY(tags)
 - label: WHERE label ILIKE '%monstercat%'
 
-AUDIO ANALYSIS (0-1 scale, require analysis_status='completed'):
-- energy: intensity (0.7+=high, 0.3-=low)
-- danceability: groove/rhythm regularity
-- valence: mood (1=happy, 0=sad)
-- acousticness: acoustic vs electronic
-- instrumentalness: instrumental vs vocal
-- speechiness: voice presence
-- liveness: live recording probability
+AUDIO ANALYSIS (NULL if not analyzed, ALWAYS require analysis_status='completed' when filtering):
+- bpm_detected: BPM (60-200)
+- key_detected: musical key (e.g., "A minor", "C major")
+- energy: intensity 0-1 (0.7+=high, 0.3-=low)
+- danceability: groove/rhythm 0-1
+- valence: mood 0-1 (1=happy, 0=sad)
+- acousticness: acoustic vs electronic 0-1
+- instrumentalness: instrumental vs vocal 0-1
+- speechiness: voice presence 0-1
+- liveness: live recording probability 0-1
 - spectral_centroid: brightness in Hz (>3000=bright, <1500=dark)
-- dissonance: harmonic tension
+- dissonance: harmonic tension 0-1
 
 PHRASE RULES:
 - Under 15 words, same language as query
