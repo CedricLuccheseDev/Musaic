@@ -49,7 +49,7 @@ async function testDatabase() {
       console.log('✅ RPC exec working')
       console.log(`   Result: ${JSON.stringify(data)}`)
     }
-  } catch (err) {
+  } catch {
     console.log('⚠️  RPC exec not available (optional)')
   }
 
