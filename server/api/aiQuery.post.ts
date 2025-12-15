@@ -17,17 +17,31 @@ interface DbTrack {
   soundcloud_created_at: string | null
   label: string | null
   tags: string[]
-  bpm: number | null
-  key: string | null
   playback_count: number
   likes_count: number
   reposts_count: number
   comment_count: number
   download_status: string
   downloadable: boolean
-  download_url: string | null
   purchase_url: string | null
   purchase_title: string | null
+  // Audio analysis fields
+  bpm_detected: number | null
+  bpm_confidence: number | null
+  key_detected: string | null
+  key_confidence: number | null
+  energy: number | null
+  loudness: number | null
+  dynamic_complexity: number | null
+  danceability: number | null
+  speechiness: number | null
+  instrumentalness: number | null
+  acousticness: number | null
+  valence: number | null
+  liveness: number | null
+  spectral_centroid: number | null
+  dissonance: number | null
+  analysis_status: string | null
 }
 
 // Convert DB format to TrackEntry format
@@ -45,17 +59,38 @@ function dbTrackToTrackEntry(db: DbTrack): TrackEntry {
     created_at: db.soundcloud_created_at,
     label: db.label,
     tags: db.tags || [],
-    bpm: db.bpm,
-    key: db.key,
     playback_count: db.playback_count,
     likes_count: db.likes_count,
     reposts_count: db.reposts_count,
     comment_count: db.comment_count,
     downloadStatus: db.download_status as DownloadStatus,
     downloadable: db.downloadable,
-    download_url: db.download_url,
     purchase_url: db.purchase_url,
-    purchase_title: db.purchase_title
+    purchase_title: db.purchase_title,
+    // Audio analysis fields
+    bpm_detected: db.bpm_detected,
+    bpm_confidence: db.bpm_confidence,
+    beats_count: null,
+    onset_rate: null,
+    key_detected: db.key_detected,
+    key_confidence: db.key_confidence,
+    tuning_frequency: null,
+    energy: db.energy,
+    loudness: db.loudness,
+    dynamic_complexity: db.dynamic_complexity,
+    spectral_centroid: db.spectral_centroid,
+    spectral_complexity: null,
+    dissonance: db.dissonance,
+    pitch_salience: null,
+    danceability: db.danceability,
+    speechiness: db.speechiness,
+    instrumentalness: db.instrumentalness,
+    acousticness: db.acousticness,
+    valence: db.valence,
+    liveness: db.liveness,
+    analysis_status: db.analysis_status as TrackEntry['analysis_status'],
+    analysis_error: null,
+    analyzed_at: null
   }
 }
 

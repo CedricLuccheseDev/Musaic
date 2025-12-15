@@ -1,5 +1,5 @@
 import { searchWithArtistDetection, type SearchResult } from '~/server/services/soundcloud'
-import { upsertTracks } from '~/server/services/trackStorage'
+import { upsertTracks, enrichTracksWithAnalysis } from '~/server/services/trackStorage'
 import { logger } from '~/server/utils/logger'
 
 export default defineEventHandler(async (event): Promise<SearchResult> => {
@@ -26,12 +26,23 @@ export default defineEventHandler(async (event): Promise<SearchResult> => {
     })
   }
 
-  // Store tracks in database (non-blocking)
+  // Collect all tracks for enrichment and storage
   const allTracks = [...result.tracks, ...(result.artist?.tracks || [])]
 
+  // Enrich tracks with analysis data from Supabase (BPM, key, etc.)
+  const [enrichedTracks, enrichedArtistTracks] = await Promise.all([
+    enrichTracksWithAnalysis(result.tracks),
+    result.artist?.tracks ? enrichTracksWithAnalysis(result.artist.tracks) : Promise.resolve([])
+  ])
+
+  // Store tracks in database (non-blocking)
   upsertTracks(allTracks).catch(err => {
     logger.db.error(err instanceof Error ? err.message : 'Failed to store tracks')
   })
 
-  return result
+  return {
+    ...result,
+    tracks: enrichedTracks,
+    artist: result.artist ? { ...result.artist, tracks: enrichedArtistTracks } : undefined
+  }
 })

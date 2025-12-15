@@ -171,15 +171,15 @@ onMounted(() => {
             <UIcon name="i-heroicons-play" class="h-3 w-3" />
             {{ track.playback_count.toLocaleString() }}
           </span>
-          <!-- BPM -->
-          <span class="flex items-center gap-1" :class="track.bpm ? 'text-violet-400' : 'text-neutral-600'">
+          <!-- BPM (from audio analysis) -->
+          <span v-if="track.bpm_detected" class="flex items-center gap-1 text-violet-400">
             <span class="font-medium">BPM:</span>
-            {{ track.bpm || '—' }}
+            {{ track.bpm_detected }}
           </span>
-          <!-- Key -->
-          <span class="flex items-center gap-1" :class="track.key ? 'text-cyan-400' : 'text-neutral-600'">
+          <!-- Key (from audio analysis) -->
+          <span v-if="track.key_detected" class="flex items-center gap-1 text-cyan-400">
             <span class="font-medium">Key:</span>
-            {{ track.key || '—' }}
+            {{ track.key_detected }}
           </span>
         </div>
       </div>

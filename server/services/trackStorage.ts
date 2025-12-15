@@ -217,3 +217,83 @@ export async function getTrackCount(): Promise<number> {
 
   return count || 0
 }
+
+interface AnalysisData {
+  soundcloud_id: number
+  bpm_detected: number | null
+  bpm_confidence: number | null
+  key_detected: string | null
+  key_confidence: number | null
+  energy: number | null
+  loudness: number | null
+  dynamic_complexity: number | null
+  danceability: number | null
+  speechiness: number | null
+  instrumentalness: number | null
+  acousticness: number | null
+  valence: number | null
+  liveness: number | null
+  spectral_centroid: number | null
+  dissonance: number | null
+  analysis_status: string | null
+}
+
+/**
+ * Get analysis data for multiple tracks by SoundCloud IDs
+ * Returns a map of soundcloud_id -> analysis data
+ */
+export async function getAnalysisData(soundcloudIds: number[]): Promise<Map<number, AnalysisData>> {
+  const supabase = getSupabaseClient()
+  if (!supabase || soundcloudIds.length === 0) return new Map()
+
+  const { data, error } = await supabase
+    .from('tracks')
+    .select('soundcloud_id, bpm_detected, bpm_confidence, key_detected, key_confidence, energy, loudness, dynamic_complexity, danceability, speechiness, instrumentalness, acousticness, valence, liveness, spectral_centroid, dissonance, analysis_status')
+    .in('soundcloud_id', soundcloudIds)
+
+  if (error) {
+    logger.db.error(error.message)
+    return new Map()
+  }
+
+  const map = new Map<number, AnalysisData>()
+  for (const row of data || []) {
+    map.set(row.soundcloud_id, row as AnalysisData)
+  }
+  return map
+}
+
+/**
+ * Enrich tracks with analysis data from Supabase
+ */
+export async function enrichTracksWithAnalysis(tracks: TrackEntry[]): Promise<TrackEntry[]> {
+  if (tracks.length === 0) return tracks
+
+  const ids = tracks.map(t => t.id)
+  const analysisMap = await getAnalysisData(ids)
+
+  return tracks.map(track => {
+    const analysis = analysisMap.get(track.id)
+    if (!analysis) return track
+
+    return {
+      ...track,
+      bpm_detected: analysis.bpm_detected,
+      bpm_confidence: analysis.bpm_confidence,
+      key_detected: analysis.key_detected,
+      key_confidence: analysis.key_confidence,
+      energy: analysis.energy,
+      loudness: analysis.loudness,
+      dynamic_complexity: analysis.dynamic_complexity,
+      danceability: analysis.danceability,
+      speechiness: analysis.speechiness,
+      instrumentalness: analysis.instrumentalness,
+      acousticness: analysis.acousticness,
+      valence: analysis.valence,
+      liveness: analysis.liveness,
+      spectral_centroid: analysis.spectral_centroid,
+      dissonance: analysis.dissonance,
+      analysis_status: analysis.analysis_status as TrackEntry['analysis_status']
+    }
+  })
+}
