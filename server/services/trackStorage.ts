@@ -9,20 +9,21 @@ const MIN_TRACK_DURATION = 2 * 60 * 1000 // 2 minutes
 const MAX_TRACK_DURATION = 8 * 60 * 1000 // 8 minutes
 
 // Trigger analysis for new tracks via musaic-analyzer
-export async function triggerAnalysis(soundcloudIds: number[]): Promise<void> {
-  const config = useRuntimeConfig()
-  const analyzerUrl = config.analyzerUrl as string
+// NOTE: Temporarily disabled - analyzer service is under maintenance
+export async function triggerAnalysis(_soundcloudIds: number[]): Promise<void> {
+  // const config = useRuntimeConfig()
+  // const analyzerUrl = config.analyzerUrl as string
 
-  if (!analyzerUrl || soundcloudIds.length === 0) return
+  // if (!analyzerUrl || soundcloudIds.length === 0) return
 
-  // Fire and forget - don't block the upsert
-  fetch(`${analyzerUrl}/analyze/batch`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ soundcloud_ids: soundcloudIds })
-  }).catch(() => {
-    // Silent fail - analyzer might be down
-  })
+  // // Fire and forget - don't block the upsert
+  // fetch(`${analyzerUrl}/analyze/batch`, {
+  //   method: 'POST',
+  //   headers: { 'Content-Type': 'application/json' },
+  //   body: JSON.stringify({ soundcloud_ids: soundcloudIds })
+  // }).catch(() => {
+  //   // Silent fail - analyzer might be down
+  // })
 }
 
 function getSupabaseClient(): SupabaseClient | null {
