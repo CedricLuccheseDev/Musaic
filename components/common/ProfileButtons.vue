@@ -1,4 +1,12 @@
 <script setup lang="ts">
+/* --- Types --- */
+interface DropdownItem {
+  label: string
+  icon: string
+  onSelect: () => void
+  class: string
+}
+
 /* --- Props --- */
 withDefaults(defineProps<{
   size?: 'sm' | 'md'
@@ -33,7 +41,7 @@ const imageError = ref(false)
 const hasAdminAccess = computed(() => isDev || isAdmin.value)
 
 const dropdownItems = computed(() => {
-  const items = [
+  const items: DropdownItem[] = [
     { label: t.value.profileMenu, icon: 'i-heroicons-cog-6-tooth', onSelect: () => router.push('/settings'), class: 'cursor-pointer' }
   ]
 
@@ -41,7 +49,7 @@ const dropdownItems = computed(() => {
     items.push({ label: 'Dashboard', icon: 'i-heroicons-chart-bar', onSelect: () => router.push('/dashboard'), class: 'cursor-pointer' })
   }
 
-  items.push({ label: t.value.profileSignOut, icon: 'i-heroicons-arrow-right-on-rectangle', onSelect: () => signOut(), class: 'cursor-pointer' })
+  items.push({ label: t.value.profileSignOut, icon: 'i-heroicons-arrow-right-on-rectangle', onSelect: () => { signOut() }, class: 'cursor-pointer' })
 
   return [items]
 })

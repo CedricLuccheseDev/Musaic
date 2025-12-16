@@ -27,21 +27,16 @@ export interface TrackEntry {
   // Rhythm
   bpm_detected: number | null
   bpm_confidence: number | null
-  beats_count: number | null
-  onset_rate: number | null
   // Tonal
   key_detected: string | null
   key_confidence: number | null
-  tuning_frequency: number | null
   // Dynamics
   energy: number | null
   loudness: number | null
   dynamic_complexity: number | null
   // Timbre
   spectral_centroid: number | null
-  spectral_complexity: number | null
   dissonance: number | null
-  pitch_salience: number | null
   // High-level descriptors
   danceability: number | null
   speechiness: number | null

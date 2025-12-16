@@ -14,7 +14,9 @@ SCHEMA: tracks(soundcloud_id PK, title, artist, genre, duration ms, download_sta
   energy, loudness, dynamic_complexity,
   danceability, speechiness, instrumentalness, acousticness, valence, liveness,
   spectral_centroid, dissonance,
-  analysis_status TEXT: pending/processing/completed/failed)
+  analysis_status TEXT: pending/processing/completed/failed,
+  -- Audio embedding for similarity search (200 dimensions, cosine distance)
+  embedding vector(200))
 
 DEFAULTS: SELECT * FROM tracks, ILIKE for text, ORDER BY playback_count DESC, LIMIT 20 (max 50)
 
@@ -50,6 +52,13 @@ PATTERNS:
 - tags: '%x%'=ANY(tags)
 - label: WHERE label ILIKE '%monstercat%'
 
+SIMILARITY SEARCH (use RPC function for "similar to track" queries):
+- Use find_similar_tracks(source_track_id, limit_count) RPC function
+- For "tracks similar to [track name]": first find the track, then use RPC
+- Example: SELECT * FROM find_similar_tracks((SELECT soundcloud_id FROM tracks WHERE title ILIKE '%track name%' LIMIT 1), 20)
+- For "similar artists to [artist]": use embedding average comparison
+- Example: WITH artist_emb AS (SELECT AVG(embedding) as e FROM tracks WHERE artist ILIKE '%artist%' AND embedding IS NOT NULL) SELECT DISTINCT ON (artist) * FROM tracks t, artist_emb WHERE t.embedding IS NOT NULL AND t.artist NOT ILIKE '%artist%' ORDER BY artist, t.embedding <=> artist_emb.e LIMIT 20
+
 AUDIO ANALYSIS (NULL if not analyzed, ALWAYS require analysis_status='completed' when filtering):
 - bpm_detected: BPM (60-200)
 - key_detected: musical key (e.g., "A minor", "C major")
@@ -62,6 +71,7 @@ AUDIO ANALYSIS (NULL if not analyzed, ALWAYS require analysis_status='completed'
 - liveness: live recording probability 0-1
 - spectral_centroid: brightness in Hz (>3000=bright, <1500=dark)
 - dissonance: harmonic tension 0-1
+- embedding: 200-dim audio feature vector for similarity (cosine distance <=> operator, lower=more similar)
 
 PHRASE RULES:
 - Under 15 words, same language as query
@@ -72,6 +82,8 @@ EXAMPLES:
 User: "chill dubstep" → {"sql":"SELECT * FROM tracks WHERE genre ILIKE '%dubstep%' AND energy < 0.5 AND analysis_status='completed' ORDER BY playback_count DESC LIMIT 20","phrase":"Voici du dubstep chill pour toi"}
 User: "tracks like Excision" → {"sql":"SELECT * FROM tracks WHERE (genre ILIKE '%dubstep%' OR genre ILIKE '%riddim%') AND artist NOT ILIKE '%excision%' ORDER BY playback_count DESC LIMIT 20","phrase":"Heavy bass tracks similar to Excision"}
 User: "happy uplifting music" → {"sql":"SELECT * FROM tracks WHERE valence > 0.7 AND energy > 0.6 AND analysis_status='completed' ORDER BY playback_count DESC LIMIT 20","phrase":"Uplifting tracks to boost your mood"}
+User: "tracks that sound like Scary Monsters" → {"sql":"SELECT * FROM find_similar_tracks((SELECT soundcloud_id FROM tracks WHERE title ILIKE '%scary monsters%' LIMIT 1), 20)","phrase":"Tracks with similar sound to Scary Monsters"}
+User: "artistes similaires à Illenium" → {"sql":"WITH artist_emb AS (SELECT AVG(embedding) as e FROM tracks WHERE artist ILIKE '%illenium%' AND embedding IS NOT NULL) SELECT DISTINCT ON (artist) * FROM tracks t, artist_emb WHERE t.embedding IS NOT NULL AND t.artist NOT ILIKE '%illenium%' ORDER BY artist, t.embedding <=> artist_emb.e LIMIT 20","phrase":"Artistes au son proche d'Illenium"}
 
 For French queries, translate intent to SQL and respond in French.`
 

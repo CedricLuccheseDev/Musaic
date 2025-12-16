@@ -39,13 +39,10 @@ CREATE TABLE IF NOT EXISTS tracks (
   -- Rhythm
   bpm_detected REAL,                 -- Detected BPM (60-200)
   bpm_confidence REAL,               -- BPM detection confidence (0-1)
-  beats_count INTEGER,               -- Number of beats detected
-  onset_rate REAL,                   -- Rhythmic density (onsets/second)
 
   -- Tonal
   key_detected TEXT,                 -- Musical key (e.g., "A minor")
   key_confidence REAL,               -- Key detection confidence (0-1)
-  tuning_frequency REAL,             -- Tuning frequency in Hz (~440)
 
   -- Dynamics
   energy REAL,                       -- Energy level (0-1)
@@ -54,9 +51,7 @@ CREATE TABLE IF NOT EXISTS tracks (
 
   -- Timbre
   spectral_centroid REAL,            -- Brightness in Hz
-  spectral_complexity REAL,          -- Harmonic richness (0-1)
   dissonance REAL,                   -- Dissonance level (0-1)
-  pitch_salience REAL,               -- Pitch clarity (0-1)
 
   -- High-level descriptors
   danceability REAL,                 -- Danceability score (0-1)
@@ -112,6 +107,13 @@ CREATE INDEX IF NOT EXISTS idx_tracks_likes_count ON tracks(likes_count DESC);
 
 -- Download status index
 CREATE INDEX IF NOT EXISTS idx_tracks_download_status ON tracks(download_status);
+CREATE INDEX IF NOT EXISTS idx_tracks_downloadable ON tracks(downloadable) WHERE downloadable = TRUE;
+
+-- Duration index (for filtering by track length)
+CREATE INDEX IF NOT EXISTS idx_tracks_duration ON tracks(duration);
+
+-- Tags index (GIN for array containment queries)
+CREATE INDEX IF NOT EXISTS idx_tracks_tags ON tracks USING GIN(tags);
 
 -- =====================================================
 -- TRIGGERS
@@ -168,13 +170,10 @@ COMMENT ON COLUMN tracks.permalink_url IS 'Full SoundCloud URL';
 -- Audio analysis - Rhythm
 COMMENT ON COLUMN tracks.bpm_detected IS 'Detected BPM (60-200)';
 COMMENT ON COLUMN tracks.bpm_confidence IS 'BPM detection confidence (0-1)';
-COMMENT ON COLUMN tracks.beats_count IS 'Number of beats detected in analyzed segment';
-COMMENT ON COLUMN tracks.onset_rate IS 'Rhythmic density - onsets per second';
 
 -- Audio analysis - Tonal
 COMMENT ON COLUMN tracks.key_detected IS 'Musical key (e.g., "A minor", "C major")';
 COMMENT ON COLUMN tracks.key_confidence IS 'Key detection confidence (0-1)';
-COMMENT ON COLUMN tracks.tuning_frequency IS 'Tuning frequency in Hz (typically ~440)';
 
 -- Audio analysis - Dynamics
 COMMENT ON COLUMN tracks.energy IS 'Energy level normalized (0-1)';
@@ -183,9 +182,7 @@ COMMENT ON COLUMN tracks.dynamic_complexity IS 'Volume variation over time (0-1)
 
 -- Audio analysis - Timbre
 COMMENT ON COLUMN tracks.spectral_centroid IS 'Brightness/brilliance in Hz';
-COMMENT ON COLUMN tracks.spectral_complexity IS 'Harmonic richness (0-1)';
 COMMENT ON COLUMN tracks.dissonance IS 'Dissonance level (0-1)';
-COMMENT ON COLUMN tracks.pitch_salience IS 'Pitch clarity (0-1)';
 
 -- Audio analysis - High-level
 COMMENT ON COLUMN tracks.danceability IS 'Danceability score (0-1)';
@@ -199,3 +196,127 @@ COMMENT ON COLUMN tracks.liveness IS 'Live recording probability (0-1)';
 COMMENT ON COLUMN tracks.analysis_status IS 'Analysis status: pending, processing, completed, failed';
 COMMENT ON COLUMN tracks.analysis_error IS 'Error message if analysis failed';
 COMMENT ON COLUMN tracks.analyzed_at IS 'Timestamp when analysis completed';
+
+-- =====================================================
+-- EXTENSIONS & VECTOR EMBEDDINGS
+-- =====================================================
+
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Add embedding column for similarity search
+ALTER TABLE tracks ADD COLUMN IF NOT EXISTS embedding vector(200);
+
+-- Index for fast cosine similarity searches
+CREATE INDEX IF NOT EXISTS tracks_embedding_idx ON tracks
+USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
+COMMENT ON COLUMN tracks.embedding IS 'Audio feature embedding vector (200 dimensions) for similarity search';
+
+-- =====================================================
+-- RPC FUNCTIONS FOR SIMILARITY SEARCH
+-- =====================================================
+
+-- Find tracks similar to a given track using embedding cosine distance
+CREATE OR REPLACE FUNCTION find_similar_tracks(
+  source_track_id BIGINT,
+  limit_count INT DEFAULT 10
+)
+RETURNS TABLE (
+  soundcloud_id BIGINT,
+  urn TEXT,
+  permalink_url TEXT,
+  title TEXT,
+  artist TEXT,
+  artwork TEXT,
+  duration INTEGER,
+  genre TEXT,
+  description TEXT,
+  soundcloud_created_at TIMESTAMPTZ,
+  label TEXT,
+  tags TEXT[],
+  playback_count INTEGER,
+  likes_count INTEGER,
+  reposts_count INTEGER,
+  comment_count INTEGER,
+  bpm_detected REAL,
+  bpm_confidence REAL,
+  key_detected TEXT,
+  key_confidence REAL,
+  energy REAL,
+  loudness REAL,
+  dynamic_complexity REAL,
+  spectral_centroid REAL,
+  dissonance REAL,
+  danceability REAL,
+  speechiness REAL,
+  instrumentalness REAL,
+  acousticness REAL,
+  valence REAL,
+  liveness REAL,
+  analysis_status TEXT,
+  analysis_error TEXT,
+  analyzed_at TIMESTAMPTZ,
+  download_status TEXT,
+  downloadable BOOLEAN,
+  purchase_url TEXT,
+  purchase_title TEXT,
+  download_count INTEGER,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ,
+  distance FLOAT
+) AS $$
+BEGIN
+  RETURN QUERY
+  WITH source AS (
+    SELECT t.embedding FROM tracks t WHERE t.soundcloud_id = source_track_id
+  )
+  SELECT
+    t.soundcloud_id,
+    t.urn,
+    t.permalink_url,
+    t.title,
+    t.artist,
+    t.artwork,
+    t.duration,
+    t.genre,
+    t.description,
+    t.soundcloud_created_at,
+    t.label,
+    t.tags,
+    t.playback_count,
+    t.likes_count,
+    t.reposts_count,
+    t.comment_count,
+    t.bpm_detected,
+    t.bpm_confidence,
+    t.key_detected,
+    t.key_confidence,
+    t.energy,
+    t.loudness,
+    t.dynamic_complexity,
+    t.spectral_centroid,
+    t.dissonance,
+    t.danceability,
+    t.speechiness,
+    t.instrumentalness,
+    t.acousticness,
+    t.valence,
+    t.liveness,
+    t.analysis_status,
+    t.analysis_error,
+    t.analyzed_at,
+    t.download_status,
+    t.downloadable,
+    t.purchase_url,
+    t.purchase_title,
+    t.download_count,
+    t.created_at,
+    t.updated_at,
+    (t.embedding <=> source.embedding)::FLOAT AS distance
+  FROM tracks t, source
+  WHERE t.embedding IS NOT NULL
+    AND t.soundcloud_id != source_track_id
+  ORDER BY t.embedding <=> source.embedding
+  LIMIT limit_count;
+END;
+$$ LANGUAGE plpgsql;
