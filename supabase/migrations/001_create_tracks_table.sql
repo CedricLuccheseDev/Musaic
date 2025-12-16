@@ -204,7 +204,7 @@ COMMENT ON COLUMN tracks.analyzed_at IS 'Timestamp when analysis completed';
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Add embedding column for similarity search
-ALTER TABLE tracks ADD COLUMN IF NOT EXISTS embedding vector(200);
+ALTER TABLE tracks ADD COLUMN IF NOT EXISTS embedding vector(1280);
 
 -- Index for fast cosine similarity searches
 CREATE INDEX IF NOT EXISTS tracks_embedding_idx ON tracks
