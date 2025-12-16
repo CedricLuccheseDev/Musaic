@@ -8,7 +8,7 @@ withDefaults(defineProps<{
 
 /* --- States --- */
 const { user } = useAuth()
-const { isPremium } = useSubscription()
+const { isPremium } = useProfile()
 const sizeClasses = {
   sm: {
     premiumBtn: 'h-8 px-2.5 gap-1',

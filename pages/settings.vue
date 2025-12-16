@@ -9,7 +9,7 @@ definePageMeta({
 /* --- States --- */
 const { t } = useI18n()
 const { user, loading, signOut } = useAuth()
-const { isPremium, profile } = useSubscription()
+const { isPremium, profile } = useProfile()
 const router = useRouter()
 const version = __APP_VERSION__
 const showTerms = ref(false)

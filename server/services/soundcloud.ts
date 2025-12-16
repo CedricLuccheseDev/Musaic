@@ -63,8 +63,16 @@ const Soundcloud = (
 const PROXY_URL = 'https://corsproxy.io/?'
 
 function createSoundcloudClient(): SoundcloudInstance {
-  const config = useRuntimeConfig()
-  const clientId = config.soundcloudClientId as string
+  // Support both Nuxt runtime and standalone scripts
+  let clientId: string | undefined
+  try {
+    const config = useRuntimeConfig()
+    clientId = config.soundcloudClientId as string
+  } catch {
+    // Outside Nuxt context (scripts), use env directly
+    clientId = process.env.SOUNDCLOUD_CLIENT_ID
+  }
+
   const isDev = process.env.NODE_ENV === 'development'
   const useProxy = !!clientId && !isDev // Use proxy in production only
 

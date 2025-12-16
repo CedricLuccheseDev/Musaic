@@ -1,35 +1,38 @@
 # Smart Commit
 
-Effectue un commit intelligent avec validation préalable.
+Run validation then commit and push.
 
 ## Instructions
 
-1. **Lancer le lint** avec `npm run lint`
-2. **Lancer les tests** avec `npm run test`
-3. **Si lint ou tests échouent**, arrête-toi et explique les erreurs
-4. **Si tout passe**, analyse les changements avec `git diff --staged` et `git diff`
-5. **Stage tous les fichiers modifiés** pertinents (ignore les fichiers sensibles comme .env)
-6. **Génère un message de commit concis** en français qui:
-   - Commence par un verbe à l'infinitif (Ajouter, Corriger, Modifier, Refactorer...)
-   - Résume les changements en 1-2 lignes max
-   - Se concentre sur le "pourquoi" plutôt que le "quoi"
-7. **Crée le commit** avec le message généré
-8. **Push** vers le remote
+1. **Run lint** with `npm run lint`
+2. **Run tests** with `npm run test`
+3. **If lint or tests fail**, stop and explain errors
+4. **If all pass**, analyze changes with `git diff --staged` and `git diff`
+5. **Stage all modified files** (ignore sensitive files like .env)
+6. **Generate a concise commit message** in English:
+   - Start with type (feat, fix, refactor, docs, test, chore)
+   - Summarize changes in 1-2 lines max
+   - Focus on "why" not "what"
+   - Do NOT add "Generated with" or "Co-Authored-By" lines
+7. **Create the commit** with generated message
+8. **Push** to remote
 
-## Format du message
+## Message format
 
 ```
-[Type] Description concise
+[type]: Concise description
 
-Details si nécessaire (max 1-2 lignes)
+- Detail 1 if needed
+- Detail 2 if needed
 ```
 
 Types: feat, fix, refactor, docs, test, chore
 
-## Exemple
+## Example
 
 ```
-feat: Ajouter la vérification premium avant recherche IA
+feat: Add premium check before AI search
 
-Attendre le chargement du profil pour éviter les faux positifs de limite
+- Wait for profile to load before search
+- Prevent false positive AI limit errors
 ```

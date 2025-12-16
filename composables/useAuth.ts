@@ -4,7 +4,7 @@ export const useAuth = () => {
   /* --- State --- */
   const user = useState<User | null>('auth-user', () => null)
   const loading = useState<boolean>('auth-loading', () => true)
-  const { fetchProfile, clearProfile } = useSubscription()
+  const { fetchProfile, clearProfile } = useProfile()
 
   const supabase = useSupabase()
 

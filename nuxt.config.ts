@@ -2,6 +2,10 @@ import { execSync } from 'child_process'
 import pkg from './package.json'
 
 function getVersion(): string {
+  // Use APP_VERSION from CI/CD if available
+  if (process.env.APP_VERSION) {
+    return process.env.APP_VERSION
+  }
   try {
     return execSync('git describe --tags --abbrev=0 2>/dev/null').toString().trim()
   } catch {
@@ -32,6 +36,7 @@ export default defineNuxtConfig({
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     supabaseUrl: process.env.SUPABASE_URL || '',
     supabaseKey: process.env.SUPABASE_KEY || '',
+    supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY || '',
     soundcloudClientId: process.env.SOUNDCLOUD_CLIENT_ID || '',
     analyzerUrl: process.env.ANALYZER_URL || '',
     public: {

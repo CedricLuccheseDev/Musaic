@@ -1,6 +1,7 @@
 interface Profile {
   id: string
   is_premium: boolean
+  is_admin: boolean
   premium_until: string | null
 }
 
@@ -39,7 +40,7 @@ function saveAiUsage() {
   localStorage.setItem('musaic_ai_usage', JSON.stringify(aiUsage.value))
 }
 
-export function useSubscription() {
+export function useProfile() {
   /* --- Computed --- */
   const isPremium = computed(() => {
     if (!profile.value) return false
@@ -58,6 +59,8 @@ export function useSubscription() {
 
   const canUseAi = computed(() => aiGenerationsLeft.value > 0)
 
+  const isAdmin = computed(() => profile.value?.is_admin || false)
+
   /* --- Methods --- */
   async function fetchProfile(userId: string) {
     const supabase = useSupabase()
@@ -68,7 +71,7 @@ export function useSubscription() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, is_premium, premium_until')
+        .select('id, is_premium, is_admin, premium_until')
         .eq('id', userId)
         .single()
 
@@ -76,7 +79,7 @@ export function useSubscription() {
         const { data: newProfile } = await supabase
           .from('profiles')
           .upsert({ id: userId })
-          .select('id, is_premium, premium_until')
+          .select('id, is_premium, is_admin, premium_until')
           .single()
 
         if (newProfile) {
@@ -105,6 +108,7 @@ export function useSubscription() {
 
   return {
     isPremium,
+    isAdmin,
     canUseAi,
     aiGenerationsLeft,
     profile: readonly(profile),

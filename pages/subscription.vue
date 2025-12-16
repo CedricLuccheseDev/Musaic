@@ -11,7 +11,7 @@ definePageMeta({
 /* --- States --- */
 const { t, lang } = useI18n()
 const { user, loading } = useAuth()
-const { isPremium } = useSubscription()
+const { isPremium } = useProfile()
 const router = useRouter()
 
 /* --- Computed --- */

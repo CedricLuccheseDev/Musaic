@@ -3,6 +3,12 @@ import { until } from '@vueuse/core'
 import { DownloadStatus, type TrackEntry } from '~/types/track'
 import type { SearchResult } from '~/server/services/soundcloud'
 
+/* --- Types --- */
+type FilterType = 'all' | 'free' | 'paid'
+
+/* --- Constants --- */
+const MAX_RESULTS = 500
+
 /* --- Meta --- */
 definePageMeta({
   layoutConfig: {
@@ -10,14 +16,16 @@ definePageMeta({
   }
 })
 
-/* --- States --- */
+/* --- Composables --- */
 const { t } = useI18n()
-const { canUseAi, aiGenerationsLeft, isPremium, incrementAiUsage } = useSubscription()
-const authLoading = inject<Ref<boolean>>('authLoading', ref(false))
-const headerMounted = ref(false)
-type FilterType = 'all' | 'free' | 'paid'
-const MAX_RESULTS = 500
+const { canUseAi, aiGenerationsLeft, isPremium, incrementAiUsage } = useProfile()
 const route = useRoute()
+
+/* --- Inject --- */
+const authLoading = inject<Ref<boolean>>('authLoading', ref(false))
+
+/* --- States --- */
+const headerMounted = ref(false)
 const searchInput = ref('')
 const activeFilter = ref<FilterType>('all')
 const aiLimitReached = ref(false)
@@ -30,8 +38,9 @@ const hasMoreFromApi = ref(false)
 const nextOffset = ref<number | undefined>(undefined)
 const isLoadingMore = ref(false)
 const initialBatchSize = ref(0)
-
 const searchError = ref<string | null>(null)
+
+/* --- Data --- */
 const { data: searchResult, status, refresh: refreshSearch } = useFetch<SearchResult>('/api/search', {
   query: { q: computed(() => (route.query.q as string) || '') },
   watch: [() => route.query.q],

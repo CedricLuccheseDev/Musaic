@@ -6,12 +6,7 @@ withDefaults(defineProps<{
   size: 'md'
 })
 
-/* --- States --- */
-const { t } = useI18n()
-const { user, loading, signOut } = useAuth()
-const { isPremium } = useSubscription()
-const router = useRouter()
-const imageError = ref(false)
+/* --- Constants --- */
 const sizeClasses = {
   sm: {
     wrapper: 'h-8 w-8',
@@ -23,11 +18,33 @@ const sizeClasses = {
   }
 }
 
+/* --- Composables --- */
+const { t } = useI18n()
+const { user, loading, signOut } = useAuth()
+const { isPremium, isAdmin } = useProfile()
+const router = useRouter()
+const config = useRuntimeConfig()
+const isDev = config.public.isDev
+
+/* --- States --- */
+const imageError = ref(false)
+
 /* --- Computed --- */
-const dropdownItems = computed(() => [[
-  { label: t.value.profileMenu, icon: 'i-heroicons-cog-6-tooth', onSelect: () => router.push('/settings'), class: 'cursor-pointer' },
-  { label: t.value.profileSignOut, icon: 'i-heroicons-arrow-right-on-rectangle', onSelect: () => signOut(), class: 'cursor-pointer' }
-]])
+const hasAdminAccess = computed(() => isDev || isAdmin.value)
+
+const dropdownItems = computed(() => {
+  const items = [
+    { label: t.value.profileMenu, icon: 'i-heroicons-cog-6-tooth', onSelect: () => router.push('/settings'), class: 'cursor-pointer' }
+  ]
+
+  if (hasAdminAccess.value) {
+    items.push({ label: 'Dashboard', icon: 'i-heroicons-chart-bar', onSelect: () => router.push('/dashboard'), class: 'cursor-pointer' })
+  }
+
+  items.push({ label: t.value.profileSignOut, icon: 'i-heroicons-arrow-right-on-rectangle', onSelect: () => signOut(), class: 'cursor-pointer' })
+
+  return [items]
+})
 
 const showAvatar = computed(() => user.value?.user_metadata?.avatar_url && !imageError.value)
 

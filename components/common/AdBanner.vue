@@ -9,7 +9,7 @@ withDefaults(defineProps<{
 })
 
 /* --- States --- */
-const { isPremium } = useSubscription()
+const { isPremium } = useProfile()
 const config = useRuntimeConfig()
 const adClient = config.public.adSenseClient || ''
 </script>
