@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS tracks (
   -- =====================================================
 
   -- Rhythm
-  bpm_detected INTEGER,              -- Detected BPM (60-200)
+  bpm_detected REAL,                 -- Detected BPM (60-200)
   bpm_confidence REAL,               -- BPM detection confidence (0-1)
   beats_count INTEGER,               -- Number of beats detected
   onset_rate REAL,                   -- Rhythmic density (onsets/second)

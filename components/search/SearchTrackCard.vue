@@ -174,7 +174,7 @@ onMounted(() => {
           <!-- BPM (from audio analysis) -->
           <span v-if="track.bpm_detected" class="flex items-center gap-1 text-violet-400">
             <span class="font-medium">BPM:</span>
-            {{ track.bpm_detected }}
+            {{ Math.round(track.bpm_detected) }}
           </span>
           <!-- Key (from audio analysis) -->
           <span v-if="track.key_detected" class="flex items-center gap-1 text-cyan-400">
