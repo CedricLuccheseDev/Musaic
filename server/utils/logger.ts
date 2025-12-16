@@ -101,8 +101,7 @@ export const logger = {
       log('info', 'AI', `"${c.cyan}${question}${c.reset}"`)
     },
     sql: (sql: string) => {
-      const shortSql = sql.length > 80 ? sql.substring(0, 80) + '...' : sql
-      log('debug', 'AI', `${c.gray}${shortSql}${c.reset}`)
+      log('debug', 'AI', `${c.gray}${sql}${c.reset}`)
     },
     tokens: (input: number, output: number, cacheRead = 0, cacheCreation = 0) => {
       sessionStats.haiku.inputTokens += input
