@@ -1,31 +1,6 @@
 import SoundcloudModule from 'soundcloud.ts'
+import type { SoundcloudConstructor } from '../types/soundcloud'
 
-interface SoundcloudTrack {
-  id: number
-  title: string
-  user?: { username: string }
-  permalink_url: string
-  artwork_url?: string
-  duration: number
-  genre?: string
-  description?: string
-  downloadable?: boolean
-  download_url?: string
-  purchase_url?: string
-  purchase_title?: string
-}
-
-interface SoundcloudConstructor {
-  new (): SoundcloudInstance
-}
-
-interface SoundcloudInstance {
-  tracks: {
-    search: (params: { q: string }) => Promise<{ collection: SoundcloudTrack[] }>
-  }
-}
-
-// Handle both ESM and CJS exports
 const Soundcloud = (
   (SoundcloudModule as { default?: SoundcloudConstructor }).default ||
   SoundcloudModule

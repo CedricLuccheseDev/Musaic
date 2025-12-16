@@ -68,15 +68,12 @@ async function testDatabase() {
     soundcloud_created_at: new Date().toISOString(),
     label: null,
     tags: ['test', 'ci'],
-    bpm: 128,
-    key: 'C minor',
     playback_count: 0,
     likes_count: 0,
     reposts_count: 0,
     comment_count: 0,
     download_status: 'No',
     downloadable: false,
-    download_url: null,
     purchase_url: null,
     purchase_title: null
   }

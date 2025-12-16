@@ -1,17 +1,5 @@
 import SoundcloudModule from 'soundcloud.ts'
-
-interface SoundcloudTrack {
-  id: number
-  title: string
-  user?: { username: string }
-  media?: {
-    transcodings: Array<{
-      url: string
-      preset: string
-      format: { protocol: string }
-    }>
-  }
-}
+import type { SoundcloudConstructor } from '~/types/soundcloud'
 
 // Patterns to remove from filename
 const TITLE_CLEANUP_PATTERNS = [
@@ -39,23 +27,6 @@ function cleanTitle(title: string): string {
 
 function sanitizeFilename(name: string): string {
   return name.replace(/[/\\?%*:|"<>]/g, '-').trim()
-}
-
-interface SoundcloudOptions {
-  proxy?: string
-}
-
-interface SoundcloudConstructor {
-  new (clientId?: string, oauthToken?: string, options?: SoundcloudOptions): SoundcloudInstance
-}
-
-interface SoundcloudInstance {
-  tracks: {
-    get: (id: number) => Promise<SoundcloudTrack>
-  }
-  util: {
-    streamLink: (track: SoundcloudTrack, protocol?: 'progressive' | 'hls') => Promise<string>
-  }
 }
 
 const Soundcloud = (

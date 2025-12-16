@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { until } from '@vueuse/core'
 import { DownloadStatus, type TrackEntry } from '~/types/track'
 import type { SearchResult } from '~/server/services/soundcloud'
 
@@ -12,6 +13,7 @@ definePageMeta({
 /* --- States --- */
 const { t } = useI18n()
 const { canUseAi, aiGenerationsLeft, isPremium, incrementAiUsage } = useSubscription()
+const authLoading = inject<Ref<boolean>>('authLoading', ref(false))
 const headerMounted = ref(false)
 type FilterType = 'all' | 'free' | 'paid'
 const MAX_RESULTS = 500
@@ -166,11 +168,15 @@ watch(filteredTracks, () => {
 })
 
 /* --- Lifecycle --- */
-onMounted(() => {
+onMounted(async () => {
   headerMounted.value = true
   window.addEventListener('scroll', handleScroll, { passive: true })
   checkInitialLoad()
   if (query.value) {
+    // Wait for auth to be loaded before running AI search
+    if (authLoading.value) {
+      await until(authLoading).toBe(false)
+    }
     runAiSearch()
   }
 })

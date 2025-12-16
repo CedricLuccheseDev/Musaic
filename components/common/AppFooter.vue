@@ -22,7 +22,7 @@ const version = __APP_VERSION__
         >
           {{ t.footer }}
         </a>
-        <span class="text-[10px] text-neutral-600 sm:text-xs">v{{ version }}</span>
+        <span class="text-[10px] text-neutral-600 sm:text-xs">{{ version }}</span>
       </div>
     </div>
   </footer>

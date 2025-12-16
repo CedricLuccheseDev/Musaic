@@ -1,77 +1,10 @@
 import SoundcloudModule from 'soundcloud.ts'
 import { DownloadStatus, type TrackEntry } from '~/types/track'
-
-// ============================================================================
-// Types
-// ============================================================================
-
-interface SoundcloudInstance {
-  tracks: {
-    search: (params: { q: string; limit?: number; offset?: number }) => Promise<SoundcloudSearchResponse>
-  }
-  users: {
-    search: (params: { q: string; limit?: number }) => Promise<SoundcloudUserSearchResponse>
-    tracks: (userId: number) => Promise<SoundcloudTrack[]>
-  }
-}
-
-interface SoundcloudSearchResponse {
-  collection: SoundcloudTrack[]
-  next_href: string | null
-  total_results?: number
-}
-
-interface SoundcloudUserSearchResponse {
-  collection: SoundcloudUser[]
-}
-
-interface SoundcloudUser {
-  id: number
-  username: string
-  permalink_url: string
-  avatar_url: string
-  full_name?: string
-  description?: string
-  city?: string
-  country_code?: string
-  followers_count: number
-  followings_count?: number
-  track_count: number
-  playlist_count?: number
-  likes_count?: number
-  reposts_count?: number
-  visuals?: {
-    visuals?: Array<{
-      visual_url?: string
-    }>
-  }
-  verified?: boolean
-  creator_subscriptions?: Array<{ product?: { id?: string } }>
-  created_at?: string
-}
-
-interface SoundcloudTrack {
-  id: number
-  urn: string
-  title: string
-  user?: { id: number; username: string }
-  artwork_url?: string
-  permalink_url: string
-  duration: number
-  genre?: string
-  description?: string
-  created_at?: string
-  label_name?: string
-  tag_list?: string
-  playback_count?: number
-  likes_count?: number
-  reposts_count?: number
-  comment_count?: number
-  downloadable?: boolean
-  download_url?: string
-  purchase_url?: string
-  purchase_title?: string
-}
+import type {
+  SoundcloudTrack,
+  SoundcloudInstance,
+  SoundcloudConstructor
+} from '~/types/soundcloud'
 
 // ============================================================================
 // Constants
@@ -121,18 +54,10 @@ const PURCHASE_DOMAINS = [
 // This ID may need to be updated periodically if SoundCloud invalidates it
 // Use NUXT_SOUNDCLOUD_CLIENT_ID in production env vars
 
-interface SoundcloudOptions {
-  proxy?: string
-}
-
-interface SoundcloudConstructorWithClientId {
-  new (clientId?: string, oauthToken?: string, options?: SoundcloudOptions): SoundcloudInstance
-}
-
 const Soundcloud = (
-  (SoundcloudModule as { default?: SoundcloudConstructorWithClientId }).default ||
+  (SoundcloudModule as { default?: SoundcloudConstructor }).default ||
   SoundcloudModule
-) as SoundcloudConstructorWithClientId
+) as SoundcloudConstructor
 
 // Proxy URL for production (bypasses IP blocking from datacenters)
 const PROXY_URL = 'https://corsproxy.io/?'

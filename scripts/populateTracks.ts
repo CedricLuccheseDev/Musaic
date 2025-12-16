@@ -20,6 +20,7 @@ import { createClient } from '@supabase/supabase-js'
 import { searchTracks } from '../server/services/soundcloud'
 import type { TrackEntry } from '../types/track'
 import { DownloadStatus } from '../types/track'
+import { trackEntryToDbTrack } from '../types/database'
 import * as dotenv from 'dotenv'
 
 dotenv.config()
@@ -87,32 +88,6 @@ function shouldIncludeTrack(track: TrackEntry, config: PopulateConfig): boolean 
 // Database Operations
 // ============================================================================
 
-function trackToDbFormat(track: TrackEntry) {
-  return {
-    soundcloud_id: track.id,
-    urn: track.urn,
-    permalink_url: track.permalink_url,
-    title: track.title,
-    artist: track.artist,
-    artist_id: null,
-    artwork: track.artwork,
-    duration: track.duration,
-    genre: track.genre,
-    description: track.description,
-    soundcloud_created_at: track.created_at,
-    label: track.label,
-    tags: track.tags,
-    playback_count: track.playback_count,
-    likes_count: track.likes_count,
-    reposts_count: track.reposts_count,
-    comment_count: track.comment_count,
-    download_status: track.downloadStatus,
-    downloadable: track.downloadable,
-    purchase_url: track.purchase_url,
-    purchase_title: track.purchase_title
-  }
-}
-
 // Trigger analysis for tracks via musaic-analyzer
 async function triggerAnalysis(soundcloudIds: number[]): Promise<void> {
   if (!analyzerUrl || soundcloudIds.length === 0) return
@@ -130,7 +105,7 @@ async function triggerAnalysis(soundcloudIds: number[]): Promise<void> {
 }
 
 async function upsertTracks(tracks: TrackEntry[]): Promise<number> {
-  const dbTracks = tracks.map(trackToDbFormat)
+  const dbTracks = tracks.map(trackEntryToDbTrack)
 
   const { error, data } = await supabase
     .from('tracks')

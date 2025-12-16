@@ -1,11 +1,14 @@
 <script setup lang="ts">
 /* --- States --- */
-const { init } = useAuth()
+const { init, loading } = useAuth()
 
 /* --- Lifecycle --- */
-onMounted(() => {
-  init()
+onMounted(async () => {
+  await init()
 })
+
+/* --- Provide --- */
+provide('authLoading', loading)
 </script>
 
 <template>

@@ -21,7 +21,7 @@ export const useAuth = () => {
 
       // Fetch profile if user is logged in
       if (session?.user) {
-        fetchProfile(session.user.id)
+        await fetchProfile(session.user.id)
       }
 
       // Listen for auth changes

@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { TrackEntry } from '~/types/track'
+import { type DbTrack, type AnalysisData, trackEntryToDbTrack } from '~/types/database'
 import { logger } from '~/server/utils/logger'
 
 let supabaseClient: SupabaseClient | null = null
@@ -9,21 +10,20 @@ const MIN_TRACK_DURATION = 2 * 60 * 1000 // 2 minutes
 const MAX_TRACK_DURATION = 8 * 60 * 1000 // 8 minutes
 
 // Trigger analysis for new tracks via musaic-analyzer
-// NOTE: Temporarily disabled - analyzer service is under maintenance
-export async function triggerAnalysis(_soundcloudIds: number[]): Promise<void> {
-  // const config = useRuntimeConfig()
-  // const analyzerUrl = config.analyzerUrl as string
+export async function triggerAnalysis(soundcloudIds: number[]): Promise<void> {
+  const config = useRuntimeConfig()
+  const analyzerUrl = config.analyzerUrl as string
 
-  // if (!analyzerUrl || soundcloudIds.length === 0) return
+  if (!analyzerUrl || soundcloudIds.length === 0) return
 
-  // // Fire and forget - don't block the upsert
-  // fetch(`${analyzerUrl}/analyze/batch`, {
-  //   method: 'POST',
-  //   headers: { 'Content-Type': 'application/json' },
-  //   body: JSON.stringify({ soundcloud_ids: soundcloudIds })
-  // }).catch(() => {
-  //   // Silent fail - analyzer might be down
-  // })
+  // Fire and forget - don't block the upsert
+  fetch(`${analyzerUrl}/analyze/batch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ soundcloud_ids: soundcloudIds })
+  }).catch(() => {
+    // Silent fail - analyzer might be down
+  })
 }
 
 function getSupabaseClient(): SupabaseClient | null {
@@ -41,53 +41,6 @@ function getSupabaseClient(): SupabaseClient | null {
   return supabaseClient
 }
 
-interface DbTrack {
-  soundcloud_id: number
-  urn: string
-  permalink_url: string
-  title: string
-  artist: string
-  artwork: string | null
-  duration: number
-  genre: string | null
-  description: string | null
-  soundcloud_created_at: string | null
-  label: string | null
-  tags: string[]
-  playback_count: number
-  likes_count: number
-  reposts_count: number
-  comment_count: number
-  download_status: string
-  downloadable: boolean
-  purchase_url: string | null
-  purchase_title: string | null
-}
-
-function trackEntryToDbTrack(track: TrackEntry): DbTrack {
-  return {
-    soundcloud_id: track.id,
-    urn: track.urn,
-    permalink_url: track.permalink_url,
-    title: track.title,
-    artist: track.artist,
-    artwork: track.artwork,
-    duration: track.duration,
-    genre: track.genre,
-    description: track.description,
-    soundcloud_created_at: track.created_at,
-    label: track.label,
-    tags: track.tags,
-    playback_count: track.playback_count,
-    likes_count: track.likes_count,
-    reposts_count: track.reposts_count,
-    comment_count: track.comment_count,
-    download_status: track.downloadStatus,
-    downloadable: track.downloadable,
-    purchase_url: track.purchase_url,
-    purchase_title: track.purchase_title
-  }
-}
 
 /**
  * Upsert a single track into the database
@@ -217,26 +170,6 @@ export async function getTrackCount(): Promise<number> {
   }
 
   return count || 0
-}
-
-interface AnalysisData {
-  soundcloud_id: number
-  bpm_detected: number | null
-  bpm_confidence: number | null
-  key_detected: string | null
-  key_confidence: number | null
-  energy: number | null
-  loudness: number | null
-  dynamic_complexity: number | null
-  danceability: number | null
-  speechiness: number | null
-  instrumentalness: number | null
-  acousticness: number | null
-  valence: number | null
-  liveness: number | null
-  spectral_centroid: number | null
-  dissonance: number | null
-  analysis_status: string | null
 }
 
 /**
