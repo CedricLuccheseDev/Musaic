@@ -210,7 +210,7 @@ ALTER TABLE tracks ADD COLUMN IF NOT EXISTS embedding vector(1280);
 CREATE INDEX IF NOT EXISTS tracks_embedding_idx ON tracks
 USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
-COMMENT ON COLUMN tracks.embedding IS 'Audio feature embedding vector (200 dimensions) for similarity search';
+COMMENT ON COLUMN tracks.embedding IS 'Audio feature embedding vector (1280 dimensions) for similarity search';
 
 -- =====================================================
 -- RPC FUNCTIONS FOR SIMILARITY SEARCH

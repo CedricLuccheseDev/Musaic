@@ -186,21 +186,16 @@ function mapToTrackEntry(track: SoundcloudTrack): TrackEntry {
     // Rhythm
     bpm_detected: null,
     bpm_confidence: null,
-    beats_count: null,
-    onset_rate: null,
     // Tonal
     key_detected: null,
     key_confidence: null,
-    tuning_frequency: null,
     // Dynamics
     energy: null,
     loudness: null,
     dynamic_complexity: null,
     // Timbre
     spectral_centroid: null,
-    spectral_complexity: null,
     dissonance: null,
-    pitch_salience: null,
     // High-level
     danceability: null,
     speechiness: null,

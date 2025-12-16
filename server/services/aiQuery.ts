@@ -15,8 +15,8 @@ SCHEMA: tracks(soundcloud_id PK, title, artist, genre, duration ms, download_sta
   danceability, speechiness, instrumentalness, acousticness, valence, liveness,
   spectral_centroid, dissonance,
   analysis_status TEXT: pending/processing/completed/failed,
-  -- Audio embedding for similarity search (200 dimensions, cosine distance)
-  embedding vector(200))
+  -- Audio embedding for similarity search (1280 dimensions, cosine distance)
+  embedding vector(1280))
 
 DEFAULTS: SELECT * FROM tracks, ILIKE for text, ORDER BY playback_count DESC, LIMIT 20 (max 50)
 
@@ -71,7 +71,7 @@ AUDIO ANALYSIS (NULL if not analyzed, ALWAYS require analysis_status='completed'
 - liveness: live recording probability 0-1
 - spectral_centroid: brightness in Hz (>3000=bright, <1500=dark)
 - dissonance: harmonic tension 0-1
-- embedding: 200-dim audio feature vector for similarity (cosine distance <=> operator, lower=more similar)
+- embedding: 1280-dim audio feature vector for similarity (cosine distance <=> operator, lower=more similar)
 
 PHRASE RULES:
 - Under 15 words, same language as query
