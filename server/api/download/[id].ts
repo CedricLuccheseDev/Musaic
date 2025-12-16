@@ -1,5 +1,5 @@
 import SoundcloudModule from 'soundcloud.ts'
-import type { SoundcloudConstructor } from '~/types/soundcloud'
+import type { SoundcloudConstructor, SoundcloudInstance } from '~/types/soundcloud'
 
 // Patterns to remove from filename
 const TITLE_CLEANUP_PATTERNS = [

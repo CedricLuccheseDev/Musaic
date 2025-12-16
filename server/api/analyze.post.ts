@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
 
     if (!response.ok) {
       const error = await response.text()
-      logger.server.error(`Analyzer error: ${error}`)
+      logger.error('Server', `Analyzer error: ${error}`)
       throw createError({
         statusCode: response.status,
         message: `Analyzer error: ${error}`
@@ -49,7 +49,7 @@ export default defineEventHandler(async (event) => {
     if (error instanceof Error && 'statusCode' in error) {
       throw error
     }
-    logger.server.error(`Analyzer unreachable: ${error}`)
+    logger.error('Server', `Analyzer unreachable: ${error}`)
     throw createError({
       statusCode: 503,
       message: 'Analyzer service unavailable'
