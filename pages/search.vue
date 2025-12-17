@@ -250,14 +250,29 @@ onUnmounted(() => {
           <span>{{ aiGenerationsLeft }} {{ t.aiGenerationsLeft }}</span>
         </div>
 
-        <!-- AI Section -->
+        <!-- AI Section (only if has results) -->
         <SearchAiSection
-          v-if="!aiLimitReached && (aiLoading || filteredAiResults.length)"
-          :loading="aiLoading"
+          v-if="!aiLimitReached && filteredAiResults.length"
+          :loading="false"
           :results="filteredAiResults"
           :sql="aiSql"
           :response="aiResponse"
         />
+
+        <!-- AI Loading State -->
+        <div v-else-if="!aiLimitReached && aiLoading" class="mt-6 flex items-center gap-3 text-neutral-400">
+          <UIcon name="i-heroicons-sparkles" class="h-5 w-5 animate-pulse text-violet-400" />
+          <span>{{ t.aiGenerating }}</span>
+        </div>
+
+        <!-- AI No Match Message -->
+        <div
+          v-else-if="!aiLimitReached && !aiLoading && !filteredAiResults.length && (isLoading || filteredTracks.length)"
+          class="mt-6 flex items-center gap-2 text-sm text-neutral-500"
+        >
+          <UIcon name="i-heroicons-sparkles" class="h-4 w-4" />
+          <span>{{ t.aiNoMatch }}</span>
+        </div>
 
         <!-- SoundCloud Section -->
         <SearchSoundcloudSection
