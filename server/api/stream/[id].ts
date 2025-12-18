@@ -35,18 +35,49 @@ export default defineEventHandler(async (event) => {
     const track = await soundcloud.tracks.get(Number(id))
     const streamUrl = await soundcloud.util.streamLink(track, 'progressive')
 
-    const response = await fetch(streamUrl)
+    // Get range header from request
+    const rangeHeader = getHeader(event, 'range')
 
-    if (!response.ok) {
+    // Fetch with range if provided
+    const fetchHeaders: HeadersInit = {}
+    if (rangeHeader) {
+      fetchHeaders['Range'] = rangeHeader
+    }
+
+    const response = await fetch(streamUrl, { headers: fetchHeaders })
+
+    if (!response.ok && response.status !== 206) {
       throw new Error('Failed to fetch audio')
     }
 
-    setHeaders(event, {
+    // Get content info from SoundCloud response
+    const contentLength = response.headers.get('content-length')
+    const contentRange = response.headers.get('content-range')
+    const acceptRanges = response.headers.get('accept-ranges')
+
+    // Set response headers
+    const headers: Record<string, string> = {
       'Content-Type': 'audio/mpeg',
-      'Accept-Ranges': 'bytes',
+      'Accept-Ranges': acceptRanges || 'bytes',
       'Access-Control-Allow-Origin': '*',
       'Cross-Origin-Resource-Policy': 'cross-origin',
-    })
+      'Cache-Control': 'public, max-age=3600',
+    }
+
+    if (contentLength) {
+      headers['Content-Length'] = contentLength
+    }
+
+    if (contentRange) {
+      headers['Content-Range'] = contentRange
+    }
+
+    setHeaders(event, headers)
+
+    // Set status code (206 for partial content)
+    if (response.status === 206) {
+      setResponseStatus(event, 206)
+    }
 
     return response.body
   }

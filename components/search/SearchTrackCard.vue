@@ -17,7 +17,7 @@ const props = withDefaults(defineProps<{
 /* --- States --- */
 const { t } = useI18n()
 const config = useRuntimeConfig()
-const { play, isTrackPlaying, isLoading, isCurrentTrack } = useSoundCloudEmbed()
+const { play, isTrackPlaying, isLoading, isCurrentTrack } = useAudioPlayer()
 const isVisible = ref(props.skipAnimation)
 
 /* --- Computed --- */
