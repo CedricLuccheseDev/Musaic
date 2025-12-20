@@ -151,6 +151,7 @@ jobs:
       - name: Get next version
         id: version
         run: |
+          git fetch --tags
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $LATEST_TAG"
 
@@ -161,6 +162,12 @@ jobs:
 
           NEW_PATCH=$((PATCH + 1))
           NEW_VERSION="v$MAJOR.$MINOR.$NEW_PATCH"
+
+          # Check if tag already exists, increment again if so
+          while git rev-parse "$NEW_VERSION" >/dev/null 2>&1; do
+            NEW_PATCH=$((NEW_PATCH + 1))
+            NEW_VERSION="v$MAJOR.$MINOR.$NEW_PATCH"
+          done
 
           echo "New version: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
