@@ -138,10 +138,19 @@ jobs:
           echo "New version: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Create and push tag
+      - name: Write version file and create tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Write version to file
+          echo "${{ steps.version.outputs.version }}" > App/.version
+
+          # Commit version file
+          git add App/.version
+          git commit -m "chore: bump version to ${{ steps.version.outputs.version }}" || true
+
+          # Create and push tag
           git tag ${{ steps.version.outputs.version }}
-          git push origin ${{ steps.version.outputs.version }}
+          git push origin main --tags
           echo "Created tag: ${{ steps.version.outputs.version }}"
