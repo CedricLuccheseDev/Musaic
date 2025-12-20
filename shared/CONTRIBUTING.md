@@ -58,6 +58,6 @@ docs: Update README with new endpoints
 
 ## Pull Request
 
-- Target `main` branch
+- Target `dev` branch
 - Describe changes clearly
 - Ensure CI passes
