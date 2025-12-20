@@ -60,7 +60,7 @@ watch(user, (u) => {
     <div v-else-if="user" class="mx-auto w-full max-w-3xl">
       <div class="flex flex-col gap-6 md:flex-row md:items-stretch md:gap-8">
         <!-- Sidebar Menu -->
-        <nav class="flex flex-row justify-center gap-2 md:w-52 md:shrink-0 md:flex-col md:justify-between">
+        <nav class="flex flex-col gap-2 md:w-52 md:shrink-0">
           <div class="flex w-full flex-row gap-1 overflow-x-auto rounded-xl border border-neutral-800/50 bg-neutral-900/50 p-1.5 backdrop-blur-sm md:flex-col md:gap-1 md:overflow-visible">
             <button
               type="button"
@@ -103,18 +103,18 @@ watch(user, (u) => {
             </button>
           </div>
 
-          <!-- Footer links in sidebar -->
-          <div class="hidden flex-col gap-3 pt-4 md:flex">
+          <!-- Terms & Version (just below menu) -->
+          <div class="flex flex-row items-center justify-center gap-4 px-2 md:flex-col md:items-start md:gap-2">
             <button
               type="button"
-              class="group flex cursor-pointer items-center gap-2 px-2 text-xs text-neutral-500 transition-colors hover:text-violet-400"
+              class="group flex cursor-pointer items-center gap-1.5 text-xs text-neutral-500 transition-colors hover:text-violet-400"
               @click="showTerms = true"
             >
               <UIcon name="i-heroicons-document-text" class="h-3.5 w-3.5" />
               <span>{{ t.termsLink }}</span>
             </button>
-            <p class="px-2 text-xs text-neutral-600">
-              v{{ version }}
+            <p class="text-xs text-neutral-600">
+              {{ version }}
             </p>
           </div>
         </nav>
@@ -258,20 +258,6 @@ watch(user, (u) => {
         </div>
       </div>
 
-      <!-- Mobile footer links -->
-      <div class="mt-6 flex flex-col items-start gap-3 md:hidden">
-        <button
-          type="button"
-          class="inline-flex cursor-pointer items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-violet-400"
-          @click="showTerms = true"
-        >
-          <UIcon name="i-heroicons-document-text" class="h-4 w-4" />
-          <span>{{ t.termsLink }}</span>
-        </button>
-        <p class="text-xs text-neutral-600">
-          v{{ version }}
-        </p>
-      </div>
     </div>
   </main>
 
