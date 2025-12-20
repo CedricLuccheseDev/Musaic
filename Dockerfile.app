@@ -12,7 +12,10 @@ WORKDIR /app
 
 # Copy dependencies
 COPY --from=deps /app/node_modules ./node_modules
+
+# Copy App and shared (needed for imports)
 COPY App/ .
+COPY shared/ ../shared/
 
 # Build with reduced telemetry
 ENV NUXT_TELEMETRY_DISABLED=1
