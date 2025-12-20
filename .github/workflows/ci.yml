@@ -158,14 +158,17 @@ jobs:
 
       - name: Merge dev to main and tag
         run: |
-          # Switch to main and merge dev (with version commit)
+          # Push version commit to dev first
+          git push origin dev
+
+          # Switch to main and merge dev (now includes version)
           git fetch origin main
           git checkout main
-          git merge origin/dev --no-edit
+          git merge dev --no-edit
 
           # Create tag on main
           git tag ${{ steps.version.outputs.version }}
 
-          # Push main + tag together (atomic)
+          # Push main + tag together
           git push origin main --tags
           echo "✅ Deployed ${{ steps.version.outputs.version }}"
