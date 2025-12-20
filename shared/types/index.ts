@@ -14,5 +14,5 @@ export { DownloadStatus, AnalysisStatus } from './enums'
 export type { DownloadStatus as DownloadStatusType, AnalysisStatus as AnalysisStatusType } from './enums'
 
 // Database row types and helpers
-export type { DbTrack, DbTrackInsert, DbTrackUpdate, DbProfile, TrackEntry } from './helpers'
+export type { DbTrack, DbTrackInsert, DbTrackUpdate, DbProfile, DbTrackWithAnalysis, AnalysisData, TrackEntry } from './helpers'
 export { trackEntryToDbTrack, dbTrackToTrackEntry } from './helpers'

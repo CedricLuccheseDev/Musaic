@@ -1,5 +1,5 @@
 import SoundcloudModule from 'soundcloud.ts'
-import { DownloadStatus, type TrackEntry } from '~/types/track'
+import { DownloadStatus, type TrackEntry } from '~/types'
 import type {
   SoundcloudTrack,
   SoundcloudInstance,

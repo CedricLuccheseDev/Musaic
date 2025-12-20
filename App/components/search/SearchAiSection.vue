@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TrackEntry } from '~/types/track'
+import type { TrackEntry } from '~/types'
 
 /* --- Props --- */
 const props = defineProps<{

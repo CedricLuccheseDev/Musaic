@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { DownloadStatus, type TrackEntry } from '~/types/track'
+import { DownloadStatus, type TrackEntry } from '~/types'
 import type { ArtistInfo } from '~/server/services/soundcloud'
 
 /* --- Props --- */

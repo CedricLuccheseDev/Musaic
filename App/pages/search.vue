@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { until } from '@vueuse/core'
-import { DownloadStatus, type TrackEntry } from '~/types/track'
+import { DownloadStatus, type TrackEntry } from '~/types'
 import type { SearchResult } from '~/server/services/soundcloud'
 
 /* --- Types --- */

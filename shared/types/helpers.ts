@@ -15,6 +15,30 @@ export type DbTrackUpdate = Database['public']['Tables']['tracks']['Update']
 
 export type DbProfile = Database['public']['Tables']['profiles']['Row']
 
+// Database track with analysis data (for AI queries)
+export type DbTrackWithAnalysis = DbTrack
+
+// Analysis data subset (for enrichment)
+export interface AnalysisData {
+  soundcloud_id: number
+  bpm_detected: number | null
+  bpm_confidence: number | null
+  key_detected: string | null
+  key_confidence: number | null
+  energy: number | null
+  loudness: number | null
+  dynamic_complexity: number | null
+  danceability: number | null
+  speechiness: number | null
+  instrumentalness: number | null
+  acousticness: number | null
+  valence: number | null
+  liveness: number | null
+  spectral_centroid: number | null
+  dissonance: number | null
+  analysis_status: string | null
+}
+
 // =============================================================================
 // Frontend Track Entry (used in UI)
 // =============================================================================

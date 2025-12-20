@@ -1,6 +1,6 @@
 import { generateSqlAndPhrase } from '~/server/services/aiQuery'
 import { createClient } from '@supabase/supabase-js'
-import { type DbTrackWithAnalysis, dbTrackToTrackEntry } from '~/types/database'
+import { type DbTrackWithAnalysis, dbTrackToTrackEntry } from '~/types'
 import { logger } from '~/server/utils/logger'
 
 export default defineEventHandler(async (event) => {
