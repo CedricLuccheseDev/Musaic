@@ -13,12 +13,12 @@ function getVersion(): string {
     if (existsSync('.version')) {
       return readFileSync('.version', 'utf-8').trim()
     }
-  } catch {}
+  } catch { /* ignore */ }
 
   // 3. Try git describe (dev only)
   try {
     return execSync('git describe --tags --abbrev=0 2>/dev/null').toString().trim()
-  } catch {}
+  } catch { /* ignore */ }
 
   // 4. Fallback to package.json
   return `v${pkg.version}`
