@@ -1,42 +1,71 @@
-# Shared Types
+# Types partagés
 
-Types TypeScript partagés entre App et Analyzer.
+Source de vérité pour les types TypeScript du projet.
 
 ## Structure
 
 ```
 shared/types/
-├── analysis.ts    # Types d'analyse audio
-├── track.ts       # Types de track
-└── index.ts       # Export centralisé
+├── generated/
+│   └── database.ts    # Généré depuis Supabase (ne pas éditer)
+├── enums.ts           # Enums custom (DownloadStatus, AnalysisStatus)
+├── helpers.ts         # Types dérivés + fonctions de conversion
+├── index.ts           # Export centralisé
+└── README.md
+```
+
+## Workflow
+
+### 1. Modifier le schéma (source de vérité = BDD)
+
+```bash
+# Créer une nouvelle migration
+vim supabase/migrations/004_add_new_column.sql
+```
+
+### 2. Régénérer les types
+
+```bash
+./shared/scripts/generate-types.sh
+```
+
+### 3. Mettre à jour les helpers si nécessaire
+
+Si tu ajoutes un nouveau champ dans la BDD, mets à jour :
+- `shared/types/helpers.ts` → `TrackEntry` interface
+- `shared/types/helpers.ts` → fonctions de conversion
+- `Analyzer/app/models.py` → modèles Pydantic
+
+### 4. Commit
+
+```bash
+git add -A && git commit -m "feat: Add new field to tracks"
 ```
 
 ## Usage
 
-### Dans App (TypeScript)
-```typescript
-// Via re-export (recommandé)
-import type { TrackEntry } from '@/types/track'
+### Dans App (Nuxt)
 
-// Ou directement
-import type { TrackEntry } from '../../shared/types'
+```typescript
+import { TrackEntry, DownloadStatus, dbTrackToTrackEntry } from '@/types'
+import type { DbTrack } from '@/types'
 ```
 
 ### Dans Analyzer (Python)
-Les types Python équivalents sont dans `Analyzer/app/models.py`.
+
+Les types équivalents sont dans `Analyzer/app/models.py`.
 
 ## Correspondance TypeScript ↔ Python
 
-| TypeScript | Python | Fichier |
-|------------|--------|---------|
-| `AnalysisStatus` | `AnalysisStatus(str, Enum)` | models.py |
-| `AnalysisResult` | `AnalysisResult(BaseModel)` | models.py |
-| `AnalysisData` | `TrackUpdate(BaseModel)` | models.py |
-| `AnalyzeRequest` | `AnalyzeRequest(BaseModel)` | models.py |
-| `BatchStatusResponse` | `BatchStatusResponse(BaseModel)` | models.py |
+| TypeScript | Python |
+|------------|--------|
+| `Database['public']['Tables']['tracks']['Row']` | Requête Supabase directe |
+| `TrackEntry` | N/A (frontend only) |
+| `AnalysisStatus` | `AnalysisStatus(str, Enum)` |
+| `DbTrackUpdate` | `TrackUpdate(BaseModel)` |
 
-## Modification des types
+## Garde-fous
 
-1. Modifier le fichier TypeScript dans `shared/types/`
-2. Mettre à jour le fichier Python correspondant dans `Analyzer/app/models.py`
-3. Tester les deux côtés
+1. **BDD = source de vérité** : Les types sont générés depuis Supabase
+2. **CI** : Le build échoue si les types ne correspondent pas
+3. **TypeScript strict** : Les erreurs de type bloquent la compilation

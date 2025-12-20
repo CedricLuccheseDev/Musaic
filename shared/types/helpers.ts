@@ -1,31 +1,24 @@
 /**
- * Shared track types between App and Analyzer
+ * Type conversion helpers
  */
 
-import type { AnalysisData, AnalysisStatus } from './analysis'
+import type { Database } from './generated/database'
+import type { DownloadStatus, AnalysisStatus } from './enums'
 
 // =============================================================================
-// Enums
+// Database Row Types (from generated types)
 // =============================================================================
 
-/**
- * Download availability status
- */
-export type DownloadStatus = 'FreeDirectLink' | 'FreeExternalLink' | 'No'
+export type DbTrack = Database['public']['Tables']['tracks']['Row']
+export type DbTrackInsert = Database['public']['Tables']['tracks']['Insert']
+export type DbTrackUpdate = Database['public']['Tables']['tracks']['Update']
 
-export const DownloadStatusValues = {
-  FREE_DIRECT: 'FreeDirectLink' as const,
-  FREE_EXTERNAL: 'FreeExternalLink' as const,
-  NO: 'No' as const
-}
+export type DbProfile = Database['public']['Tables']['profiles']['Row']
 
 // =============================================================================
-// Track Types
+// Frontend Track Entry (used in UI)
 // =============================================================================
 
-/**
- * Track entry as used in the frontend
- */
 export interface TrackEntry {
   // Identifiers
   id: number
@@ -78,45 +71,14 @@ export interface TrackEntry {
   purchase_title: string | null
 }
 
-/**
- * Database track record (snake_case matching Supabase schema)
- */
-export interface DbTrack {
-  soundcloud_id: number
-  urn: string
-  permalink_url: string
-  title: string
-  artist: string
-  artwork: string | null
-  duration: number
-  genre: string | null
-  description: string | null
-  soundcloud_created_at: string | null
-  label: string | null
-  tags: string[]
-  playback_count: number
-  likes_count: number
-  reposts_count: number
-  comment_count: number
-  download_status: string
-  downloadable: boolean
-  purchase_url: string | null
-  purchase_title: string | null
-}
-
-/**
- * Database track with analysis fields
- */
-export interface DbTrackWithAnalysis extends DbTrack, AnalysisData {}
-
 // =============================================================================
 // Conversion Functions
 // =============================================================================
 
 /**
- * Convert TrackEntry to DbTrack format for insertion
+ * Convert frontend TrackEntry to database format for insertion
  */
-export function trackEntryToDbTrack(track: TrackEntry): DbTrack {
+export function trackEntryToDbTrack(track: TrackEntry): DbTrackInsert {
   return {
     soundcloud_id: track.id,
     urn: track.urn,
@@ -142,9 +104,9 @@ export function trackEntryToDbTrack(track: TrackEntry): DbTrack {
 }
 
 /**
- * Convert DbTrackWithAnalysis to TrackEntry format
+ * Convert database row to frontend TrackEntry format
  */
-export function dbTrackToTrackEntry(db: DbTrackWithAnalysis): TrackEntry {
+export function dbTrackToTrackEntry(db: DbTrack): TrackEntry {
   return {
     id: db.soundcloud_id,
     urn: db.urn,
@@ -158,12 +120,12 @@ export function dbTrackToTrackEntry(db: DbTrackWithAnalysis): TrackEntry {
     created_at: db.soundcloud_created_at,
     label: db.label,
     tags: db.tags || [],
-    playback_count: db.playback_count,
-    likes_count: db.likes_count,
-    reposts_count: db.reposts_count,
-    comment_count: db.comment_count,
-    downloadStatus: db.download_status as DownloadStatus,
-    downloadable: db.downloadable,
+    playback_count: db.playback_count || 0,
+    likes_count: db.likes_count || 0,
+    reposts_count: db.reposts_count || 0,
+    comment_count: db.comment_count || 0,
+    downloadStatus: (db.download_status || 'No') as DownloadStatus,
+    downloadable: db.downloadable || false,
     purchase_url: db.purchase_url,
     purchase_title: db.purchase_title,
     // Analysis fields
