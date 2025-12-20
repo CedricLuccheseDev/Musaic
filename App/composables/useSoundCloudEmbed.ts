@@ -1,4 +1,4 @@
-import type { TrackEntry } from '~/types/track'
+import type { TrackEntry } from '~/types'
 
 interface EmbedState {
   currentTrack: TrackEntry | null

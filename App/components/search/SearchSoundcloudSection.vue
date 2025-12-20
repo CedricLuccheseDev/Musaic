@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TrackEntry } from '~/types/track'
+import type { TrackEntry } from '~/types'
 import type { ArtistInfo } from '~/server/services/soundcloud'
 import { AD_INTERVAL } from '~/config/search'
 

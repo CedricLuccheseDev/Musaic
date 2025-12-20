@@ -1,6 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { TrackEntry } from '~/types/track'
-import { type DbTrack, type AnalysisData, trackEntryToDbTrack } from '~/types/database'
+import { type TrackEntry, type DbTrack, type AnalysisData, trackEntryToDbTrack } from '~/types'
 import { logger } from '~/server/utils/logger'
 
 let supabaseClient: SupabaseClient | null = null

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { DownloadStatus } from '~/types/track'
+import { DownloadStatus } from '~/types'
 
 /* --- States --- */
 const { t } = useI18n()
