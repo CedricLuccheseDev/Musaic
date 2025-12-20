@@ -107,10 +107,10 @@ jobs:
         run: python -m py_compile app/*.py app/endpoints/*.py
 
   # ============================================
-  # Merge to main (only on dev push, after CI passes)
+  # Deploy: Merge to main + Release (atomic)
   # ============================================
-  merge-to-main:
-    name: Merge to main
+  deploy:
+    name: Deploy
     needs: [frontend, backend]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
@@ -118,32 +118,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Merge dev to main
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git fetch origin main
-          git checkout main
-          git merge origin/dev --no-edit
-          git push origin main
-
-  # ============================================
-  # Release (only on main, after merge)
-  # ============================================
-  release:
-    name: Release
-    needs: [merge-to-main]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
           fetch-depth: 0
           fetch-tags: true
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -172,19 +146,26 @@ jobs:
           echo "New version: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Write version file and create tag
+      - name: Prepare release on dev
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Write version to file
+          # Write version to file on dev branch
           echo "${{ steps.version.outputs.version }}" > App/.version
-
-          # Commit version file
           git add App/.version
-          git commit -m "chore: bump version to ${{ steps.version.outputs.version }}" || true
+          git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
 
-          # Create and push tag
+      - name: Merge dev to main and tag
+        run: |
+          # Switch to main and merge dev (with version commit)
+          git fetch origin main
+          git checkout main
+          git merge origin/dev --no-edit
+
+          # Create tag on main
           git tag ${{ steps.version.outputs.version }}
+
+          # Push main + tag together (atomic)
           git push origin main --tags
-          echo "Created tag: ${{ steps.version.outputs.version }}"
+          echo "✅ Deployed ${{ steps.version.outputs.version }}"
