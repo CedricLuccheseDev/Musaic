@@ -10,7 +10,11 @@ Plateforme de recherche musicale pour DJs et producteurs.
 Musaic/
 ├── App/              # Frontend (Nuxt 3)
 ├── Analyzer/         # Backend (FastAPI)
-├── shared/           # Documentation partagée
+├── shared/
+│   ├── docs/         # Documentation partagée
+│   ├── types/        # Types TypeScript partagés
+│   └── schemas/      # JSON Schemas (source de vérité)
+├── supabase/         # Migrations BDD
 ├── Dockerfile.app    # Build frontend
 └── Dockerfile.analyzer # Build backend
 ```
@@ -50,10 +54,13 @@ python -m app.main
 
 ## Documentation
 
+- [Architecture](shared/docs/ARCHITECTURE.md)
+- [API Reference](shared/docs/API.md)
+- [Standards](shared/docs/STANDARDS.md)
+- [Deployment](shared/docs/DEPLOYMENT.md)
+- [Contributing](shared/CONTRIBUTING.md)
 - [Frontend README](App/README.md)
 - [Analyzer README](Analyzer/README.md)
-- [Contributing](shared/CONTRIBUTING.md)
-- [Code Guidelines](CLAUDE.md)
 
 ## Deployment (Dokploy)
 
