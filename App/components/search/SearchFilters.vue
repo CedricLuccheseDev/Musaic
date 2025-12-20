@@ -1,0 +1,43 @@
+<script setup lang="ts">
+/* --- States --- */
+const { t } = useI18n()
+type FilterType = 'all' | 'free' | 'paid'
+const filter = defineModel<FilterType>('filter', { default: 'all' })
+</script>
+
+<template>
+  <div class="flex items-center gap-0.5 sm:gap-1">
+    <button
+      type="button"
+      class="flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-all duration-200 sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-sm"
+      :class="filter === 'all'
+        ? 'bg-violet-600/20 text-violet-400'
+        : 'text-neutral-400 hover:text-neutral-200'"
+      @click="filter = 'all'"
+    >
+      {{ t.all }}
+    </button>
+    <button
+      type="button"
+      class="flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-all duration-200 sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-sm"
+      :class="filter === 'free'
+        ? 'bg-emerald-600/20 text-emerald-400'
+        : 'text-neutral-400 hover:text-neutral-200'"
+      @click="filter = 'free'"
+    >
+      <UIcon name="i-heroicons-arrow-down-tray" class="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+      <span class="hidden sm:inline">{{ t.free }}</span>
+    </button>
+    <button
+      type="button"
+      class="flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-all duration-200 sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-sm"
+      :class="filter === 'paid'
+        ? 'bg-orange-600/20 text-orange-400'
+        : 'text-neutral-400 hover:text-neutral-200'"
+      @click="filter = 'paid'"
+    >
+      <UIcon name="i-heroicons-shopping-cart" class="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+      <span class="hidden sm:inline">{{ t.paid }}</span>
+    </button>
+  </div>
+</template>

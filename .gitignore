@@ -1,0 +1,79 @@
+# ===================
+# Monorepo Musaic
+# ===================
+
+# ----- Node.js / Nuxt (App) -----
+node_modules/
+.output/
+.data/
+.nuxt/
+.nitro/
+dist/
+
+# ----- Python (Analyzer) -----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+eggs/
+.eggs/
+*.egg-info/
+*.egg
+.installed.cfg
+sdist/
+wheels/
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+.venv/
+venv/
+env/
+ENV/
+
+# ----- Environment -----
+.env
+.env.*
+!.env.example
+
+# ----- IDE / Editors -----
+.idea/
+.vscode/
+.fleet/
+*.swp
+*.swo
+
+# ----- OS -----
+.DS_Store
+Thumbs.db
+
+# ----- Logs -----
+*.log
+logs/
+
+# ----- Temp files -----
+*.tmp
+*.temp
+.tmp/
+.cache/
+/tmp/
+
+# ----- Audio files (Analyzer temp) -----
+*.wav
+*.mp3
+*.flac
+
+# ----- Docker -----
+.docker/
+
+# ----- Misc -----
+*-player-script.js
