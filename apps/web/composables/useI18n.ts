@@ -190,7 +190,14 @@ const translations = {
     analysisVocal: 'Vocal',
     analysisInstrumental: 'Instrumental',
     analysisStudio: 'Studio',
-    analysisLive: 'Live'
+    analysisLive: 'Live',
+
+    // Similar tracks
+    similarTo: 'Similaire à',
+    similarTracks: 'Tracks similaires',
+    similarSearching: 'Recherche de tracks similaires...',
+    similarNotAnalyzed: 'Cette track n\'a pas encore été analysée',
+    similarNoResults: 'Aucune track similaire trouvée'
   },
   en: {
     // SearchBar
@@ -381,7 +388,14 @@ const translations = {
     analysisVocal: 'Vocal',
     analysisInstrumental: 'Instrumental',
     analysisStudio: 'Studio',
-    analysisLive: 'Live'
+    analysisLive: 'Live',
+
+    // Similar tracks
+    similarTo: 'Similar to',
+    similarTracks: 'Similar tracks',
+    similarSearching: 'Searching for similar tracks...',
+    similarNotAnalyzed: 'This track has not been analyzed yet',
+    similarNoResults: 'No similar tracks found'
   }
 } as const
 

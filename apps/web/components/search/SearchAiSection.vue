@@ -129,7 +129,7 @@ function isArtistCollapsed(artist: string): boolean {
               leave-from-class="opacity-100 max-h-[1000px]"
               leave-to-class="opacity-0 max-h-0"
             >
-              <div v-if="!isArtistCollapsed(artist as string)" class="mt-2 space-y-2 overflow-hidden pl-6">
+              <div v-if="!isArtistCollapsed(artist as string)" class="mt-2 space-y-2 overflow-hidden">
                 <SearchTrackCard
                   v-for="(track, index) in tracks"
                   :key="`ai-${track.id}`"
