@@ -26,6 +26,7 @@ class AnalysisResult(BaseModel):
     # Rhythm
     bpm_detected: float  # BPM with precision (e.g., 174.5)
     bpm_confidence: float
+    beat_offset: float | None = None  # First beat position in seconds (phase offset)
 
     # Tonal
     key_detected: str
@@ -61,6 +62,7 @@ class TrackUpdate(BaseModel):
     # Rhythm
     bpm_detected: float | None = None
     bpm_confidence: float | None = None
+    beat_offset: float | None = None  # First beat position in seconds (phase offset)
 
     # Tonal
     key_detected: str | None = None
@@ -82,6 +84,9 @@ class TrackUpdate(BaseModel):
     acousticness: float | None = None
     valence: float | None = None
     liveness: float | None = None
+
+    # Highlight
+    highlight_time: float | None = None  # Timestamp of the highlight (seconds)
 
     # Embedding (for similarity search)
     embedding: list[float] | None = None  # 1280-dim vector

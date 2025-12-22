@@ -197,7 +197,16 @@ const translations = {
     similarTracks: 'Tracks similaires',
     similarSearching: 'Recherche de tracks similaires...',
     similarNotAnalyzed: 'Cette track n\'a pas encore été analysée',
-    similarNoResults: 'Aucune track similaire trouvée'
+    similarNoResults: 'Aucune track similaire trouvée',
+
+    // DJ Preview
+    djDropTrack: 'Clique sur A ou B pour charger une track',
+    djMasterBpm: 'BPM Master',
+    djLoadToA: 'Charger sur A',
+    djLoadToB: 'Charger sur B',
+    djEjectFromA: 'Éjecter de A',
+    djEjectFromB: 'Éjecter de B',
+    djTrackNotAnalyzed: 'Track non analysée'
   },
   en: {
     // SearchBar
@@ -395,7 +404,16 @@ const translations = {
     similarTracks: 'Similar tracks',
     similarSearching: 'Searching for similar tracks...',
     similarNotAnalyzed: 'This track has not been analyzed yet',
-    similarNoResults: 'No similar tracks found'
+    similarNoResults: 'No similar tracks found',
+
+    // DJ Preview
+    djDropTrack: 'Click A or B to load a track',
+    djMasterBpm: 'Master BPM',
+    djLoadToA: 'Load to A',
+    djLoadToB: 'Load to B',
+    djEjectFromA: 'Eject from A',
+    djEjectFromB: 'Eject from B',
+    djTrackNotAnalyzed: 'Track not analyzed'
   }
 } as const
 

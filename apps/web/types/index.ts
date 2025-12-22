@@ -62,6 +62,8 @@ export interface DbTrack {
   acousticness: number | null
   valence: number | null
   liveness: number | null
+  beat_offset: number | null
+  highlight_time: number | null
   analysis_status: string | null
   analysis_error: string | null
   analyzed_at: string | null
@@ -107,6 +109,8 @@ export interface DbTrackInsert {
   acousticness?: number | null
   valence?: number | null
   liveness?: number | null
+  beat_offset?: number | null
+  highlight_time?: number | null
   analysis_status?: string | null
   analysis_error?: string | null
   analyzed_at?: string | null
@@ -150,6 +154,8 @@ export interface DbTrackUpdate {
   acousticness?: number | null
   valence?: number | null
   liveness?: number | null
+  beat_offset?: number | null
+  highlight_time?: number | null
   analysis_status?: string | null
   analysis_error?: string | null
   analyzed_at?: string | null
@@ -228,6 +234,8 @@ export interface TrackEntry {
   acousticness: number | null
   valence: number | null
   liveness: number | null
+  beat_offset: number | null
+  highlight_time: number | null
   analysis_status: AnalysisStatus | null
   analysis_error: string | null
   analyzed_at: string | null
@@ -307,6 +315,8 @@ export function dbTrackToTrackEntry(db: DbTrack): TrackEntry {
     acousticness: db.acousticness,
     valence: db.valence,
     liveness: db.liveness,
+    beat_offset: db.beat_offset,
+    highlight_time: db.highlight_time,
     analysis_status: db.analysis_status as AnalysisStatus | null,
     analysis_error: db.analysis_error,
     analyzed_at: db.analyzed_at

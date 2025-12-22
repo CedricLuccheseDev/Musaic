@@ -26,16 +26,21 @@ EMBEDDING_MODEL_PATH = Path(__file__).parent.parent / "models" / "discogs-effnet
 EMBEDDING_SAMPLE_RATE = 16000  # Discogs-Effnet expects 16kHz
 EMBEDDING_DIM = 1280  # Discogs-Effnet outputs 1280-dim embeddings
 
-# Lazy-loaded embedding model (loaded once on first use)
+# TempoCNN model configuration (more accurate BPM detection)
+TEMPO_CNN_MODEL_PATH = Path(__file__).parent.parent / "models" / "deepsquare-k16-3.pb"
+
+# Lazy-loaded models (loaded once on first use)
 _embedding_model = None
 _embedding_model_available = None
+_tempo_cnn_model = None
+_tempo_cnn_available = None
 
-# Optimized sample rate (22050 is sufficient for music analysis)
-SAMPLE_RATE = 22050
+# Sample rate (44100 Hz = CD quality for better BPM/beat detection accuracy)
+SAMPLE_RATE = 44100
 
-# Frame parameters
-FRAME_SIZE = 2048
-HOP_SIZE = 1024
+# Frame parameters (doubled for 44100 Hz)
+FRAME_SIZE = 4096
+HOP_SIZE = 2048
 
 
 class AnalysisError(Exception):
@@ -69,6 +74,32 @@ def _get_embedding_model():
     except Exception as e:
         print(f"[Embedding] Failed to load model: {e}")
         _embedding_model_available = False
+        return None
+
+
+def _get_tempo_cnn_model():
+    """Get or load the TempoCNN model (lazy loading)."""
+    global _tempo_cnn_model, _tempo_cnn_available
+
+    # Return cached result if already checked
+    if _tempo_cnn_available is not None:
+        return _tempo_cnn_model if _tempo_cnn_available else None
+
+    # Check if model file exists
+    if not TEMPO_CNN_MODEL_PATH.exists():
+        print(f"[TempoCNN] Model not found at: {TEMPO_CNN_MODEL_PATH}")
+        _tempo_cnn_available = False
+        return None
+
+    try:
+        from essentia.standard import TempoCNN
+        _tempo_cnn_model = TempoCNN(graphFilename=str(TEMPO_CNN_MODEL_PATH))
+        _tempo_cnn_available = True
+        print(f"[TempoCNN] Model loaded successfully from: {TEMPO_CNN_MODEL_PATH}")
+        return _tempo_cnn_model
+    except Exception as e:
+        print(f"[TempoCNN] Failed to load model: {e}")
+        _tempo_cnn_available = False
         return None
 
 
@@ -351,7 +382,11 @@ def analyze_audio(file_path: str | Path, progress_callback=None) -> AnalysisResu
 
         # === RHYTHM ANALYSIS ===
         _progress("Rhythm", 20)
-        bpm, bpm_confidence, _ = _extract_rhythm(audio)
+        bpm, bpm_confidence, _, beat_offset = _extract_rhythm(
+            audio,
+            full_audio=full_audio,
+            highlight_time=highlight_time
+        )
 
         # === TONAL ANALYSIS ===
         _progress("Key detection", 40)
@@ -384,6 +419,7 @@ def analyze_audio(file_path: str | Path, progress_callback=None) -> AnalysisResu
             # Rhythm
             bpm_detected=bpm,
             bpm_confidence=bpm_confidence,
+            beat_offset=beat_offset,
             # Tonal
             key_detected=key_detected,
             key_confidence=key_confidence,
@@ -458,7 +494,11 @@ def analyze_audio_from_bytes(audio_bytes: bytes, progress_callback=None) -> Anal
 
         # === RHYTHM ANALYSIS ===
         _progress("Rhythm", 20)
-        bpm, bpm_confidence, _ = _extract_rhythm(audio)
+        bpm, bpm_confidence, _, beat_offset = _extract_rhythm(
+            audio,
+            full_audio=full_audio,
+            highlight_time=highlight_time
+        )
 
         # === TONAL ANALYSIS ===
         _progress("Key detection", 40)
@@ -491,6 +531,7 @@ def analyze_audio_from_bytes(audio_bytes: bytes, progress_callback=None) -> Anal
             # Rhythm
             bpm_detected=bpm,
             bpm_confidence=bpm_confidence,
+            beat_offset=beat_offset,
             # Tonal
             key_detected=key_detected,
             key_confidence=key_confidence,
@@ -522,17 +563,137 @@ def analyze_audio_from_bytes(audio_bytes: bytes, progress_callback=None) -> Anal
 # RHYTHM EXTRACTORS
 # =============================================================================
 
-def _extract_rhythm(audio: np.ndarray) -> tuple[float, float, int]:
+def _extract_bpm_tempocnn(audio: np.ndarray) -> tuple[float, float]:
     """
-    Extract BPM, confidence, and beat count using multiple methods.
+    Extract BPM using TempoCNN neural network.
+
+    More accurate than traditional methods, especially for complex rhythms.
+    Returns (bpm, confidence) or (0.0, 0.0) if model unavailable.
+    """
+    model = _get_tempo_cnn_model()
+    if model is None:
+        return 0.0, 0.0
+
+    try:
+        global_tempo, local_tempo, local_probs = model(audio)
+
+        # Confidence = average max probability across local estimates
+        if len(local_probs) > 0:
+            confidence = float(np.mean([float(np.max(p)) for p in local_probs]))
+        else:
+            confidence = 0.5
+
+        return float(global_tempo), confidence
+    except Exception:
+        return 0.0, 0.0
+
+
+def _extract_beat_offset_from_drop(full_audio: np.ndarray, highlight_time: float, bpm: float) -> float | None:
+    """
+    Extract beat offset using BeatTrackerMultiFeature starting from the drop/highlight.
+
+    This is more accurate than RhythmExtractor2013 for beat positions.
+    Analyzes the audio starting from the drop to find the first strong beat.
+
+    Args:
+        full_audio: Full track audio samples
+        highlight_time: Time of the drop/highlight in seconds
+        bpm: Already detected BPM for validation
+
+    Returns:
+        Beat offset in seconds (phase relative to track start), or None if detection failed
+    """
+    try:
+        # Extract segment starting a bit before the drop (to catch the first beat)
+        # and lasting about 10 seconds (enough for stable beat detection)
+        drop_start = max(0, highlight_time - 1.0)  # 1 second before drop
+        drop_end = min(len(full_audio) / SAMPLE_RATE, highlight_time + 10.0)
+
+        start_sample = int(drop_start * SAMPLE_RATE)
+        end_sample = int(drop_end * SAMPLE_RATE)
+        drop_segment = full_audio[start_sample:end_sample]
+
+        if len(drop_segment) < SAMPLE_RATE * 2:  # Need at least 2 seconds
+            return None
+
+        # BeatTrackerMultiFeature combines multiple onset detection methods
+        beat_tracker = es.BeatTrackerMultiFeature()
+        beats, confidence = beat_tracker(drop_segment)
+
+        if len(beats) < 4:
+            print(f"[BeatTrackerMultiFeature] Not enough beats detected ({len(beats)})")
+            return None
+
+        # Convert beat times to full track time
+        beats_absolute = beats + drop_start
+
+        # Validate beats against expected BPM
+        beat_interval = 60.0 / bpm
+        intervals = np.diff(beats)
+
+        # Find first stable beat pair (consecutive beats matching expected BPM within 10%)
+        tolerance = beat_interval * 0.10
+        stable_beat_idx = None
+
+        for i, interval in enumerate(intervals[:20]):  # Check first 20 intervals
+            if abs(interval - beat_interval) < tolerance:
+                # Check next interval too for stability
+                if i + 1 < len(intervals) and abs(intervals[i + 1] - beat_interval) < tolerance:
+                    stable_beat_idx = i
+                    break
+
+        if stable_beat_idx is not None:
+            first_stable_beat = float(beats_absolute[stable_beat_idx])
+            beat_offset = first_stable_beat % beat_interval
+            print(f"[BeatTrackerMultiFeature] First stable beat at {first_stable_beat:.3f}s (drop+{first_stable_beat - highlight_time:.3f}s), offset: {beat_offset:.3f}s")
+            return round(beat_offset, 3)
+
+        # Fallback: find the first beat at or after the highlight time
+        for beat in beats_absolute:
+            if beat >= highlight_time - 0.1:  # Allow 100ms before
+                beat_offset = float(beat) % beat_interval
+                print(f"[BeatTrackerMultiFeature] Using first beat at drop: {beat:.3f}s, offset: {beat_offset:.3f}s")
+                return round(beat_offset, 3)
+
+        # Last fallback: use first detected beat
+        first_beat = float(beats_absolute[0])
+        beat_offset = first_beat % beat_interval
+        print(f"[BeatTrackerMultiFeature] Fallback first beat: {first_beat:.3f}s, offset: {beat_offset:.3f}s")
+        return round(beat_offset, 3)
+
+    except Exception as e:
+        print(f"[BeatTrackerMultiFeature] Error: {e}")
+        return None
+
+
+def _extract_rhythm(
+    audio: np.ndarray,
+    full_audio: np.ndarray | None = None,
+    highlight_time: float | None = None
+) -> tuple[float, float, int, float | None]:
+    """
+    Extract BPM, confidence, beat count, and beat offset using multiple methods.
 
     Combines several approaches to improve accuracy:
-    1. RhythmExtractor2013 with multifeature (good for complex rhythms)
-    2. RhythmExtractor2013 with degara (good for electronic music)
-    3. LoopBpmEstimator (good for loops/electronic)
-    4. Validates against beat intervals
+    1. TempoCNN neural network (most accurate for BPM)
+    2. RhythmExtractor2013 with multifeature (good general purpose)
+    3. RhythmExtractor2013 with degara (good for electronic music)
+    4. LoopBpmEstimator (good for loops/electronic)
+    5. BeatTrackerMultiFeature for precise beat positions at the drop
+
+    Args:
+        audio: Audio segment for BPM analysis
+        full_audio: Full track audio for beat offset detection at the drop
+        highlight_time: Time of the drop/highlight for beat offset detection
+
+    Returns:
+        tuple: (bpm, confidence, beat_count, beat_offset)
+               beat_offset is the phase offset of the first beat in seconds
     """
-    # Method 1: Multifeature (default, good general purpose)
+    # Method 1: TempoCNN (neural network - most accurate for BPM)
+    bpm_cnn, conf_cnn = _extract_bpm_tempocnn(audio)
+
+    # Method 2: Multifeature (default, good general purpose)
     try:
         rhythm_multi = es.RhythmExtractor2013(method="multifeature")
         bpm_multi, beats_multi, conf_multi, _, _ = rhythm_multi(audio)
@@ -541,7 +702,7 @@ def _extract_rhythm(audio: np.ndarray) -> tuple[float, float, int]:
     except Exception:
         bpm_multi, conf_multi, beats_multi = 0.0, 0.0, np.array([])
 
-    # Method 2: Degara (better for electronic/dance music)
+    # Method 3: Degara (better for electronic/dance music)
     try:
         rhythm_degara = es.RhythmExtractor2013(method="degara")
         bpm_degara, beats_degara, conf_degara, _, _ = rhythm_degara(audio)
@@ -550,7 +711,7 @@ def _extract_rhythm(audio: np.ndarray) -> tuple[float, float, int]:
     except Exception:
         bpm_degara, conf_degara, beats_degara = 0.0, 0.0, np.array([])
 
-    # Method 3: LoopBpmEstimator (good for loops, electronic)
+    # Method 4: LoopBpmEstimator (good for loops, electronic)
     try:
         loop_estimator = es.LoopBpmEstimator()
         bpm_loop = float(loop_estimator(audio))
@@ -558,7 +719,7 @@ def _extract_rhythm(audio: np.ndarray) -> tuple[float, float, int]:
     except Exception:
         bpm_loop, conf_loop = 0.0, 0.0
 
-    # Method 4: Calculate BPM from beat intervals (ground truth validation)
+    # Method 5: Calculate BPM from beat intervals (ground truth validation)
     bpm_from_beats = 0.0
     beats = beats_multi if len(beats_multi) > len(beats_degara) else beats_degara
     if len(beats) > 2:
@@ -570,58 +731,78 @@ def _extract_rhythm(audio: np.ndarray) -> tuple[float, float, int]:
             bpm_from_beats = 60.0 / median_interval
 
     # Collect all candidates with their confidence
+    # TempoCNN gets 3x weight because it's the most accurate neural network method
     candidates = []
+    if bpm_cnn > 0:
+        candidates.append((bpm_cnn, conf_cnn * 3.0, "cnn"))  # 3x weight - most accurate
     if bpm_multi > 0:
-        candidates.append((bpm_multi, conf_multi, "multi"))
+        candidates.append((bpm_multi, conf_multi * 0.7, "multi"))  # Lower weight
     if bpm_degara > 0:
-        candidates.append((bpm_degara, conf_degara, "degara"))
+        candidates.append((bpm_degara, conf_degara * 0.7, "degara"))  # Lower weight
     if bpm_loop > 0:
         candidates.append((bpm_loop, conf_loop, "loop"))
     if bpm_from_beats > 0:
-        candidates.append((bpm_from_beats, 0.8, "beats"))
+        candidates.append((bpm_from_beats, 0.6, "beats"))  # Lower weight
 
     if not candidates:
-        return 120.0, 0.0, 0  # Default fallback
+        return 120.0, 0.0, 0, None  # Default fallback
 
-    # Normalize all candidates to 70-180 range (most common for music)
+    # Normalize all candidates to 100-200 range (better for electronic/DnB)
     def normalize_bpm(bpm: float) -> float:
-        while bpm < 70:
+        while bpm < 100:
             bpm *= 2
-        while bpm > 180:
+        while bpm > 200:
             bpm /= 2
         return bpm
 
     normalized = [(normalize_bpm(bpm), conf, src) for bpm, conf, src in candidates]
 
+    # Debug: log all candidates
+    print(f"[BPM Debug] Candidates: {[(round(b, 1), round(c, 2), s) for b, c, s in normalized]}")
+
     # Find consensus: group similar BPMs (within 4% tolerance)
     def bpm_similar(a: float, b: float) -> bool:
-        """Check if two BPMs are similar (accounting for double/half)."""
         if b == 0:
             return False
         ratio = a / b
-        # Check direct match, double, or half
         for mult in [1.0, 2.0, 0.5]:
             if 0.96 <= ratio * mult <= 1.04:
                 return True
         return False
 
-    # Score each candidate by how many others agree with it
+    # Score each candidate by agreement
     scored = []
     for i, (bpm_i, conf_i, src_i) in enumerate(normalized):
-        agreement = conf_i  # Start with own confidence
+        agreement = conf_i
         for j, (bpm_j, conf_j, _) in enumerate(normalized):
             if i != j and bpm_similar(bpm_i, bpm_j):
-                agreement += conf_j * 0.5  # Add partial confidence for agreement
+                agreement += conf_j * 0.3
         scored.append((bpm_i, agreement, src_i))
 
-    # Pick best scoring BPM
     scored.sort(key=lambda x: x[1], reverse=True)
-    best_bpm, best_score, _ = scored[0]
+    best_bpm, best_score, best_src = scored[0]
 
-    # Final confidence is based on agreement score (normalized)
-    final_confidence = min(1.0, best_score / 2.0)
+    print(f"[BPM Debug] Winner: {round(best_bpm, 1)} from {best_src} (score: {round(best_score, 2)})")
 
-    return round(best_bpm, 1), round(final_confidence, 3), len(beats)
+    final_confidence = min(1.0, best_score / 3.0)
+
+    # Use BeatTrackerMultiFeature for more accurate beat offset detection at the drop
+    beat_offset = None
+    if full_audio is not None and highlight_time is not None and highlight_time > 0:
+        beat_offset = _extract_beat_offset_from_drop(full_audio, highlight_time, best_bpm)
+
+    # Fallback: try on the analysis segment if drop detection failed
+    if beat_offset is None:
+        beat_offset = _extract_beat_offset_from_drop(audio, 0.0, best_bpm)
+
+    # Last fallback to RhythmExtractor2013 beats
+    if beat_offset is None and len(beats) > 0:
+        first_beat = float(beats[0])
+        beat_interval = 60.0 / best_bpm
+        beat_offset = round(first_beat % beat_interval, 3)
+        print(f"[Beat Grid Fallback] First beat: {first_beat:.3f}s, offset: {beat_offset:.3f}s")
+
+    return round(best_bpm, 1), round(final_confidence, 3), len(beats), beat_offset
 
 
 

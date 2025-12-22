@@ -83,6 +83,19 @@ GitHub Actions runs on every push:
 2. Backend: Syntax check
 3. Release: Auto-tag on main
 
+## Git Commits
+
+When committing, use simple commit messages without signatures or generated-by footers.
+
+```bash
+# Good
+git commit -m "feat: Add similar tracks feature"
+
+# Bad (don't add these)
+# 🤖 Generated with [Claude Code](https://claude.com/claude-code)
+# Co-Authored-By: ...
+```
+
 ## Database Population
 
 When asked to add/populate tracks:

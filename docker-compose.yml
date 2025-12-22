@@ -9,4 +9,5 @@ services:
       - ./apps/analyzer/.env
     volumes:
       - ./apps/analyzer/app:/app/app
+      - ./apps/analyzer/models:/app/models
     restart: unless-stopped

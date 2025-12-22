@@ -17,6 +17,12 @@ MODELS = {
         "size_mb": 18,
         "description": "Discogs-Effnet embedding model (1280 dimensions)",
     },
+    "tempocnn": {
+        "url": "https://essentia.upf.edu/models/tempo/tempocnn/deepsquare-k16-3.pb",
+        "filename": "deepsquare-k16-3.pb",
+        "size_mb": 5,
+        "description": "TempoCNN tempo detection model (neural network)",
+    },
 }
 
 

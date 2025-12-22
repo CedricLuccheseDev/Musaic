@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     temp_dir: Path = Path(__file__).parent.parent / ".tmp"
 
     # Analysis settings
-    audio_duration_seconds: int = 45  # Duration of segment to analyze (45s is enough for good accuracy)
+    audio_duration_seconds: int = 60  # Duration of segment to analyze (60s for better BPM accuracy)
     analysis_timeout_seconds: int = 600  # Increased for full track download
     max_concurrent_analyses: int = min(os.cpu_count() or 4, 16)  # Cap at 16 to avoid RAM issues
 

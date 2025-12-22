@@ -20,6 +20,7 @@ definePageMeta({
 const { t } = useI18n()
 const { canUseAi, aiGenerationsLeft, isPremium, incrementAiUsage } = useProfile()
 const route = useRoute()
+const { watchTracks } = useTrackUpdates()
 
 /* --- Inject --- */
 const authLoading = inject<Ref<boolean>>('authLoading', ref(false))
@@ -189,6 +190,10 @@ onMounted(async () => {
     runAiSearch()
   }
 })
+
+// Real-time track updates when analysis completes
+watchTracks(allTracks)
+watchTracks(aiResults)
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)

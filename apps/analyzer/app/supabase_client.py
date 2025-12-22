@@ -57,6 +57,7 @@ async def update_track_analysis(
         # Rhythm
         bpm_detected=analysis_result["bpm_detected"],
         bpm_confidence=analysis_result["bpm_confidence"],
+        beat_grid=analysis_result.get("beat_grid"),
         # Tonal
         key_detected=analysis_result["key_detected"],
         key_confidence=analysis_result["key_confidence"],
@@ -74,6 +75,8 @@ async def update_track_analysis(
         acousticness=analysis_result["acousticness"],
         valence=analysis_result["valence"],
         liveness=analysis_result["liveness"],
+        # Highlight
+        highlight_time=analysis_result.get("highlight_time"),
         # Embedding
         embedding=analysis_result.get("embedding"),
         # Status

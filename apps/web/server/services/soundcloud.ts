@@ -203,6 +203,9 @@ function mapToTrackEntry(track: SoundcloudTrack): TrackEntry {
     acousticness: null,
     valence: null,
     liveness: null,
+    // Beat offset for DJ
+    beat_offset: null,
+    highlight_time: null,
     // Status
     analysis_status: null,
     analysis_error: null,

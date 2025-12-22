@@ -16,6 +16,6 @@ provide('authLoading', loading)
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
-    <AudioPlayer />
+    <DjPreview />
   </UApp>
 </template>
