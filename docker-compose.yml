@@ -1,0 +1,12 @@
+services:
+  analyzer:
+    build:
+      context: .
+      dockerfile: Dockerfile.analyzer
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./apps/analyzer/.env
+    volumes:
+      - ./apps/analyzer/app:/app/app
+    restart: unless-stopped
