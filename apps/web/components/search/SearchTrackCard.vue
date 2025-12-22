@@ -21,6 +21,7 @@ const { play, isTrackPlaying, isLoading, isCurrentTrack } = useAudioPlayer()
 const { formatKey, getKeyColor } = useKeyNotation()
 const isVisible = ref(props.skipAnimation)
 const showDetails = ref(false)
+const showSimilar = ref(false)
 
 /* --- Computed --- */
 const hasAnalysis = computed(() => props.track.analysis_status === AnalysisStatus.Completed)
@@ -193,6 +194,13 @@ onMounted(() => {
             >
               {{ t.analysisDetails }}
             </button>
+            <button
+              type="button"
+              class="cursor-pointer text-cyan-400 hover:text-cyan-300"
+              @click.stop="showSimilar = true"
+            >
+              ≈
+            </button>
           </template>
         </div>
       </div>
@@ -268,6 +276,13 @@ onMounted(() => {
       :track="track"
       :open="showDetails"
       @close="showDetails = false"
+    />
+
+    <!-- Similar Tracks Modal -->
+    <SimilarTracksModal
+      :track="track"
+      :open="showSimilar"
+      @close="showSimilar = false"
     />
   </div>
 </template>

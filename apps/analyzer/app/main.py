@@ -1,5 +1,6 @@
 """FastAPI application for Musaic Analyzer microservice."""
 
+import asyncio
 from collections import deque
 from contextlib import asynccontextmanager
 
@@ -10,10 +11,29 @@ from app.config import get_settings
 from app.endpoints import health_router, analyze_router, batch_router
 from app.endpoints.health import set_analysis_queue as set_health_queue
 from app.endpoints.analyze import set_analysis_queue as set_analyze_queue
+from app.endpoints.batch import process_batch_analysis, batch_state
 from app.logger import log
 
 # Shared analysis queue for tracking pending jobs
 analysis_queue: deque[int] = deque()
+
+
+async def auto_batch_on_startup():
+    """Automatically start batch analysis on startup after a short delay."""
+    await asyncio.sleep(2)
+
+    if batch_state["is_running"]:
+        log.info("Batch already running, skipping auto-start")
+        return
+
+    log.info("Auto-starting batch analysis for pending tracks...")
+    batch_state["is_running"] = True
+
+    try:
+        await process_batch_analysis()
+    except Exception as e:
+        log.error(f"Auto-batch failed: {e}")
+        batch_state["is_running"] = False
 
 
 @asynccontextmanager
@@ -27,6 +47,10 @@ async def lifespan(app: FastAPI):
     set_analyze_queue(analysis_queue)
 
     log.success(f"Musaic Analyzer v{__version__} started on {settings.host}:{settings.port}")
+
+    # Start auto-batch in background
+    asyncio.create_task(auto_batch_on_startup())
+
     yield
     log.info("Shutting down...")
 
