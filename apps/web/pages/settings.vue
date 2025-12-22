@@ -10,10 +10,11 @@ definePageMeta({
 const { t } = useI18n()
 const { user, loading, signOut } = useAuth()
 const { isPremium, profile } = useProfile()
+const { notation, setNotation } = useKeyNotation()
 const router = useRouter()
 const version = __APP_VERSION__
 const showTerms = ref(false)
-type Tab = 'profile' | 'subscription' | 'contact'
+type Tab = 'profile' | 'preferences' | 'subscription' | 'contact'
 const activeTab = ref<Tab>('profile')
 
 /* --- Computed --- */
@@ -74,6 +75,19 @@ watch(user, (u) => {
               />
               <UIcon name="i-heroicons-user" class="h-5 w-5" :class="activeTab === 'profile' ? 'text-violet-400' : 'text-neutral-500 group-hover:text-neutral-300'" />
               <span class="whitespace-nowrap">{{ t.profileMenu }}</span>
+            </button>
+            <button
+              type="button"
+              class="group relative flex shrink-0 cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 md:gap-3 md:px-4 md:py-3"
+              :class="activeTab === 'preferences' ? 'bg-violet-600/20 text-white shadow-lg shadow-violet-500/10' : 'text-neutral-400 hover:bg-neutral-800/50 hover:text-white'"
+              @click="activeTab = 'preferences'"
+            >
+              <div
+                v-if="activeTab === 'preferences'"
+                class="absolute bottom-0 left-1/2 h-1 w-6 -translate-x-1/2 rounded-full bg-violet-500 md:bottom-auto md:left-0 md:top-1/2 md:h-6 md:w-1 md:translate-x-0 md:-translate-y-1/2"
+              />
+              <UIcon name="i-heroicons-cog-6-tooth" class="h-5 w-5" :class="activeTab === 'preferences' ? 'text-violet-400' : 'text-neutral-500 group-hover:text-neutral-300'" />
+              <span class="whitespace-nowrap">{{ t.preferencesMenu }}</span>
             </button>
             <button
               type="button"
@@ -188,6 +202,69 @@ watch(user, (u) => {
               <UIcon name="i-heroicons-arrow-right-on-rectangle" class="h-5 w-5" />
               <span>{{ t.profileSignOut }}</span>
             </button>
+          </div>
+
+          <!-- Preferences Section -->
+          <div v-else-if="activeTab === 'preferences'">
+            <h2 class="mb-6 text-lg font-semibold text-white">{{ t.preferencesMenu }}</h2>
+
+            <!-- Key Notation -->
+            <div class="mb-6">
+              <h3 class="mb-3 text-sm font-medium text-neutral-400">{{ t.keyNotation }}</h3>
+              <div class="space-y-2">
+                <button
+                  type="button"
+                  class="flex w-full cursor-pointer items-center justify-between rounded-xl px-4 py-3 transition-all"
+                  :class="notation === 'standard' ? 'bg-violet-600/20 ring-1 ring-violet-500/50' : 'bg-neutral-800/30 hover:bg-neutral-800/50'"
+                  @click="setNotation('standard')"
+                >
+                  <div class="flex items-center gap-3">
+                    <div
+                      class="flex h-10 w-10 items-center justify-center rounded-full"
+                      :class="notation === 'standard' ? 'bg-violet-500/30' : 'bg-neutral-700/50'"
+                    >
+                      <span class="text-sm font-bold" :class="notation === 'standard' ? 'text-violet-300' : 'text-neutral-400'">Am</span>
+                    </div>
+                    <div class="text-left">
+                      <p class="font-medium" :class="notation === 'standard' ? 'text-white' : 'text-neutral-300'">{{ t.keyNotationStandard }}</p>
+                      <p class="text-xs text-neutral-500">A minor, F# major, C major...</p>
+                    </div>
+                  </div>
+                  <div
+                    class="flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all"
+                    :class="notation === 'standard' ? 'border-violet-500 bg-violet-500' : 'border-neutral-600'"
+                  >
+                    <UIcon v-if="notation === 'standard'" name="i-heroicons-check" class="h-3 w-3 text-white" />
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  class="flex w-full cursor-pointer items-center justify-between rounded-xl px-4 py-3 transition-all"
+                  :class="notation === 'camelot' ? 'bg-violet-600/20 ring-1 ring-violet-500/50' : 'bg-neutral-800/30 hover:bg-neutral-800/50'"
+                  @click="setNotation('camelot')"
+                >
+                  <div class="flex items-center gap-3">
+                    <div
+                      class="flex h-10 w-10 items-center justify-center rounded-full"
+                      :class="notation === 'camelot' ? 'bg-violet-500/30' : 'bg-neutral-700/50'"
+                    >
+                      <span class="text-sm font-bold" :class="notation === 'camelot' ? 'text-violet-300' : 'text-neutral-400'">8A</span>
+                    </div>
+                    <div class="text-left">
+                      <p class="font-medium" :class="notation === 'camelot' ? 'text-white' : 'text-neutral-300'">{{ t.keyNotationCamelot }}</p>
+                      <p class="text-xs text-neutral-500">8A, 11A, 8B, 2B...</p>
+                    </div>
+                  </div>
+                  <div
+                    class="flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all"
+                    :class="notation === 'camelot' ? 'border-violet-500 bg-violet-500' : 'border-neutral-600'"
+                  >
+                    <UIcon v-if="notation === 'camelot'" name="i-heroicons-check" class="h-3 w-3 text-white" />
+                  </div>
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Subscription Section -->

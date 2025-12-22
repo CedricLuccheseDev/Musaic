@@ -4,9 +4,11 @@
 
 ```
 Musaic/
-├── App/              # Frontend (Nuxt 3 / TypeScript)
-├── Analyzer/         # Backend (FastAPI / Python)
-└── shared/           # Shared documentation
+├── apps/
+│   ├── web/          # Frontend (Nuxt 3 / TypeScript)
+│   └── analyzer/     # Backend (FastAPI / Python)
+├── documentation/    # Project documentation
+└── supabase/         # Database migrations
 ```
 
 ## Code Style
@@ -16,12 +18,12 @@ Musaic/
 - SOLID architecture principles
 - No eslint-disable or type:ignore comments
 
-### TypeScript (App/)
+### TypeScript (apps/web/)
 - camelCase for folders, files, and variables
 - PascalCase for components and types
 - Script above template in Vue files
 
-### Python (Analyzer/)
+### Python (apps/analyzer/)
 - snake_case for files, functions, variables
 - PascalCase for classes
 - Docstrings for public functions
@@ -56,20 +58,20 @@ After generating code:
 
 ```bash
 # Frontend
-cd App && npm run lint && npm run build
+cd apps/web && npm run lint && npm run build
 
 # Backend
-python3 -m py_compile Analyzer/app/*.py
+python3 -m py_compile apps/analyzer/app/*.py
 ```
 
 ## Testing
 
 ```bash
 # Frontend
-cd App && npm run test
+cd apps/web && npm run test
 
 # Backend
-cd Analyzer && python -m pytest
+cd apps/analyzer && python -m pytest
 ```
 
 ## CI/CD
@@ -79,7 +81,7 @@ GitHub Actions runs on every push:
 2. Backend: Syntax check
 3. Release: Auto-tag on main
 
-## Database Population (App)
+## Database Population
 
 When asked to add/populate tracks:
 
@@ -91,7 +93,7 @@ Extract 20-40 artist names, label names, and genre terms.
 
 ### Step 3: Run Script
 ```bash
-cd App && npx tsx scripts/populateTracks.ts '<JSON_CONFIG>'
+cd apps/web && npx tsx scripts/populateTracks.ts '<JSON_CONFIG>'
 ```
 
 Config format:

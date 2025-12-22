@@ -83,7 +83,11 @@ const translations = {
     termsSection5Content: 'Nous nous réservons le droit de modifier ces conditions à tout moment. Les utilisateurs seront notifiés des changements importants.',
 
     // Profile
-    profileMenu: 'Paramètres',
+    profileMenu: 'Profil',
+    preferencesMenu: 'Préférences',
+    keyNotation: 'Notation des tonalités',
+    keyNotationStandard: 'Standard (Am, F#, C)',
+    keyNotationCamelot: 'Camelot (8A, 11A, 8B)',
     profileProvider: 'Connexion via',
     profileMemberSince: 'Membre depuis',
     profileSignOut: 'Se déconnecter',
@@ -148,7 +152,45 @@ const translations = {
     hiwBack: 'Retour',
 
     // Footer
-    footer: '@ ClHub'
+    footer: '@ ClHub',
+
+    // Track Analysis Details
+    analysisDetails: 'Détails',
+    analysisTitle: 'Analyse audio',
+    analysisNotAvailable: 'Analyse non disponible',
+    analysisPending: 'Analyse en attente',
+    analysisProcessing: 'Analyse en cours...',
+    analysisFailed: 'Analyse échouée',
+    analysisClose: 'Fermer',
+    analysisBpm: 'BPM',
+    analysisKey: 'Tonalité',
+    analysisEnergy: 'Énergie',
+    analysisDanceability: 'Dansabilité',
+    analysisValence: 'Positivité',
+    analysisAcousticness: 'Acoustique',
+    analysisInstrumentalness: 'Instrumental',
+    analysisSpeechiness: 'Voix',
+    analysisLiveness: 'Live',
+    analysisLoudness: 'Volume',
+    analysisDynamicComplexity: 'Complexité dynamique',
+    analysisSpectralCentroid: 'Brillance',
+    analysisDissonance: 'Dissonance',
+    analysisConfidence: 'Confiance',
+    analysisLow: 'Bas',
+    analysisMedium: 'Moyen',
+    analysisHigh: 'Haut',
+    analysisDark: 'Sombre',
+    analysisBright: 'Brillant',
+    analysisSad: 'Triste',
+    analysisHappy: 'Joyeux',
+    analysisCalm: 'Calme',
+    analysisEnergetic: 'Énergique',
+    analysisAcoustic: 'Acoustique',
+    analysisElectronic: 'Électronique',
+    analysisVocal: 'Vocal',
+    analysisInstrumental: 'Instrumental',
+    analysisStudio: 'Studio',
+    analysisLive: 'Live'
   },
   en: {
     // SearchBar
@@ -232,7 +274,11 @@ const translations = {
     termsSection5Content: 'We reserve the right to modify these terms at any time. Users will be notified of significant changes.',
 
     // Profile
-    profileMenu: 'Settings',
+    profileMenu: 'Profile',
+    preferencesMenu: 'Preferences',
+    keyNotation: 'Key notation',
+    keyNotationStandard: 'Standard (Am, F#, C)',
+    keyNotationCamelot: 'Camelot (8A, 11A, 8B)',
     profileProvider: 'Signed in with',
     profileMemberSince: 'Member since',
     profileSignOut: 'Sign out',
@@ -297,7 +343,45 @@ const translations = {
     hiwBack: 'Back',
 
     // Footer
-    footer: '@ ClHub'
+    footer: '@ ClHub',
+
+    // Track Analysis Details
+    analysisDetails: 'Details',
+    analysisTitle: 'Audio analysis',
+    analysisNotAvailable: 'Analysis not available',
+    analysisPending: 'Analysis pending',
+    analysisProcessing: 'Analyzing...',
+    analysisFailed: 'Analysis failed',
+    analysisClose: 'Close',
+    analysisBpm: 'BPM',
+    analysisKey: 'Key',
+    analysisEnergy: 'Energy',
+    analysisDanceability: 'Danceability',
+    analysisValence: 'Positivity',
+    analysisAcousticness: 'Acousticness',
+    analysisInstrumentalness: 'Instrumentalness',
+    analysisSpeechiness: 'Speechiness',
+    analysisLiveness: 'Liveness',
+    analysisLoudness: 'Loudness',
+    analysisDynamicComplexity: 'Dynamic complexity',
+    analysisSpectralCentroid: 'Brightness',
+    analysisDissonance: 'Dissonance',
+    analysisConfidence: 'Confidence',
+    analysisLow: 'Low',
+    analysisMedium: 'Medium',
+    analysisHigh: 'High',
+    analysisDark: 'Dark',
+    analysisBright: 'Bright',
+    analysisSad: 'Sad',
+    analysisHappy: 'Happy',
+    analysisCalm: 'Calm',
+    analysisEnergetic: 'Energetic',
+    analysisAcoustic: 'Acoustic',
+    analysisElectronic: 'Electronic',
+    analysisVocal: 'Vocal',
+    analysisInstrumental: 'Instrumental',
+    analysisStudio: 'Studio',
+    analysisLive: 'Live'
   }
 } as const
 
