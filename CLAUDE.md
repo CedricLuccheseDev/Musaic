@@ -54,15 +54,17 @@ Only include sections that are used.
 
 ## Validation
 
-After generating code:
+**IMPORTANT: Before committing, run all CI checks locally:**
 
 ```bash
-# Frontend
-cd apps/web && npm run lint && npm run build
+# Frontend (run all before commit)
+cd apps/web && npm run lint && npm run test && npx nuxi typecheck && npm run build
 
 # Backend
 python3 -m py_compile apps/analyzer/app/*.py
 ```
+
+These are the same checks that run in CI. All must pass before committing.
 
 ## Testing
 

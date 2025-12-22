@@ -18,7 +18,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { searchTracks } from '../server/services/soundcloud'
-import { type TrackEntry, DownloadStatus, trackEntryToDbTrack } from '../../shared/types'
+import { type TrackEntry, DownloadStatus, trackEntryToDbTrack } from '../types'
 import * as dotenv from 'dotenv'
 
 dotenv.config()

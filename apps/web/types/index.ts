@@ -170,6 +170,33 @@ export interface DbProfile {
 }
 
 // =============================================================================
+// Analysis Data (subset of DbTrack for analysis queries)
+// =============================================================================
+
+export interface AnalysisData {
+  soundcloud_id: number
+  bpm_detected: number | null
+  bpm_confidence: number | null
+  key_detected: string | null
+  key_confidence: number | null
+  energy: number | null
+  loudness: number | null
+  dynamic_complexity: number | null
+  danceability: number | null
+  speechiness: number | null
+  instrumentalness: number | null
+  acousticness: number | null
+  valence: number | null
+  liveness: number | null
+  spectral_centroid: number | null
+  dissonance: number | null
+  analysis_status: string | null
+}
+
+// Alias for compatibility (DbTrack includes analysis fields)
+export type DbTrackWithAnalysis = DbTrack
+
+// =============================================================================
 // Frontend Types
 // =============================================================================
 
