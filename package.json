@@ -1,0 +1,15 @@
+{
+  "name": "musaic",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n web,analyzer -c blue,green \"npm run dev:web\" \"npm run dev:analyzer\"",
+    "dev:web": "npm run dev --prefix apps/web -- --dotenv .env.local",
+    "dev:analyzer": "docker compose up --no-log-prefix analyzer",
+    "build": "npm run build --prefix apps/web",
+    "lint": "npm run lint --prefix apps/web",
+    "test": "npm run test --prefix apps/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
