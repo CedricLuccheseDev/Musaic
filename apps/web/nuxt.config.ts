@@ -38,7 +38,8 @@ export default defineNuxtConfig({
     { path: '~/components/common', pathPrefix: false },
     { path: '~/components/home', pathPrefix: false },
     { path: '~/components/search', pathPrefix: false },
-    { path: '~/components/auth', pathPrefix: false }
+    { path: '~/components/auth', pathPrefix: false },
+    { path: '~/components/dj', prefix: 'Dj' }
   ],
   app: {
     pageTransition: { name: 'page', mode: 'out-in' }

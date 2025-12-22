@@ -8,7 +8,7 @@ from fastapi import FastAPI
 
 from app import __version__
 from app.config import get_settings
-from app.endpoints import health_router, analyze_router, batch_router
+from app.endpoints import health_router, analyze_router, analyze_bytes_router, batch_router
 from app.endpoints.health import set_analysis_queue as set_health_queue
 from app.endpoints.analyze import set_analysis_queue as set_analyze_queue
 from app.endpoints.batch import process_batch_analysis, batch_state
@@ -65,6 +65,7 @@ app = FastAPI(
 # Register routers
 app.include_router(health_router)
 app.include_router(analyze_router)
+app.include_router(analyze_bytes_router)
 app.include_router(batch_router)
 
 

@@ -61,6 +61,10 @@ CREATE TABLE IF NOT EXISTS tracks (
   valence REAL,                      -- Musical positivity/mood (0-1)
   liveness REAL,                     -- Live recording probability (0-1)
 
+  -- Beat offset for DJ sync
+  beat_offset REAL,                  -- First beat position in seconds (phase offset)
+  highlight_time REAL,               -- Most energetic segment start time (seconds)
+
   -- Analysis status
   analysis_status TEXT DEFAULT 'pending',  -- pending/processing/completed/failed
   analysis_error TEXT,
@@ -192,6 +196,10 @@ COMMENT ON COLUMN tracks.acousticness IS 'Acoustic vs electronic (0=electronic, 
 COMMENT ON COLUMN tracks.valence IS 'Musical positivity/mood (0=sad, 1=happy)';
 COMMENT ON COLUMN tracks.liveness IS 'Live recording probability (0-1)';
 
+-- Beat offset for DJ sync
+COMMENT ON COLUMN tracks.beat_offset IS 'Beat phase offset in seconds (0 to beat_interval). Use with bpm_detected to generate beat grid.';
+COMMENT ON COLUMN tracks.highlight_time IS 'Start time of most energetic segment in seconds';
+
 -- Analysis status
 COMMENT ON COLUMN tracks.analysis_status IS 'Analysis status: pending, processing, completed, failed';
 COMMENT ON COLUMN tracks.analysis_error IS 'Error message if analysis failed';
@@ -215,6 +223,9 @@ COMMENT ON COLUMN tracks.embedding IS 'Audio feature embedding vector (1280 dime
 -- =====================================================
 -- RPC FUNCTIONS FOR SIMILARITY SEARCH
 -- =====================================================
+
+-- Drop existing function first (required when changing return type)
+DROP FUNCTION IF EXISTS find_similar_tracks(BIGINT, INT);
 
 -- Find tracks similar to a given track using embedding cosine distance
 CREATE OR REPLACE FUNCTION find_similar_tracks(
@@ -253,6 +264,8 @@ RETURNS TABLE (
   acousticness REAL,
   valence REAL,
   liveness REAL,
+  beat_offset REAL,
+  highlight_time REAL,
   analysis_status TEXT,
   analysis_error TEXT,
   analyzed_at TIMESTAMPTZ,
@@ -302,6 +315,8 @@ BEGIN
     t.acousticness,
     t.valence,
     t.liveness,
+    t.beat_offset,
+    t.highlight_time,
     t.analysis_status,
     t.analysis_error,
     t.analyzed_at,

@@ -17,8 +17,8 @@ const props = withDefaults(defineProps<{
 /* --- States --- */
 const { t } = useI18n()
 const config = useRuntimeConfig()
-const { play, isTrackPlaying, isLoading, isCurrentTrack } = useAudioPlayer()
 const { formatKey, getKeyColor } = useKeyNotation()
+const { loadToDeck, deckA, deckB, getTargetDeck, togglePlay, ejectDeck } = useDjPlayer()
 const isVisible = ref(props.skipAnimation)
 const showDetails = ref(false)
 const showSimilar = ref(false)
@@ -38,8 +38,11 @@ const isFromDetectedArtist = computed(() => {
 
 const isFreeDownload = computed(() => props.track.downloadStatus !== DownloadStatus.No)
 const isDirectDownload = computed(() => props.track.downloadStatus === DownloadStatus.FreeDirectLink)
-const isPlaying = computed(() => isTrackPlaying(props.track.id))
-const isCurrentlyLoading = computed(() => isCurrentTrack(props.track.id) && isLoading.value)
+const isOnDeckA = computed(() => deckA.value.track?.id === props.track.id)
+const isOnDeckB = computed(() => deckB.value.track?.id === props.track.id)
+const isPlaying = computed(() => (isOnDeckA.value && deckA.value.isPlaying) || (isOnDeckB.value && deckB.value.isPlaying))
+const isCurrentlyLoading = computed(() => (isOnDeckA.value && deckA.value.isLoading) || (isOnDeckB.value && deckB.value.isLoading))
+const isOnAnyDeck = computed(() => isOnDeckA.value || isOnDeckB.value)
 
 const artistUrl = computed(() => {
   const url = props.track.permalink_url
@@ -53,7 +56,7 @@ const mp3DownloadUrl = computed(() => {
 })
 
 const cardClass = computed(() => {
-  if (isCurrentTrack(props.track.id)) {
+  if (isOnAnyDeck.value) {
     return 'bg-violet-950/50 hover:bg-violet-950/60 border-violet-500/50 ring-1 ring-violet-500/30'
   }
   if (props.track.downloadStatus === DownloadStatus.FreeDirectLink) {
@@ -67,7 +70,19 @@ const cardClass = computed(() => {
 
 /* --- Methods --- */
 function handleCardClick() {
-  play(props.track)
+  // If track is already on a deck, toggle play/pause
+  if (isOnDeckA.value) {
+    togglePlay('A')
+    return
+  }
+  if (isOnDeckB.value) {
+    togglePlay('B')
+    return
+  }
+
+  // Otherwise load to appropriate deck
+  const targetDeck = getTargetDeck()
+  loadToDeck(props.track, targetDeck)
 }
 
 function getDownloadUrl(): string | null {
@@ -84,6 +99,28 @@ function formatDuration(ms: number): string {
   const minutes = Math.floor(ms / 60000)
   const seconds = Math.floor((ms % 60000) / 1000)
   return `${minutes}:${seconds.toString().padStart(2, '0')}`
+}
+
+function handleDeckClick(deck: 'A' | 'B') {
+  if (!hasAnalysis.value) return
+
+  const isOnThisDeck = deck === 'A' ? isOnDeckA.value : isOnDeckB.value
+  const isOnOtherDeck = deck === 'A' ? isOnDeckB.value : isOnDeckA.value
+  const otherDeck = deck === 'A' ? 'B' : 'A'
+
+  if (isOnThisDeck) {
+    // Track is already on this deck - eject it
+    ejectDeck(deck)
+  }
+  else if (isOnOtherDeck) {
+    // Track is on the other deck - move it to this deck
+    ejectDeck(otherDeck)
+    loadToDeck(props.track, deck)
+  }
+  else {
+    // Track is not loaded anywhere - load to deck
+    loadToDeck(props.track, deck)
+  }
 }
 
 /* --- Lifecycle --- */
@@ -143,18 +180,16 @@ onMounted(() => {
       </div>
 
       <!-- Info -->
-      <div class="min-w-0 flex-1 pr-20 sm:pr-24">
-        <div class="flex items-center gap-2">
-          <a
-            :href="track.permalink_url"
-            target="_blank"
-            rel="noopener"
-            class="truncate text-sm font-medium text-white hover:text-violet-400 sm:text-base"
-            @click.stop
-          >
-            {{ track.title }}
-          </a>
-        </div>
+      <div class="min-w-0 flex-1 overflow-hidden pr-20 sm:pr-24">
+        <a
+          :href="track.permalink_url"
+          target="_blank"
+          rel="noopener"
+          class="block truncate text-sm font-medium text-white hover:text-violet-400 sm:text-base"
+          @click.stop
+        >
+          {{ track.title }}
+        </a>
         <a
           :href="artistUrl"
           target="_blank"
@@ -269,6 +304,44 @@ onMounted(() => {
       >
         <UIcon name="i-simple-icons-soundcloud" class="h-4 w-4" />
       </a>
+
+      <!-- DJ Deck buttons -->
+      <div class="flex items-center gap-1">
+        <UTooltip :text="hasAnalysis ? (isOnDeckA ? t.djEjectFromA : t.djLoadToA) : t.djTrackNotAnalyzed">
+          <button
+            type="button"
+            class="rounded px-1.5 py-0.5 text-[10px] font-bold transition-colors"
+            :class="[
+              isOnDeckA
+                ? 'bg-cyan-500 text-white cursor-pointer'
+                : hasAnalysis
+                  ? 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 cursor-pointer'
+                  : 'bg-neutral-700/30 text-neutral-500 cursor-not-allowed'
+            ]"
+            :disabled="!hasAnalysis"
+            @click.stop="handleDeckClick('A')"
+          >
+            A
+          </button>
+        </UTooltip>
+        <UTooltip :text="hasAnalysis ? (isOnDeckB ? t.djEjectFromB : t.djLoadToB) : t.djTrackNotAnalyzed">
+          <button
+            type="button"
+            class="rounded px-1.5 py-0.5 text-[10px] font-bold transition-colors"
+            :class="[
+              isOnDeckB
+                ? 'bg-orange-500 text-white cursor-pointer'
+                : hasAnalysis
+                  ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 cursor-pointer'
+                  : 'bg-neutral-700/30 text-neutral-500 cursor-not-allowed'
+            ]"
+            :disabled="!hasAnalysis"
+            @click.stop="handleDeckClick('B')"
+          >
+            B
+          </button>
+        </UTooltip>
+      </div>
     </div>
 
     <!-- Details Modal -->
