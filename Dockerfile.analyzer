@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Install Python dependencies
-COPY Analyzer/requirements.txt .
+COPY apps/analyzer/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Verify essentia-tensorflow is available
@@ -26,8 +26,8 @@ RUN python -c "from essentia.standard import TensorflowPredictEffnetDiscogs; pri
 RUN pip install --no-cache-dir --upgrade "yt-dlp[default] @ https://github.com/yt-dlp/yt-dlp/archive/master.tar.gz"
 
 # Copy application code
-COPY Analyzer/app/ ./app/
-COPY Analyzer/scripts/ ./scripts/
+COPY apps/analyzer/app/ ./app/
+COPY apps/analyzer/scripts/ ./scripts/
 
 # Create directories
 RUN mkdir -p /tmp/musaic-analyzer /app/models

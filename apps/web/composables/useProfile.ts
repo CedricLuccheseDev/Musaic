@@ -52,6 +52,8 @@ export function useProfile() {
   })
 
   const aiGenerationsLeft = computed(() => {
+    const config = useRuntimeConfig()
+    if (config.public.isDev) return Infinity
     if (isPremium.value) return Infinity
     loadAiUsage()
     return Math.max(0, FREE_AI_LIMIT - aiUsage.value.count)

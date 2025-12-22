@@ -1,26 +1,52 @@
 /**
- * Type conversion helpers
+ * Musaic Types
  */
 
-import type { Database } from './generated/database'
-import type { DownloadStatus, AnalysisStatus } from './enums'
+// Re-export SoundCloud types
+export * from './soundcloud'
 
 // =============================================================================
-// Database Row Types (from generated types)
+// Enums
 // =============================================================================
 
-export type DbTrack = Database['public']['Tables']['tracks']['Row']
-export type DbTrackInsert = Database['public']['Tables']['tracks']['Insert']
-export type DbTrackUpdate = Database['public']['Tables']['tracks']['Update']
+export type DownloadStatus = 'FreeDirectLink' | 'FreeExternalLink' | 'No'
 
-export type DbProfile = Database['public']['Tables']['profiles']['Row']
+export const DownloadStatus = {
+  FreeDirectLink: 'FreeDirectLink',
+  FreeExternalLink: 'FreeExternalLink',
+  No: 'No'
+} as const
 
-// Database track with analysis data (for AI queries)
-export type DbTrackWithAnalysis = DbTrack
+export type AnalysisStatus = 'pending' | 'processing' | 'completed' | 'failed'
 
-// Analysis data subset (for enrichment)
-export interface AnalysisData {
+export const AnalysisStatus = {
+  Pending: 'pending',
+  Processing: 'processing',
+  Completed: 'completed',
+  Failed: 'failed'
+} as const
+
+// =============================================================================
+// Database Types
+// =============================================================================
+
+export interface DbTrack {
   soundcloud_id: number
+  urn: string
+  permalink_url: string
+  title: string
+  artist: string
+  artwork: string | null
+  duration: number
+  genre: string | null
+  description: string | null
+  soundcloud_created_at: string | null
+  label: string | null
+  tags: string[] | null
+  playback_count: number | null
+  likes_count: number | null
+  reposts_count: number | null
+  comment_count: number | null
   bpm_detected: number | null
   bpm_confidence: number | null
   key_detected: string | null
@@ -28,41 +54,138 @@ export interface AnalysisData {
   energy: number | null
   loudness: number | null
   dynamic_complexity: number | null
+  spectral_centroid: number | null
+  dissonance: number | null
   danceability: number | null
   speechiness: number | null
   instrumentalness: number | null
   acousticness: number | null
   valence: number | null
   liveness: number | null
-  spectral_centroid: number | null
-  dissonance: number | null
   analysis_status: string | null
+  analysis_error: string | null
+  analyzed_at: string | null
+  download_status: string
+  downloadable: boolean | null
+  purchase_url: string | null
+  purchase_title: string | null
+  download_count: number | null
+  embedding: number[] | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface DbTrackInsert {
+  soundcloud_id: number
+  urn: string
+  permalink_url: string
+  title: string
+  artist: string
+  artwork?: string | null
+  duration?: number
+  genre?: string | null
+  description?: string | null
+  soundcloud_created_at?: string | null
+  label?: string | null
+  tags?: string[] | null
+  playback_count?: number | null
+  likes_count?: number | null
+  reposts_count?: number | null
+  comment_count?: number | null
+  bpm_detected?: number | null
+  bpm_confidence?: number | null
+  key_detected?: string | null
+  key_confidence?: number | null
+  energy?: number | null
+  loudness?: number | null
+  dynamic_complexity?: number | null
+  spectral_centroid?: number | null
+  dissonance?: number | null
+  danceability?: number | null
+  speechiness?: number | null
+  instrumentalness?: number | null
+  acousticness?: number | null
+  valence?: number | null
+  liveness?: number | null
+  analysis_status?: string | null
+  analysis_error?: string | null
+  analyzed_at?: string | null
+  download_status?: string
+  downloadable?: boolean | null
+  purchase_url?: string | null
+  purchase_title?: string | null
+  download_count?: number | null
+  embedding?: number[] | null
+}
+
+export interface DbTrackUpdate {
+  soundcloud_id?: number
+  urn?: string
+  permalink_url?: string
+  title?: string
+  artist?: string
+  artwork?: string | null
+  duration?: number
+  genre?: string | null
+  description?: string | null
+  soundcloud_created_at?: string | null
+  label?: string | null
+  tags?: string[] | null
+  playback_count?: number | null
+  likes_count?: number | null
+  reposts_count?: number | null
+  comment_count?: number | null
+  bpm_detected?: number | null
+  bpm_confidence?: number | null
+  key_detected?: string | null
+  key_confidence?: number | null
+  energy?: number | null
+  loudness?: number | null
+  dynamic_complexity?: number | null
+  spectral_centroid?: number | null
+  dissonance?: number | null
+  danceability?: number | null
+  speechiness?: number | null
+  instrumentalness?: number | null
+  acousticness?: number | null
+  valence?: number | null
+  liveness?: number | null
+  analysis_status?: string | null
+  analysis_error?: string | null
+  analyzed_at?: string | null
+  download_status?: string
+  downloadable?: boolean | null
+  purchase_url?: string | null
+  purchase_title?: string | null
+  download_count?: number | null
+  embedding?: number[] | null
+}
+
+export interface DbProfile {
+  id: string
+  is_premium: boolean | null
+  is_admin: boolean | null
+  premium_until: string | null
+  created_at: string | null
 }
 
 // =============================================================================
-// Frontend Track Entry (used in UI)
+// Frontend Types
 // =============================================================================
 
 export interface TrackEntry {
-  // Identifiers
   id: number
   urn: string
   permalink_url: string
-
-  // Basic info
   title: string
   artist: string
   artwork: string | null
-
-  // Metadata
   duration: number
   genre: string | null
   description: string | null
   created_at: string | null
   label: string | null
   tags: string[]
-
-  // Audio analysis
   bpm_detected: number | null
   bpm_confidence: number | null
   key_detected: string | null
@@ -81,14 +204,10 @@ export interface TrackEntry {
   analysis_status: AnalysisStatus | null
   analysis_error: string | null
   analyzed_at: string | null
-
-  // Stats
   playback_count: number
   likes_count: number
   reposts_count: number
   comment_count: number
-
-  // Download info
   downloadStatus: DownloadStatus
   downloadable: boolean
   purchase_url: string | null
@@ -99,9 +218,6 @@ export interface TrackEntry {
 // Conversion Functions
 // =============================================================================
 
-/**
- * Convert frontend TrackEntry to database format for insertion
- */
 export function trackEntryToDbTrack(track: TrackEntry): DbTrackInsert {
   return {
     soundcloud_id: track.id,
@@ -127,9 +243,6 @@ export function trackEntryToDbTrack(track: TrackEntry): DbTrackInsert {
   }
 }
 
-/**
- * Convert database row to frontend TrackEntry format
- */
 export function dbTrackToTrackEntry(db: DbTrack): TrackEntry {
   return {
     id: db.soundcloud_id,
@@ -152,7 +265,6 @@ export function dbTrackToTrackEntry(db: DbTrack): TrackEntry {
     downloadable: db.downloadable || false,
     purchase_url: db.purchase_url,
     purchase_title: db.purchase_title,
-    // Analysis fields
     bpm_detected: db.bpm_detected,
     bpm_confidence: db.bpm_confidence,
     key_detected: db.key_detected,

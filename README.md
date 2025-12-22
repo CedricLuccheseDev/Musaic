@@ -8,14 +8,12 @@ Plateforme de recherche musicale pour DJs et producteurs.
 
 ```
 Musaic/
-├── App/              # Frontend (Nuxt 3)
-├── Analyzer/         # Backend (FastAPI)
-├── shared/
-│   ├── docs/         # Documentation partagée
-│   ├── types/        # Types TypeScript partagés
-│   └── schemas/      # JSON Schemas (source de vérité)
-├── supabase/         # Migrations BDD
-├── Dockerfile.app    # Build frontend
+├── apps/
+│   ├── web/          # Frontend (Nuxt 3)
+│   └── analyzer/     # Backend (FastAPI)
+├── documentation/    # Project docs
+├── supabase/         # Database migrations
+├── Dockerfile.web    # Build frontend
 └── Dockerfile.analyzer # Build backend
 ```
 
@@ -23,14 +21,14 @@ Musaic/
 
 ### Frontend
 ```bash
-cd App
+cd apps/web
 npm install
 npm run dev
 ```
 
 ### Backend
 ```bash
-cd Analyzer
+cd apps/analyzer
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -41,7 +39,7 @@ python -m app.main
 
 | Service | Technologies |
 |---------|--------------|
-| **App** | Nuxt 3, Vue 3, TypeScript, Tailwind, Supabase |
+| **Web** | Nuxt 3, Vue 3, TypeScript, Tailwind, Supabase |
 | **Analyzer** | FastAPI, Essentia, Python 3.10 |
 
 ## Features
@@ -54,13 +52,11 @@ python -m app.main
 
 ## Documentation
 
-- [Architecture](shared/docs/ARCHITECTURE.md)
-- [API Reference](shared/docs/API.md)
-- [Standards](shared/docs/STANDARDS.md)
-- [Deployment](shared/docs/DEPLOYMENT.md)
-- [Contributing](shared/CONTRIBUTING.md)
-- [Frontend README](App/README.md)
-- [Analyzer README](Analyzer/README.md)
+- [Architecture](documentation/ARCHITECTURE.md)
+- [API Reference](documentation/API.md)
+- [Standards](documentation/STANDARDS.md)
+- [Deployment](documentation/DEPLOYMENT.md)
+- [Contributing](documentation/CONTRIBUTING.md)
 
 ## Deployment (Dokploy)
 
@@ -68,7 +64,7 @@ Configurer 2 services pointant vers ce repo :
 
 | Service | Dockerfile |
 |---------|------------|
-| musaic-app | `Dockerfile.app` |
+| musaic-web | `Dockerfile.web` |
 | musaic-analyzer | `Dockerfile.analyzer` |
 
 ## License

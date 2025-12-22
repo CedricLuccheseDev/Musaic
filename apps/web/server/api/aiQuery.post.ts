@@ -52,7 +52,7 @@ export default defineEventHandler(async (event) => {
       return { sql, results: [], error: error.message }
     }
 
-    const isDev = process.env.DEV === 'true'
+    const isDev = process.env.NODE_ENV === 'development'
 
     // Transform DB results to TrackEntry format
     const results = (data || []).map((row: DbTrackWithAnalysis) => dbTrackToTrackEntry(row))
