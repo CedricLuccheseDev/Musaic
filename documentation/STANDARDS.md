@@ -1,30 +1,30 @@
-# Standards de Code
+# Code Standards
 
-## Conventions de Nommage
+## Naming Conventions
 
-### TypeScript (App/)
+### TypeScript (apps/web/)
 
-| Élément | Convention | Exemple |
+| Element | Convention | Example |
 |---------|------------|---------|
 | Variables | camelCase | `userName`, `isLoading` |
-| Constantes | UPPER_SNAKE | `MAX_RESULTS`, `API_URL` |
-| Fonctions | camelCase | `fetchTracks()`, `handleClick()` |
+| Constants | UPPER_SNAKE | `MAX_RESULTS`, `API_URL` |
+| Functions | camelCase | `fetchTracks()`, `handleClick()` |
 | Classes/Types | PascalCase | `Track`, `UserProfile` |
-| Composants Vue | PascalCase | `SearchBar.vue`, `TrackCard.vue` |
-| Fichiers | camelCase | `useAuth.ts`, `trackStorage.ts` |
-| Dossiers | camelCase | `components/`, `composables/` |
+| Vue Components | PascalCase | `SearchBar.vue`, `TrackCard.vue` |
+| Files | camelCase | `useAuth.ts`, `trackStorage.ts` |
+| Folders | camelCase | `components/`, `composables/` |
 
-### Python (Analyzer/)
+### Python (apps/analyzer/)
 
-| Élément | Convention | Exemple |
+| Element | Convention | Example |
 |---------|------------|---------|
 | Variables | snake_case | `user_name`, `is_loading` |
-| Constantes | UPPER_SNAKE | `MAX_RESULTS`, `API_URL` |
-| Fonctions | snake_case | `fetch_tracks()`, `analyze_audio()` |
+| Constants | UPPER_SNAKE | `MAX_RESULTS`, `API_URL` |
+| Functions | snake_case | `fetch_tracks()`, `analyze_audio()` |
 | Classes | PascalCase | `TrackAnalysis`, `BatchStatus` |
-| Fichiers | snake_case | `supabase_client.py`, `analyzer.py` |
+| Files | snake_case | `supabase_client.py`, `analyzer.py` |
 
-## Structure des Fichiers
+## File Structure
 
 ### Vue Component
 
@@ -94,54 +94,54 @@ async def my_function(param: str) -> MyModel:
 
 ## Commits
 
-Format : `type(scope): description`
+Format: `type(scope): description`
 
 ### Types
 
 | Type | Usage |
 |------|-------|
-| `feat` | Nouvelle fonctionnalité |
-| `fix` | Correction de bug |
+| `feat` | New feature |
+| `fix` | Bug fix |
 | `docs` | Documentation |
-| `refactor` | Refactoring sans changement fonctionnel |
-| `test` | Ajout/modification de tests |
-| `chore` | Maintenance, dépendances |
+| `refactor` | Code refactoring |
+| `test` | Tests |
+| `chore` | Maintenance, dependencies |
 | `ci` | CI/CD |
 
 ### Scopes
 
 | Scope | Usage |
 |-------|-------|
-| `app` | Frontend Nuxt |
+| `web` | Frontend Nuxt |
 | `analyzer` | Backend FastAPI |
-| `shared` | Documentation partagée |
+| `docs` | Documentation |
 | `ci` | GitHub Actions |
-| _(vide)_ | Changements transversaux |
+| _(empty)_ | Cross-cutting changes |
 
-### Exemples
+### Examples
 
 ```
-feat(app): Add dark mode toggle
+feat(web): Add dark mode toggle
 fix(analyzer): Handle timeout on large audio files
 docs: Update API documentation
-refactor(app): Simplify auth flow
+refactor(web): Simplify auth flow
 chore: Update dependencies
 ```
 
-## Tests
+## Testing
 
-### Frontend (App/)
+### Frontend (apps/web/)
 
 ```bash
-npm run test              # Tous les tests
-npx tsx tests/ai.test.ts  # Test spécifique
+npm run test              # All tests
+npx tsx tests/ai.test.ts  # Specific test
 ```
 
-### Backend (Analyzer/)
+### Backend (apps/analyzer/)
 
 ```bash
-python -m pytest                    # Tous les tests
-python -m pytest tests/test_api.py  # Test spécifique
+python -m pytest                    # All tests
+python -m pytest tests/test_api.py  # Specific test
 ```
 
 ## Linting
@@ -149,23 +149,23 @@ python -m pytest tests/test_api.py  # Test spécifique
 ### Frontend
 
 ```bash
-npm run lint        # Vérification
-npm run lint --fix  # Correction auto
+npm run lint        # Check
+npm run lint --fix  # Auto-fix
 ```
 
 ### Backend
 
 ```bash
-ruff check .          # Vérification
-ruff check --fix .    # Correction auto
-ruff format .         # Formatage
+ruff check .          # Check
+ruff check --fix .    # Auto-fix
+ruff format .         # Format
 ```
 
-## Règles Importantes
+## Important Rules
 
-1. **Pas de `eslint-disable` ou `type: ignore`** sauf cas exceptionnel documenté
-2. **Commentaires en anglais**
-3. **Pas de console.log** en production (utiliser le logger)
-4. **Pas de secrets dans le code** (utiliser .env)
-5. **Max 100 lignes par composant Vue**
-6. **Docstrings obligatoires** pour fonctions publiques Python
+1. **No `eslint-disable` or `type: ignore`** unless documented exception
+2. **Comments in English**
+3. **No console.log** in production (use logger)
+4. **No secrets in code** (use .env)
+5. **Max 100 lines per Vue component**
+6. **Docstrings required** for public Python functions

@@ -1,6 +1,6 @@
 # API Reference
 
-## App API (Nuxt/Nitro)
+## Web API (Nuxt/Nitro)
 
 Base URL: `https://musaic.clhub.fr/api`
 
@@ -8,13 +8,13 @@ Base URL: `https://musaic.clhub.fr/api`
 
 #### `GET /api/search`
 
-Recherche de tracks sur SoundCloud.
+Search tracks on SoundCloud.
 
 **Query params:**
 | Param | Type | Description |
 |-------|------|-------------|
-| `q` | string | Terme de recherche |
-| `limit` | number | Nombre de résultats (default: 20) |
+| `q` | string | Search term |
+| `limit` | number | Number of results (default: 20) |
 | `offset` | number | Pagination offset |
 
 **Response:**
@@ -30,12 +30,12 @@ Recherche de tracks sur SoundCloud.
 
 #### `POST /api/aiQuery`
 
-Recherche en langage naturel via Claude AI.
+Natural language search powered by Claude AI.
 
 **Body:**
 ```json
 {
-  "query": "Trouve des remixes de Drake"
+  "query": "Find Drake remixes"
 }
 ```
 
@@ -52,7 +52,7 @@ Recherche en langage naturel via Claude AI.
 
 #### `POST /api/analyze`
 
-Déclenche l'analyse audio d'une track (fire-and-forget).
+Trigger audio analysis for a track (fire-and-forget).
 
 **Body:**
 ```json
@@ -73,7 +73,7 @@ Déclenche l'analyse audio d'une track (fire-and-forget).
 
 #### `GET /api/stream/[id]`
 
-Stream audio d'une track.
+Stream audio for a track.
 
 **Params:**
 | Param | Type | Description |
@@ -86,7 +86,7 @@ Stream audio d'une track.
 
 #### `GET /api/dashboard/stats`
 
-Statistiques pour le dashboard admin.
+Get admin dashboard statistics.
 
 **Response:**
 ```json
@@ -100,7 +100,7 @@ Statistiques pour le dashboard admin.
 
 #### `POST /api/dashboard/analyze-batch`
 
-Lance l'analyse batch.
+Start batch analysis.
 
 **Body:**
 ```json
@@ -121,7 +121,7 @@ Swagger UI: `/docs`
 
 #### `GET /health`
 
-Health check et statut de la queue.
+Health check and queue status.
 
 **Response:**
 ```json
@@ -136,7 +136,7 @@ Health check et statut de la queue.
 
 #### `POST /analyze`
 
-Analyse une track par son SoundCloud ID.
+Analyze a track by SoundCloud ID.
 
 **Body:**
 ```json
@@ -163,7 +163,7 @@ Analyse une track par son SoundCloud ID.
 
 #### `POST /analyze/batch`
 
-Lance l'analyse de toutes les tracks en attente.
+Start analysis for all pending tracks.
 
 **Body:**
 ```json
@@ -183,7 +183,7 @@ Lance l'analyse de toutes les tracks en attente.
 
 #### `GET /analyze/batch/status`
 
-Statut du batch en cours.
+Get current batch status.
 
 **Response:**
 ```json
@@ -199,19 +199,19 @@ Statut du batch en cours.
 
 ---
 
-## Codes d'erreur
+## Error Codes
 
 | Code | Description |
 |------|-------------|
-| 200 | Succès |
-| 400 | Requête invalide |
-| 401 | Non authentifié |
-| 403 | Non autorisé (limite atteinte, non premium) |
-| 404 | Ressource non trouvée |
-| 500 | Erreur serveur |
+| 200 | Success |
+| 400 | Bad request |
+| 401 | Unauthorized |
+| 403 | Forbidden (rate limit, not premium) |
+| 404 | Not found |
+| 500 | Server error |
 
-## Authentification
+## Authentication
 
-L'API App utilise Supabase Auth. Le token JWT est passé via cookie ou header `Authorization: Bearer <token>`.
+The Web API uses Supabase Auth. JWT token is passed via cookie or `Authorization: Bearer <token>` header.
 
-L'API Analyzer n'a pas d'authentification (usage interne uniquement).
+The Analyzer API has no authentication (internal use only).
