@@ -42,18 +42,22 @@ jobs:
         run: npx tsx tests/soundcloud.test.ts
         continue-on-error: true
 
+      # Tests requiring secrets - skipped for fork PRs
       - name: Run Supabase connection test
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: npx tsx tests/supabase.test.ts
 
       - name: Run AI test
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: npx tsx tests/ai.test.ts
 
       - name: Run Database test
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

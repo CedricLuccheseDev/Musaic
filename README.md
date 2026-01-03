@@ -2,22 +2,20 @@
 
 Music search platform for DJs and producers.
 
-**URL**: https://musaic.clhub.fr
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 
-## Structure
+## Features
 
-```
-Musaic/
-├── apps/
-│   ├── web/          # Frontend (Nuxt 3)
-│   └── analyzer/     # Backend (FastAPI)
-├── documentation/    # Project docs
-├── supabase/         # Database migrations
-├── Dockerfile.web    # Build frontend
-└── Dockerfile.analyzer # Build backend
-```
+- SoundCloud track search
+- Free / paid download detection
+- AI-powered natural language search (Claude)
+- Audio analysis (BPM, key, energy, danceability...)
+- Similar tracks via vector embeddings
+- Google/Apple authentication
 
 ## Quick Start
+
+> See [Contributing Guide](documentation/CONTRIBUTING.md) for full setup instructions including Supabase configuration.
 
 ### Frontend
 ```bash
@@ -35,37 +33,42 @@ pip install -r requirements.txt
 python -m app.main
 ```
 
-## Stack
+## Project Structure
+
+```
+Musaic/
+├── apps/
+│   ├── web/          # Frontend (Nuxt 3)
+│   └── analyzer/     # Backend (FastAPI)
+├── documentation/    # Project docs
+├── supabase/         # Database migrations
+├── Dockerfile.web
+└── Dockerfile.analyzer
+```
+
+## Tech Stack
 
 | Service | Technologies |
 |---------|--------------|
 | **Web** | Nuxt 3, Vue 3, TypeScript, Tailwind, Supabase |
 | **Analyzer** | FastAPI, Essentia, Python 3.10 |
 
-## Features
-
-- SoundCloud track search
-- Free / paid download detection
-- AI-powered natural language search (Claude)
-- Audio analysis (BPM, key, energy, danceability...)
-- Google/Apple authentication
-
 ## Documentation
 
-- [Architecture](documentation/ARCHITECTURE.md)
+- [Features & Architecture](documentation/FEATURES.md)
 - [API Reference](documentation/API.md)
-- [Standards](documentation/STANDARDS.md)
-- [Deployment](documentation/DEPLOYMENT.md)
+- [Code Standards](documentation/STANDARDS.md)
 - [Contributing](documentation/CONTRIBUTING.md)
 
-## Deployment (Dokploy)
+## Contributing
 
-Configure 2 services pointing to this repo:
+Contributions are welcome! Please read the [Contributing Guide](documentation/CONTRIBUTING.md) first.
 
-| Service | Dockerfile |
-|---------|------------|
-| musaic-web | `Dockerfile.web` |
-| musaic-analyzer | `Dockerfile.analyzer` |
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
 
 ## License
 
