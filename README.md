@@ -1,8 +1,8 @@
 # Musaic
 
-Plateforme de recherche musicale pour DJs et producteurs.
+Music search platform for DJs and producers.
 
-**URL** : https://musaic.clhub.fr
+**URL**: https://musaic.clhub.fr
 
 ## Structure
 
@@ -44,11 +44,11 @@ python -m app.main
 
 ## Features
 
-- Recherche de tracks SoundCloud
-- Détection téléchargement gratuit / payant
-- Recherche IA en langage naturel (Claude)
-- Analyse audio (BPM, key, energy, danceability...)
-- Authentification Google/Apple
+- SoundCloud track search
+- Free / paid download detection
+- AI-powered natural language search (Claude)
+- Audio analysis (BPM, key, energy, danceability...)
+- Google/Apple authentication
 
 ## Documentation
 
@@ -60,7 +60,7 @@ python -m app.main
 
 ## Deployment (Dokploy)
 
-Configurer 2 services pointant vers ce repo :
+Configure 2 services pointing to this repo:
 
 | Service | Dockerfile |
 |---------|------------|
@@ -69,4 +69,6 @@ Configurer 2 services pointant vers ce repo :
 
 ## License
 
-MIT
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+See [LICENSE](LICENSE) for details.
