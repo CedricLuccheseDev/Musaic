@@ -8,9 +8,14 @@ from threading import Lock
 from fastapi import APIRouter, BackgroundTasks
 from supabase import create_client
 
-from app.analyzer import AnalysisError, analyze_audio_from_bytes
+from app.analyzer import AnalysisError, analyze_audio, analyze_audio_from_bytes
 from app.config import get_settings
-from app.downloader import DownloadError, stream_audio_to_memory
+from app.downloader import (
+    DownloadError,
+    stream_audio_to_memory,
+    download_full_audio_async,
+    cleanup_audio_file,
+)
 from app.logger import log
 from app.models import (
     AnalysisStatus,
@@ -55,47 +60,72 @@ async def analyze_single_track_streaming(
     Analyze a track using streaming (no file download).
 
     Streams audio directly to memory and analyzes without saving to disk.
-    Useful for VPS where SoundCloud blocks downloads but allows streaming.
+    Falls back to file-based download with YouTube if streaming fails.
 
     Returns True if successful, False otherwise.
     """
     global _batch_stats
     soundcloud_id = track["soundcloud_id"]
     url = track["permalink_url"]
-    title = track.get("title", "Unknown")[:30]
-    artist = track.get("artist", "Unknown")[:20]
+    title = track.get("title", "Unknown")
+    artist = track.get("artist", "Unknown")
+    duration = track.get("duration")  # in ms
+    title_short = title[:30]
+    artist_short = artist[:20]
 
     start_time_track = time.time()
+    audio_file = None
 
     try:
         # Update status to processing
         await update_track_status(soundcloud_id, AnalysisStatus.PROCESSING)
 
         # === STREAM PHASE (limited by download_semaphore) ===
+        # Minimum valid audio size (100KB) - smaller means invalid/error response
+        MIN_AUDIO_SIZE = 100 * 1024
+
         async with download_semaphore:
-            log.info(f"Streaming: {artist} - {title}")
-            audio_bytes = await asyncio.wait_for(
-                stream_audio_to_memory(url),
-                timeout=settings.analysis_timeout_seconds,
-            )
+            log.info(f"Streaming: {artist_short} - {title_short}")
+            try:
+                audio_bytes = await asyncio.wait_for(
+                    stream_audio_to_memory(url),
+                    timeout=settings.analysis_timeout_seconds,
+                )
+                # Check if audio data is suspiciously small (geo-block returns small error pages)
+                if len(audio_bytes) < MIN_AUDIO_SIZE:
+                    raise DownloadError(f"Audio too small ({len(audio_bytes)} bytes) - likely geo-blocked")
+            except (DownloadError, asyncio.TimeoutError) as e:
+                # Streaming failed, try file-based download with YouTube fallback
+                log.warn(f"Streaming failed ({e}), trying fallback: {artist_short} - {title_short}")
+                audio_file = await download_full_audio_async(
+                    url,
+                    title=title,
+                    artist=artist,
+                    duration_ms=duration,
+                )
+                audio_bytes = None  # Use file instead
 
         # === ANALYZE PHASE (limited by analyze_semaphore - CPU bound) ===
         async with analyze_semaphore:
-            size_mb = len(audio_bytes) / (1024 * 1024)
-            log.info(f"Analyzing: {artist} - {title} ({size_mb:.1f}MB)")
-            result = await asyncio.to_thread(analyze_audio_from_bytes, audio_bytes)
+            if audio_bytes:
+                size_mb = len(audio_bytes) / (1024 * 1024)
+                log.info(f"Analyzing: {artist_short} - {title_short} ({size_mb:.1f}MB)")
+                result = await asyncio.to_thread(analyze_audio_from_bytes, audio_bytes)
+            else:
+                log.info(f"Analyzing (file): {artist_short} - {title_short}")
+                result = await asyncio.to_thread(analyze_audio, audio_file)
 
         # === SAVE PHASE ===
         await update_track_analysis(soundcloud_id, result.model_dump())
 
-        duration = time.time() - start_time_track
+        elapsed = time.time() - start_time_track
         with _progress_lock:
             _batch_stats["completed"] += 1
             _batch_stats["successful"] += 1
             completed = _batch_stats["completed"]
             total = _batch_stats["total"]
 
-        log.success(f"[{completed}/{total}] {artist} - {title} | BPM: {result.bpm_detected} | Key: {result.key_detected} | {duration:.1f}s")
+        log.success(f"[{completed}/{total}] {artist_short} - {title_short} | BPM: {result.bpm_detected} | Key: {result.key_detected} | {elapsed:.1f}s")
         return True
 
     except asyncio.TimeoutError:
@@ -105,7 +135,7 @@ async def analyze_single_track_streaming(
             _batch_stats["failed"] += 1
             completed = _batch_stats["completed"]
             total = _batch_stats["total"]
-        log.error(f"[{completed}/{total}] {artist} - {title} | Timeout")
+        log.error(f"[{completed}/{total}] {artist_short} - {title_short} | Timeout")
         return False
 
     except DownloadError as e:
@@ -115,7 +145,7 @@ async def analyze_single_track_streaming(
             _batch_stats["failed"] += 1
             completed = _batch_stats["completed"]
             total = _batch_stats["total"]
-        log.error(f"[{completed}/{total}] {artist} - {title} | {e}")
+        log.error(f"[{completed}/{total}] {artist_short} - {title_short} | {e}")
         return False
 
     except AnalysisError as e:
@@ -125,7 +155,7 @@ async def analyze_single_track_streaming(
             _batch_stats["failed"] += 1
             completed = _batch_stats["completed"]
             total = _batch_stats["total"]
-        log.error(f"[{completed}/{total}] {artist} - {title} | {e}")
+        log.error(f"[{completed}/{total}] {artist_short} - {title_short} | {e}")
         return False
 
     except Exception as e:
@@ -135,8 +165,13 @@ async def analyze_single_track_streaming(
             _batch_stats["failed"] += 1
             completed = _batch_stats["completed"]
             total = _batch_stats["total"]
-        log.error(f"[{completed}/{total}] {artist} - {title} | {e}")
+        log.error(f"[{completed}/{total}] {artist_short} - {title_short} | {e}")
         return False
+
+    finally:
+        # Cleanup temp file if we used file-based download
+        if audio_file:
+            cleanup_audio_file(audio_file)
 
 
 def _format_duration(seconds: float) -> str:
@@ -168,20 +203,21 @@ async def process_batch_analysis() -> None:
     try:
         while True:
             # Get all tracks that need analysis
+            # Include "pending" + stuck "processing" (analyzed_at IS NULL)
             if _batch_include_failed:
-                # Include both pending and failed tracks
+                # Include pending, failed, and stuck processing
                 response = (
                     client.table("tracks")
-                    .select("soundcloud_id, permalink_url, title, artist")
-                    .in_("analysis_status", ["pending", "failed"])
+                    .select("soundcloud_id, permalink_url, title, artist, duration")
+                    .or_("analysis_status.eq.pending,analysis_status.eq.failed,and(analysis_status.eq.processing,analyzed_at.is.null)")
                     .execute()
                 )
             else:
-                # Only pending tracks
+                # Pending + stuck processing
                 response = (
                     client.table("tracks")
-                    .select("soundcloud_id, permalink_url, title, artist")
-                    .eq("analysis_status", "pending")
+                    .select("soundcloud_id, permalink_url, title, artist, duration")
+                    .or_("analysis_status.eq.pending,and(analysis_status.eq.processing,analyzed_at.is.null)")
                     .execute()
                 )
             tracks = response.data
@@ -250,14 +286,14 @@ async def process_batch_analysis() -> None:
                 response = (
                     client.table("tracks")
                     .select("soundcloud_id", count="exact")
-                    .in_("analysis_status", ["pending", "failed"])
+                    .or_("analysis_status.eq.pending,analysis_status.eq.failed,and(analysis_status.eq.processing,analyzed_at.is.null)")
                     .execute()
                 )
             else:
                 response = (
                     client.table("tracks")
                     .select("soundcloud_id", count="exact")
-                    .eq("analysis_status", "pending")
+                    .or_("analysis_status.eq.pending,and(analysis_status.eq.processing,analyzed_at.is.null)")
                     .execute()
                 )
             pending_count = response.count or 0
@@ -302,7 +338,7 @@ async def analyze_all_tracks(
             message="Batch analysis is already in progress",
         )
 
-    # Get count of tracks to analyze
+    # Get count of tracks to analyze (pending + stuck processing)
     settings = get_settings()
     client = create_client(settings.supabase_url, settings.supabase_service_key)
 
@@ -310,14 +346,14 @@ async def analyze_all_tracks(
         response = (
             client.table("tracks")
             .select("soundcloud_id", count="exact")
-            .in_("analysis_status", ["pending", "failed"])
+            .or_("analysis_status.eq.pending,analysis_status.eq.failed,and(analysis_status.eq.processing,analyzed_at.is.null)")
             .execute()
         )
     else:
         response = (
             client.table("tracks")
             .select("soundcloud_id", count="exact")
-            .eq("analysis_status", "pending")
+            .or_("analysis_status.eq.pending,and(analysis_status.eq.processing,analyzed_at.is.null)")
             .execute()
         )
     total = response.count or 0

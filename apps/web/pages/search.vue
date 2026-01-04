@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { until } from '@vueuse/core'
 import { DownloadStatus, type TrackEntry } from '~/types'
 import type { SearchResult } from '~/server/services/soundcloud'
 
 /* --- Types --- */
 type FilterType = 'all' | 'free' | 'paid'
+
+interface CascadeSearchResult extends SearchResult {
+  source: 'database' | 'soundcloud'
+  response?: string
+}
 
 /* --- Constants --- */
 const MAX_RESULTS = 500
@@ -22,18 +26,11 @@ const { canUseAi, aiGenerationsLeft, isPremium, incrementAiUsage } = useProfile(
 const route = useRoute()
 const { watchTracks } = useTrackUpdates()
 
-/* --- Inject --- */
-const authLoading = inject<Ref<boolean>>('authLoading', ref(false))
-
 /* --- States --- */
 const headerMounted = ref(false)
 const searchInput = ref('')
 const activeFilter = ref<FilterType>('all')
 const aiLimitReached = ref(false)
-const aiLoading = ref(false)
-const aiSql = ref('')
-const aiResults = ref<TrackEntry[]>([])
-const aiResponse = ref('')
 const allTracks = ref<TrackEntry[]>([])
 const hasMoreFromApi = ref(false)
 const nextOffset = ref<number | undefined>(undefined)
@@ -42,11 +39,17 @@ const initialBatchSize = ref(0)
 const searchError = ref<string | null>(null)
 
 /* --- Data --- */
-const { data: searchResult, status, refresh: refreshSearch } = useFetch<SearchResult>('/api/search', {
+const { data: searchResult, status } = useFetch<CascadeSearchResult>('/api/search', {
   query: { q: computed(() => (route.query.q as string) || '') },
   watch: [() => route.query.q],
   server: false,
   lazy: true,
+  onResponse() {
+    // Increment AI usage on successful search
+    if (canUseAi.value) {
+      incrementAiUsage()
+    }
+  },
   onResponseError({ response }) {
     const errorData = response._data as { message?: string } | undefined
     searchError.value = errorData?.message || `Error ${response.status}`
@@ -57,13 +60,10 @@ const { data: searchResult, status, refresh: refreshSearch } = useFetch<SearchRe
 /* --- Computed --- */
 const query = computed(() => (route.query.q as string) || '')
 const isLoading = computed(() => status.value === 'pending')
+const resultSource = computed(() => searchResult.value?.source)
+const aiResponse = computed(() => searchResult.value?.response || '')
 const detectedArtist = computed(() => searchResult.value?.artist)
-const filteredAiResults = computed(() => applyFilter(aiResults.value))
-const aiTrackIds = computed(() => new Set(filteredAiResults.value.map(t => t.id)))
-const filteredTracks = computed(() => {
-  const filtered = applyFilter(allTracks.value)
-  return filtered.filter(t => !aiTrackIds.value.has(t.id))
-})
+const filteredTracks = computed(() => applyFilter(allTracks.value))
 const hasMore = computed(() => hasMoreFromApi.value && allTracks.value.length < MAX_RESULTS)
 
 /* --- Methods --- */
@@ -76,12 +76,14 @@ function applyFilter(tracks: TrackEntry[]): TrackEntry[] {
 }
 
 async function loadMore() {
+  // Only allow load more for SoundCloud results
+  if (resultSource.value !== 'soundcloud') return
   if (!hasMore.value || isLoadingMore.value || nextOffset.value === undefined) return
   if (allTracks.value.length >= MAX_RESULTS) return
 
   isLoadingMore.value = true
   try {
-    const response = await $fetch<SearchResult>('/api/search', {
+    const response = await $fetch<CascadeSearchResult>('/api/search', {
       query: { q: query.value, offset: nextOffset.value }
     })
     allTracks.value = [...allTracks.value, ...(response.tracks || [])]
@@ -116,7 +118,7 @@ function checkInitialLoad() {
   })
 }
 
-async function runAiSearch() {
+function search() {
   if (!searchInput.value.trim()) return
 
   if (!canUseAi.value) {
@@ -125,32 +127,7 @@ async function runAiSearch() {
   }
 
   aiLimitReached.value = false
-  aiLoading.value = true
-  aiSql.value = ''
-  aiResults.value = []
-  aiResponse.value = ''
-
-  try {
-    const result = await $fetch<{ sql: string; results: TrackEntry[]; response: string }>('/api/aiQuery', {
-      method: 'POST',
-      body: { question: searchInput.value }
-    })
-    aiSql.value = result.sql
-    aiResults.value = result.results || []
-    aiResponse.value = result.response || ''
-    incrementAiUsage()
-  } catch (err) {
-    console.error('[AI Search] Error:', err)
-  } finally {
-    aiLoading.value = false
-  }
-}
-
-async function search() {
-  if (!searchInput.value.trim()) return
   navigateTo({ path: '/search', query: { q: searchInput.value } })
-  runAiSearch()
-  refreshSearch()
 }
 
 /* --- Watchers --- */
@@ -169,7 +146,6 @@ watch(query, (newQuery, oldQuery) => {
     allTracks.value = []
     hasMoreFromApi.value = false
     nextOffset.value = undefined
-    runAiSearch()
   }
 }, { immediate: true })
 
@@ -178,22 +154,14 @@ watch(filteredTracks, () => {
 })
 
 /* --- Lifecycle --- */
-onMounted(async () => {
+onMounted(() => {
   headerMounted.value = true
   window.addEventListener('scroll', handleScroll, { passive: true })
   checkInitialLoad()
-  if (query.value) {
-    // Wait for auth to be loaded before running AI search
-    if (authLoading.value) {
-      await until(authLoading).toBe(false)
-    }
-    runAiSearch()
-  }
 })
 
 // Real-time track updates when analysis completes
 watchTracks(allTracks)
-watchTracks(aiResults)
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
@@ -218,7 +186,7 @@ onUnmounted(() => {
   <main class="relative mx-auto w-full max-w-4xl flex-1 px-4 py-6 pb-32 md:px-6 md:py-10">
     <ClientOnly>
       <!-- Main results container -->
-      <template v-if="query && (aiLoading || filteredAiResults.length || isLoading || filteredTracks.length)">
+      <template v-if="query && (isLoading || filteredTracks.length)">
         <!-- Main title with filters -->
         <div class="flex items-center gap-3 pb-2">
           <UIcon name="i-heroicons-magnifying-glass" class="h-6 w-6 text-violet-400" />
@@ -255,40 +223,37 @@ onUnmounted(() => {
           <span>{{ aiGenerationsLeft }} {{ t.aiGenerationsLeft }}</span>
         </div>
 
-        <!-- AI Section (only if has results) -->
-        <SearchAiSection
-          v-if="!aiLimitReached && filteredAiResults.length"
-          :loading="false"
-          :results="filteredAiResults"
-          :sql="aiSql"
-          :response="aiResponse"
-        />
-
         <!-- AI Loading State -->
-        <div v-else-if="!aiLimitReached && aiLoading" class="mt-6 flex items-center gap-3 text-neutral-400">
+        <div v-if="isLoading" class="mt-6 flex items-center gap-3 text-neutral-400">
           <UIcon name="i-heroicons-sparkles" class="h-5 w-5 animate-pulse text-violet-400" />
           <span>{{ t.aiGenerating }}</span>
         </div>
 
-        <!-- AI No Match Message -->
-        <div
-          v-else-if="!aiLimitReached && !aiLoading && !filteredAiResults.length && (isLoading || filteredTracks.length)"
-          class="mt-6 flex items-center gap-2 text-sm text-neutral-500"
-        >
-          <UIcon name="i-heroicons-sparkles" class="h-4 w-4" />
-          <span>{{ t.aiNoMatch }}</span>
-        </div>
-
-        <!-- SoundCloud Section -->
-        <SearchSoundcloudSection
-          v-if="isLoading || filteredTracks.length || (allTracks.length && !filteredTracks.length)"
-          :loading="isLoading"
+        <!-- AI Results (source: database) -->
+        <SearchAiSection
+          v-else-if="resultSource === 'database' && filteredTracks.length"
+          :loading="false"
           :results="filteredTracks"
-          :has-more="hasMore"
-          :is-loading-more="isLoadingMore"
-          :initial-batch-size="initialBatchSize"
-          :detected-artist="detectedArtist"
+          :response="aiResponse"
         />
+
+        <!-- SoundCloud Results (source: soundcloud) -->
+        <template v-else-if="resultSource === 'soundcloud'">
+          <!-- AI No Match Message -->
+          <div class="mt-6 flex items-center gap-2 text-sm text-neutral-500">
+            <UIcon name="i-heroicons-sparkles" class="h-4 w-4" />
+            <span>{{ t.aiNoMatch }}</span>
+          </div>
+
+          <SearchSoundcloudSection
+            :loading="false"
+            :results="filteredTracks"
+            :has-more="hasMore"
+            :is-loading-more="isLoadingMore"
+            :initial-batch-size="initialBatchSize"
+            :detected-artist="detectedArtist"
+          />
+        </template>
       </template>
 
       <!-- Error state -->
@@ -298,7 +263,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Empty state (when no results at all) -->
-      <div v-else-if="query && !isLoading && !aiLoading" class="py-12 text-center">
+      <div v-else-if="query && !isLoading" class="py-12 text-center">
         <p class="text-muted">{{ t.noResults }} "{{ query }}"</p>
       </div>
 

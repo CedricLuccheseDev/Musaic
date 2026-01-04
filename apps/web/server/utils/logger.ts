@@ -40,7 +40,7 @@ const sessionStats: SessionStats = {
 }
 
 function time(): string {
-  return `${c.gray}${new Date().toLocaleTimeString('fr-FR')}${c.reset}`
+  return `${c.gray}${new Date().toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris' })}${c.reset}`
 }
 
 function log(level: LogLevel, tag: string, message: string, data?: unknown): void {
@@ -79,6 +79,9 @@ export const logger = {
   db: {
     upsert: (count: number, totalInDb: number) => {
       log('success', 'DB', `+${num(count, c.green)} tracks ${c.dim}│${c.reset} Total: ${num(totalInDb, c.magenta)}`)
+    },
+    quality: (stored: number, rejected: number) => {
+      log('info', 'DB', `Quality filter: ${num(stored, c.green)} stored, ${num(rejected, c.yellow)} rejected`)
     },
     query: (resultCount: number, query: string) => {
       const shortQuery = query.length > 60 ? query.substring(0, 60) + '...' : query

@@ -120,3 +120,14 @@ Config format:
   "excludeMixes": true
 }
 ```
+
+## Database Cleanup
+
+When user says "lance le clean", "cleanup", "nettoie la db" or similar:
+
+```bash
+cd apps/web && npx tsx scripts/cleanupLowQualityTracks.ts -y
+```
+
+This removes tracks with quality score < 40 (mixes, too short/long, low engagement).
+Use `-y` or `--force` to skip confirmation prompt.

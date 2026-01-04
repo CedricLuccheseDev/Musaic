@@ -1,12 +1,60 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { type TrackEntry, type DbTrack, type AnalysisData, trackEntryToDbTrack } from '~/types'
+import { type TrackEntry, type DbTrack, type AnalysisData, trackEntryToDbTrack, DownloadStatus } from '~/types'
 import { logger } from '~/server/utils/logger'
+import {
+  MIN_TRACK_DURATION,
+  MAX_TRACK_DURATION,
+  QUALITY_THRESHOLD,
+  SCORING,
+  ENGAGEMENT,
+  containsRejectKeyword,
+  isValidDuration,
+  isIdealDuration,
+  isRecent
+} from '~/server/config/qualityRules'
 
 let supabaseClient: SupabaseClient | null = null
 
-// Track duration limits (in ms)
-const MIN_TRACK_DURATION = 2 * 60 * 1000 // 2 minutes
-const MAX_TRACK_DURATION = 8 * 60 * 1000 // 8 minutes
+/**
+ * Calculate quality score for a track
+ * Returns 0 if track fails hard filters (should be rejected)
+ * Otherwise returns cumulative score based on quality criteria
+ */
+export function calculateQualityScore(track: TrackEntry): number {
+  // === HARD FILTERS (score = 0 = rejected) ===
+
+  // Contains mix/live keywords
+  if (containsRejectKeyword(track.title)) return 0
+
+  // Duration outside limits
+  if (!isValidDuration(track.duration)) return 0
+
+  // === POSITIVE SCORING ===
+  let score = 0
+
+  // Duration scoring
+  if (isIdealDuration(track.duration)) score += SCORING.idealDuration
+  else score += SCORING.acceptableDuration
+
+  // Presentation
+  if (track.artwork) score += SCORING.hasArtwork
+  if (track.genre) score += SCORING.hasGenre
+  if (track.description) score += SCORING.hasDescription
+
+  // Engagement
+  if (track.likes_count > ENGAGEMENT.minLikes) score += SCORING.minLikes
+  if (track.likes_count > ENGAGEMENT.goodLikes) score += SCORING.goodLikes
+  if (track.playback_count > ENGAGEMENT.minPlays) score += SCORING.minPlays
+  if (track.comment_count > 0) score += SCORING.hasComments
+
+  // Download availability
+  if (track.downloadStatus !== DownloadStatus.No) score += SCORING.downloadable
+
+  // Freshness
+  if (isRecent(track.created_at)) score += SCORING.recent
+
+  return score
+}
 
 // Trigger analysis for new tracks via musaic-analyzer
 export async function triggerAnalysis(soundcloudIds: number[]): Promise<void> {
@@ -72,23 +120,45 @@ export async function upsertTrack(track: TrackEntry): Promise<void> {
   }
 }
 
+export interface UpsertOptions {
+  forceStore?: boolean  // Skip quality filter (for user-saved tracks)
+}
+
 /**
  * Upsert multiple tracks into the database
  * Uses batch upsert for efficiency
  * Deduplicates by soundcloud_id to avoid ON CONFLICT errors
- * Filters out tracks outside duration limits (1-8 minutes)
+ * Filters out tracks that don't meet quality threshold (unless forceStore)
  */
-export async function upsertTracks(tracks: TrackEntry[]): Promise<void> {
-  if (tracks.length === 0) return
+export async function upsertTracks(tracks: TrackEntry[], options?: UpsertOptions): Promise<{ stored: number; rejected: number }> {
+  if (tracks.length === 0) return { stored: 0, rejected: 0 }
 
   const supabase = getSupabaseClient()
-  if (!supabase) return
+  if (!supabase) return { stored: 0, rejected: 0 }
 
-  // Filter by duration and deduplicate by soundcloud_id (keep last occurrence)
-  const validTracks = tracks.filter(t => t.duration >= MIN_TRACK_DURATION && t.duration <= MAX_TRACK_DURATION)
-  if (validTracks.length === 0) return
+  // Filter by quality score (unless force storing)
+  let qualityTracks: TrackEntry[]
+  let rejectedCount: number
 
-  const uniqueTracks = [...new Map(validTracks.map(t => [t.id, t])).values()]
+  if (options?.forceStore) {
+    // Force store: only apply hard duration filter
+    qualityTracks = tracks.filter(t => t.duration >= MIN_TRACK_DURATION && t.duration <= MAX_TRACK_DURATION)
+    rejectedCount = tracks.length - qualityTracks.length
+  } else {
+    // Normal: apply full quality scoring
+    qualityTracks = tracks.filter(t => calculateQualityScore(t) >= QUALITY_THRESHOLD)
+    rejectedCount = tracks.length - qualityTracks.length
+  }
+
+  if (qualityTracks.length === 0) {
+    if (rejectedCount > 0) {
+      logger.db.quality(0, rejectedCount)
+    }
+    return { stored: 0, rejected: rejectedCount }
+  }
+
+  // Deduplicate by soundcloud_id (keep last occurrence)
+  const uniqueTracks = [...new Map(qualityTracks.map(t => [t.id, t])).values()]
   const dbTracks = uniqueTracks.map(trackEntryToDbTrack)
 
   const { error, data } = await supabase
@@ -101,11 +171,18 @@ export async function upsertTracks(tracks: TrackEntry[]): Promise<void> {
 
   if (error) {
     logger.db.error(error.message)
-  } else {
-    const totalCount = await getTrackCount()
-    logger.db.upsert(data?.length || uniqueTracks.length, totalCount)
-    triggerAnalysis(uniqueTracks.map(t => t.id))
+    return { stored: 0, rejected: rejectedCount }
   }
+
+  const storedCount = data?.length || uniqueTracks.length
+  const totalCount = await getTrackCount()
+  logger.db.upsert(storedCount, totalCount)
+  if (rejectedCount > 0) {
+    logger.db.quality(storedCount, rejectedCount)
+  }
+  triggerAnalysis(uniqueTracks.map(t => t.id))
+
+  return { stored: storedCount, rejected: rejectedCount }
 }
 
 /**

@@ -58,7 +58,6 @@ def _get_embedding_model():
 
     # Check if model file exists
     if not EMBEDDING_MODEL_PATH.exists():
-        print(f"[Embedding] Model not found at: {EMBEDDING_MODEL_PATH}")
         _embedding_model_available = False
         return None
 
@@ -69,10 +68,8 @@ def _get_embedding_model():
             output="PartitionedCall:1"  # Embedding layer output
         )
         _embedding_model_available = True
-        print(f"[Embedding] Model loaded successfully from: {EMBEDDING_MODEL_PATH}")
         return _embedding_model
-    except Exception as e:
-        print(f"[Embedding] Failed to load model: {e}")
+    except Exception:
         _embedding_model_available = False
         return None
 
@@ -87,7 +84,6 @@ def _get_tempo_cnn_model():
 
     # Check if model file exists
     if not TEMPO_CNN_MODEL_PATH.exists():
-        print(f"[TempoCNN] Model not found at: {TEMPO_CNN_MODEL_PATH}")
         _tempo_cnn_available = False
         return None
 
@@ -95,10 +91,8 @@ def _get_tempo_cnn_model():
         from essentia.standard import TempoCNN
         _tempo_cnn_model = TempoCNN(graphFilename=str(TEMPO_CNN_MODEL_PATH))
         _tempo_cnn_available = True
-        print(f"[TempoCNN] Model loaded successfully from: {TEMPO_CNN_MODEL_PATH}")
         return _tempo_cnn_model
-    except Exception as e:
-        print(f"[TempoCNN] Failed to load model: {e}")
+    except Exception:
         _tempo_cnn_available = False
         return None
 
@@ -621,7 +615,6 @@ def _extract_beat_offset_from_drop(full_audio: np.ndarray, highlight_time: float
         beats, confidence = beat_tracker(drop_segment)
 
         if len(beats) < 4:
-            print(f"[BeatTrackerMultiFeature] Not enough beats detected ({len(beats)})")
             return None
 
         # Convert beat times to full track time
@@ -645,24 +638,20 @@ def _extract_beat_offset_from_drop(full_audio: np.ndarray, highlight_time: float
         if stable_beat_idx is not None:
             first_stable_beat = float(beats_absolute[stable_beat_idx])
             beat_offset = first_stable_beat % beat_interval
-            print(f"[BeatTrackerMultiFeature] First stable beat at {first_stable_beat:.3f}s (drop+{first_stable_beat - highlight_time:.3f}s), offset: {beat_offset:.3f}s")
             return round(beat_offset, 3)
 
         # Fallback: find the first beat at or after the highlight time
         for beat in beats_absolute:
             if beat >= highlight_time - 0.1:  # Allow 100ms before
                 beat_offset = float(beat) % beat_interval
-                print(f"[BeatTrackerMultiFeature] Using first beat at drop: {beat:.3f}s, offset: {beat_offset:.3f}s")
                 return round(beat_offset, 3)
 
         # Last fallback: use first detected beat
         first_beat = float(beats_absolute[0])
         beat_offset = first_beat % beat_interval
-        print(f"[BeatTrackerMultiFeature] Fallback first beat: {first_beat:.3f}s, offset: {beat_offset:.3f}s")
         return round(beat_offset, 3)
 
-    except Exception as e:
-        print(f"[BeatTrackerMultiFeature] Error: {e}")
+    except Exception:
         return None
 
 
@@ -757,9 +746,6 @@ def _extract_rhythm(
 
     normalized = [(normalize_bpm(bpm), conf, src) for bpm, conf, src in candidates]
 
-    # Debug: log all candidates
-    print(f"[BPM Debug] Candidates: {[(round(b, 1), round(c, 2), s) for b, c, s in normalized]}")
-
     # Find consensus: group similar BPMs (within 4% tolerance)
     def bpm_similar(a: float, b: float) -> bool:
         if b == 0:
@@ -780,9 +766,7 @@ def _extract_rhythm(
         scored.append((bpm_i, agreement, src_i))
 
     scored.sort(key=lambda x: x[1], reverse=True)
-    best_bpm, best_score, best_src = scored[0]
-
-    print(f"[BPM Debug] Winner: {round(best_bpm, 1)} from {best_src} (score: {round(best_score, 2)})")
+    best_bpm, best_score, _ = scored[0]
 
     final_confidence = min(1.0, best_score / 3.0)
 
@@ -800,7 +784,6 @@ def _extract_rhythm(
         first_beat = float(beats[0])
         beat_interval = 60.0 / best_bpm
         beat_offset = round(first_beat % beat_interval, 3)
-        print(f"[Beat Grid Fallback] First beat: {first_beat:.3f}s, offset: {beat_offset:.3f}s")
 
     return round(best_bpm, 1), round(final_confidence, 3), len(beats), beat_offset
 

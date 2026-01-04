@@ -2,11 +2,40 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages'
 import { logger } from '~/server/utils/logger'
 
+// Validate SQL query structure
+function validateSql(sql: string): boolean {
+  const lower = sql.toLowerCase().trim()
+  if (!lower.startsWith('select') && !lower.startsWith('with')) return false
+  if (!lower.includes('from tracks') && !lower.includes('find_similar_tracks')) return false
+  return true
+}
+
+// Escape user input for SQL fallback (prevent injection)
+function escapeSqlString(str: string): string {
+  return str.replace(/'/g, "''").replace(/\\/g, '\\\\')
+}
+
 // System prompt for SQL + response generation in one call
 const SYSTEM_PROMPT = `SQL and response generator for music search. Output JSON only.
 
 OUTPUT FORMAT (strict JSON, no markdown):
-{"sql":"SELECT ...","phrase":"Short response in user's language"}
+{
+  "sql": "SELECT ...",
+  "phrase": "Short response in user's language",
+  "soundcloudQuery": "optimized search query for SoundCloud API",
+  "soundcloudFilters": {
+    "genres": "genre1,genre2",
+    "bpm": { "from": 130, "to": 150 }
+  }
+}
+
+SOUNDCLOUD QUERY RULES:
+- soundcloudQuery: reformulate user intent into effective SoundCloud search keywords (artists, genres, style keywords)
+- soundcloudFilters.genres: comma-separated SC genres (dubstep, house, techno, drum-n-bass, trap, etc.) - only if clearly relevant
+- soundcloudFilters.bpm: only if user mentions BPM or tempo-related terms
+- Keep soundcloudQuery short (3-6 keywords max)
+- Include artist names if mentioned
+- Include style/vibe keywords
 
 SCHEMA: tracks(soundcloud_id PK, title, artist, genre, duration ms, download_status, downloadable, playback_count, likes_count, tags[], soundcloud_created_at, label,
   -- Audio analysis (from Essentia via musaic-analyzer)
@@ -23,8 +52,13 @@ DEFAULTS: SELECT * FROM tracks, ILIKE for text, ORDER BY playback_count DESC, LI
 GENRES: dubstep, melodic dubstep, future bass, trap, house, techno, drum and bass, bass house, riddim, electronic, edm, progressive house, deep house, future house, hybrid trap, midtempo, color bass, lo-fi, ambient, hardcore, hardstyle, trance, psytrance, breakbeat, garage, uk garage, jungle, neurofunk, liquid dnb, minimal, industrial
 
 PATTERNS:
-- genre: WHERE genre ILIKE '%dubstep%'
+- genre simple: WHERE genre ILIKE '%dubstep%'
+- genre multiple: WHERE (genre ILIKE '%dubstep%' OR genre ILIKE '%riddim%')
+- drum and bass: WHERE (genre ILIKE '%drum%bass%' OR genre ILIKE '%dnb%' OR genre ILIKE '%d&b%' OR genre ILIKE '%jungle%' OR genre ILIKE '%neurofunk%' OR genre ILIKE '%liquid%')
 - artist: WHERE artist ILIKE '%skrillex%'
+- artist + genre: WHERE artist ILIKE '%netsky%' AND (genre ILIKE '%dnb%' OR genre ILIKE '%drum%bass%')
+- label: WHERE label ILIKE '%hospital%'
+- no vocals: WHERE instrumentalness > 0.7 AND analysis_status='completed'
 - title: WHERE title ILIKE '%memories%'
 - similar to artist: WHERE (genre ILIKE '%melodic dubstep%' OR genre ILIKE '%future bass%') AND artist NOT ILIKE '%artistname%'
 - free: WHERE download_status IN ('FreeDirectLink','FreeExternalLink')
@@ -79,20 +113,55 @@ PHRASE RULES:
 - No emojis
 
 EXAMPLES:
-User: "chill dubstep" → {"sql":"SELECT * FROM tracks WHERE genre ILIKE '%dubstep%' AND energy < 0.5 AND analysis_status='completed' ORDER BY playback_count DESC LIMIT 20","phrase":"Voici du dubstep chill pour toi"}
-User: "tracks like Excision" → {"sql":"SELECT * FROM tracks WHERE (genre ILIKE '%dubstep%' OR genre ILIKE '%riddim%') AND artist NOT ILIKE '%excision%' ORDER BY playback_count DESC LIMIT 20","phrase":"Heavy bass tracks similar to Excision"}
-User: "happy uplifting music" → {"sql":"SELECT * FROM tracks WHERE valence > 0.7 AND energy > 0.6 AND analysis_status='completed' ORDER BY playback_count DESC LIMIT 20","phrase":"Uplifting tracks to boost your mood"}
-User: "tracks that sound like Scary Monsters" → {"sql":"SELECT * FROM find_similar_tracks((SELECT soundcloud_id FROM tracks WHERE title ILIKE '%scary monsters%' LIMIT 1), 20)","phrase":"Tracks with similar sound to Scary Monsters"}
-User: "artistes similaires à Illenium" → {"sql":"WITH artist_emb AS (SELECT AVG(embedding) as e FROM tracks WHERE artist ILIKE '%illenium%' AND embedding IS NOT NULL) SELECT DISTINCT ON (artist) * FROM tracks t, artist_emb WHERE t.embedding IS NOT NULL AND t.artist NOT ILIKE '%illenium%' ORDER BY artist, t.embedding <=> artist_emb.e LIMIT 20","phrase":"Artistes au son proche d'Illenium"}
+User: "chill dubstep"
+→ {"sql":"SELECT * FROM tracks WHERE genre ILIKE '%dubstep%' AND energy < 0.5 AND analysis_status='completed' ORDER BY playback_count DESC LIMIT 20","phrase":"Voici du dubstep chill pour toi","soundcloudQuery":"melodic dubstep chill","soundcloudFilters":{"genres":"dubstep"}}
+
+User: "tracks like Excision"
+→ {"sql":"SELECT * FROM tracks WHERE (genre ILIKE '%dubstep%' OR genre ILIKE '%riddim%') AND artist NOT ILIKE '%excision%' ORDER BY playback_count DESC LIMIT 20","phrase":"Heavy bass tracks similar to Excision","soundcloudQuery":"excision dubstep heavy bass","soundcloudFilters":{"genres":"dubstep"}}
+
+User: "dubstep 140 bpm"
+→ {"sql":"SELECT * FROM tracks WHERE genre ILIKE '%dubstep%' AND bpm_detected BETWEEN 135 AND 145 AND analysis_status='completed' ORDER BY playback_count DESC LIMIT 20","phrase":"Dubstep tracks around 140 BPM","soundcloudQuery":"dubstep","soundcloudFilters":{"genres":"dubstep","bpm":{"from":135,"to":145}}}
+
+User: "happy uplifting music"
+→ {"sql":"SELECT * FROM tracks WHERE valence > 0.7 AND energy > 0.6 AND analysis_status='completed' ORDER BY playback_count DESC LIMIT 20","phrase":"Uplifting tracks to boost your mood","soundcloudQuery":"uplifting happy melodic edm","soundcloudFilters":{}}
+
+User: "je veux du riddim agressif"
+→ {"sql":"SELECT * FROM tracks WHERE genre ILIKE '%riddim%' AND energy > 0.7 AND analysis_status='completed' ORDER BY playback_count DESC LIMIT 20","phrase":"Du riddim bien lourd pour toi","soundcloudQuery":"riddim heavy aggressive bass","soundcloudFilters":{"genres":"dubstep"}}
+
+User: "artistes similaires à Illenium"
+→ {"sql":"WITH artist_emb AS (SELECT AVG(embedding) as e FROM tracks WHERE artist ILIKE '%illenium%' AND embedding IS NOT NULL) SELECT DISTINCT ON (artist) * FROM tracks t, artist_emb WHERE t.embedding IS NOT NULL AND t.artist NOT ILIKE '%illenium%' ORDER BY artist, t.embedding <=> artist_emb.e LIMIT 20","phrase":"Artistes au son proche d'Illenium","soundcloudQuery":"illenium melodic dubstep future bass","soundcloudFilters":{"genres":"dubstep,future-bass"}}
+
+User: "drum & bass"
+→ {"sql":"SELECT * FROM tracks WHERE (genre ILIKE '%drum%bass%' OR genre ILIKE '%dnb%' OR genre ILIKE '%d&b%') ORDER BY playback_count DESC LIMIT 20","phrase":"Drum and bass tracks for you","soundcloudQuery":"drum and bass dnb","soundcloudFilters":{"genres":"drum-n-bass"}}
+
+User: "liquid dnb chill"
+→ {"sql":"SELECT * FROM tracks WHERE (genre ILIKE '%liquid%' OR genre ILIKE '%drum%bass%' OR genre ILIKE '%dnb%') AND energy < 0.5 AND analysis_status='completed' ORDER BY playback_count DESC LIMIT 20","phrase":"Smooth liquid drum and bass vibes","soundcloudQuery":"liquid drum bass chill atmospheric","soundcloudFilters":{"genres":"drum-n-bass"}}
+
+User: "Netsky liquid"
+→ {"sql":"SELECT * FROM tracks WHERE artist ILIKE '%netsky%' OR (genre ILIKE '%liquid%' AND (genre ILIKE '%dnb%' OR genre ILIKE '%drum%bass%')) ORDER BY playback_count DESC LIMIT 20","phrase":"Netsky and liquid dnb","soundcloudQuery":"netsky liquid drum bass","soundcloudFilters":{"genres":"drum-n-bass"}}
+
+User: "bass sans vocals"
+→ {"sql":"SELECT * FROM tracks WHERE (genre ILIKE '%bass%' OR genre ILIKE '%dubstep%') AND instrumentalness > 0.7 AND analysis_status='completed' ORDER BY playback_count DESC LIMIT 20","phrase":"Bass music instrumental","soundcloudQuery":"instrumental bass dubstep","soundcloudFilters":{"genres":"dubstep"}}
+
+User: "Hospital Records"
+→ {"sql":"SELECT * FROM tracks WHERE label ILIKE '%hospital%' ORDER BY playback_count DESC LIMIT 20","phrase":"Tracks from Hospital Records","soundcloudQuery":"hospital records dnb","soundcloudFilters":{"genres":"drum-n-bass"}}
 
 For French queries, translate intent to SQL and respond in French.`
+
+export interface SoundcloudFilters {
+  genres?: string
+  bpm?: { from: number; to: number }
+}
 
 export interface AiQueryResult {
   sql: string
   phrase: string
+  soundcloudQuery: string
+  soundcloudFilters?: SoundcloudFilters
 }
 
-export async function generateSqlAndPhrase(question: string): Promise<AiQueryResult> {
+// Internal function to call the AI API
+async function callAiApi(question: string): Promise<AiQueryResult> {
   const config = useRuntimeConfig()
   const apiKey = config.anthropicApiKey
 
@@ -108,7 +177,7 @@ export async function generateSqlAndPhrase(question: string): Promise<AiQueryRes
 
   const message = await anthropic.messages.create({
     model: 'claude-3-5-haiku-latest',
-    max_tokens: 300,
+    max_tokens: 250,
     system: [
       {
         type: 'text',
@@ -135,18 +204,52 @@ export async function generateSqlAndPhrase(question: string): Promise<AiQueryRes
   // Remove markdown if present
   text = text.replace(/^```json\n?/i, '').replace(/\n?```$/i, '')
 
-  try {
-    const result = JSON.parse(text) as AiQueryResult
-    return {
-      sql: result.sql || '',
-      phrase: result.phrase || ''
-    }
-  } catch {
-    // Fallback: try to extract SQL if JSON parsing fails
-    const sqlMatch = text.match(/SELECT[\s\S]+?(?:LIMIT \d+|$)/i)
-    return {
-      sql: sqlMatch ? sqlMatch[0] : text,
-      phrase: ''
+  const result = JSON.parse(text) as AiQueryResult
+  return {
+    sql: result.sql || '',
+    phrase: result.phrase || '',
+    soundcloudQuery: result.soundcloudQuery || question,
+    soundcloudFilters: result.soundcloudFilters || undefined
+  }
+}
+
+// Create a simple fallback query for search
+function createFallbackQuery(question: string): AiQueryResult {
+  const escaped = escapeSqlString(question)
+  return {
+    sql: `SELECT * FROM tracks WHERE title ILIKE '%${escaped}%' OR artist ILIKE '%${escaped}%' ORDER BY playback_count DESC LIMIT 20`,
+    phrase: '',
+    soundcloudQuery: question,
+    soundcloudFilters: undefined
+  }
+}
+
+// Main function with retry and validation
+export async function generateSqlAndPhrase(question: string, retries = 1): Promise<AiQueryResult> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const result = await callAiApi(question)
+
+      // Validate SQL structure
+      if (validateSql(result.sql)) {
+        return result
+      }
+
+      // Invalid SQL, retry if attempts left
+      if (attempt < retries) {
+        logger.ai.error(`Invalid SQL structure, retrying (${attempt + 1}/${retries})`)
+        continue
+      }
+    } catch (err) {
+      // Parse error or API error, retry if attempts left
+      if (attempt < retries) {
+        logger.ai.error(`AI error, retrying (${attempt + 1}/${retries}): ${err instanceof Error ? err.message : 'Unknown'}`)
+        continue
+      }
     }
   }
+
+  // All retries failed, return fallback
+  logger.ai.error('All retries failed, using fallback query')
+  return createFallbackQuery(question)
 }

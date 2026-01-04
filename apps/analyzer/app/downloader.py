@@ -1,6 +1,7 @@
-"""Audio downloader using yt-dlp for SoundCloud tracks."""
+"""Audio downloader using yt-dlp for SoundCloud and YouTube tracks."""
 
 import asyncio
+import json
 import subprocess
 import tempfile
 import aiofiles
@@ -21,6 +22,142 @@ class DownloadError(Exception):
 class StreamUnavailableError(Exception):
     """Raised when stream is not available (geo-blocked, label restriction, etc.)."""
     pass
+
+
+# =============================================================================
+# YouTube Fallback
+# =============================================================================
+
+async def _search_youtube(query: str, expected_duration_ms: int) -> str | None:
+    """
+    Search YouTube for a track and return the best matching URL.
+
+    Uses yt-dlp's search feature: ytsearch5:query
+    Filters results by duration (within 30s of expected).
+
+    Args:
+        query: Search query (e.g., "Artist Title")
+        expected_duration_ms: Expected track duration in milliseconds
+
+    Returns:
+        YouTube URL of best match, or None if not found
+    """
+    cmd = [
+        "yt-dlp",
+        f"ytsearch5:{query}",
+        "--dump-json",
+        "--no-download",
+        "--quiet",
+        "--no-warnings",
+    ]
+
+    try:
+        result = await asyncio.to_thread(
+            subprocess.run, cmd, capture_output=True, text=True, timeout=30
+        )
+    except subprocess.TimeoutExpired:
+        return None
+
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+
+    expected_sec = expected_duration_ms / 1000
+    tolerance = 30  # seconds
+
+    best_match = None
+    best_diff = float('inf')
+
+    for line in result.stdout.strip().split('\n'):
+        if not line:
+            continue
+        try:
+            video = json.loads(line)
+            duration = video.get('duration', 0)
+            if duration == 0:
+                continue
+
+            diff = abs(duration - expected_sec)
+            if diff <= tolerance and diff < best_diff:
+                best_diff = diff
+                video_id = video.get('id')
+                if video_id:
+                    best_match = f"https://www.youtube.com/watch?v={video_id}"
+        except json.JSONDecodeError:
+            continue
+
+    return best_match
+
+
+def _download_from_youtube(url: str, temp_dir: Path, settings) -> Path:
+    """
+    Download audio from YouTube URL using yt-dlp.
+
+    Args:
+        url: YouTube video URL
+        temp_dir: Temporary directory for download
+        settings: Application settings
+
+    Returns:
+        Path to the downloaded audio file
+
+    Raises:
+        DownloadError: If download fails
+    """
+    output_template = temp_dir / "audio.%(ext)s"
+
+    cmd = [
+        "yt-dlp",
+        url,
+        "-x",  # Extract audio
+        "--audio-format",
+        "m4a",  # Keep m4a format - more compatible than mp3 conversion
+        "-o",
+        str(output_template),
+        "--no-playlist",
+        "--retries",
+        "3",
+        "--no-warnings",
+    ]
+
+    # Add proxy if configured
+    if settings.proxy_url:
+        cmd.extend(["--proxy", settings.proxy_url])
+
+    try:
+        result = subprocess.run(
+            cmd,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except subprocess.CalledProcessError as e:
+        raise DownloadError(f"YouTube download failed: {e.stderr[:500] if e.stderr else 'unknown error'}") from e
+    except subprocess.TimeoutExpired as e:
+        raise DownloadError("YouTube download timed out after 300s") from e
+
+    # Check if file was created and has valid size
+    MIN_AUDIO_SIZE = 100 * 1024  # 100KB minimum
+
+    expected_m4a = temp_dir / "audio.m4a"
+    if expected_m4a.exists():
+        if expected_m4a.stat().st_size >= MIN_AUDIO_SIZE:
+            return expected_m4a
+        raise DownloadError(f"YouTube: Audio too small ({expected_m4a.stat().st_size} bytes)")
+
+    audio_files = list(temp_dir.glob("audio.*"))
+    if audio_files:
+        audio_file = audio_files[0]
+        if audio_file.stat().st_size >= MIN_AUDIO_SIZE:
+            return audio_file
+        raise DownloadError(f"YouTube: Audio too small ({audio_file.stat().st_size} bytes)")
+
+    raise DownloadError("YouTube: No audio file was created")
+
+
+# =============================================================================
+# SoundCloud Streaming
+# =============================================================================
 
 
 async def _get_stream_url(
@@ -245,7 +382,11 @@ async def _try_direct_download_async(
                 async for chunk in audio_response.aiter_bytes(chunk_size=65536):  # 64KB chunks
                     await f.write(chunk)
 
-        return mp3_path if mp3_path.exists() else None
+        # Validate file size
+        MIN_AUDIO_SIZE = 100 * 1024  # 100KB minimum
+        if mp3_path.exists() and mp3_path.stat().st_size >= MIN_AUDIO_SIZE:
+            return mp3_path
+        return None
 
     except Exception:
         return None
@@ -257,21 +398,28 @@ async def _try_direct_download_async(
 async def download_full_audio_async(
     url: str,
     client: httpx.AsyncClient | None = None,
+    title: str | None = None,
+    artist: str | None = None,
+    duration_ms: int | None = None,
 ) -> Path:
     """
     Download full audio from SoundCloud URL using async httpx.
 
-    Tries direct API first (with client_id), then falls back to yt-dlp.
+    Tries direct API first (with client_id), then falls back to yt-dlp,
+    and finally tries YouTube search if metadata is provided.
 
     Args:
         url: SoundCloud track URL
         client: Optional shared httpx.AsyncClient for connection pooling
+        title: Optional track title for YouTube fallback
+        artist: Optional artist name for YouTube fallback
+        duration_ms: Optional track duration in ms for YouTube matching
 
     Returns:
         Path to the downloaded audio file (MP3 or WAV)
 
     Raises:
-        DownloadError: If download fails
+        DownloadError: If all download methods fail
     """
     settings = get_settings()
 
@@ -294,9 +442,25 @@ async def download_full_audio_async(
         if result:
             return result
 
-    # Fallback to yt-dlp (download as MP3 - faster, no conversion)
-    # Run yt-dlp in a thread to not block the event loop
-    return await asyncio.to_thread(_download_with_ytdlp, url, temp_dir, settings)
+    # Fallback to yt-dlp for SoundCloud
+    try:
+        return await asyncio.to_thread(_download_with_ytdlp, url, temp_dir, settings)
+    except DownloadError:
+        pass  # Continue to YouTube fallback
+
+    # YouTube fallback: search and download if metadata is available
+    if title and artist and duration_ms:
+        query = f"{artist} {title}"
+        log.info(f"Trying YouTube fallback: {query}")
+
+        youtube_url = await _search_youtube(query, duration_ms)
+        if youtube_url:
+            log.success(f"Found on YouTube: {youtube_url}")
+            return await asyncio.to_thread(
+                _download_from_youtube, youtube_url, temp_dir, settings
+            )
+
+    raise DownloadError("All download methods failed (SoundCloud + YouTube)")
 
 
 def _download_with_ytdlp(url: str, temp_dir: Path, settings) -> Path:
@@ -358,15 +522,22 @@ def _download_with_ytdlp(url: str, temp_dir: Path, settings) -> Path:
     except subprocess.TimeoutExpired as e:
         raise DownloadError("Download timed out after 300s") from e
 
-    # Check if file was created (could be .mp3 or other format)
+    # Check if file was created and has valid size
+    MIN_AUDIO_SIZE = 100 * 1024  # 100KB minimum
+
     expected_mp3 = temp_dir / "audio.mp3"
     if expected_mp3.exists():
-        return expected_mp3
+        if expected_mp3.stat().st_size >= MIN_AUDIO_SIZE:
+            return expected_mp3
+        raise DownloadError(f"SoundCloud yt-dlp: Audio too small ({expected_mp3.stat().st_size} bytes)")
 
     # Try to find any audio file in the temp directory
     audio_files = list(temp_dir.glob("audio.*"))
     if audio_files:
-        return audio_files[0]
+        audio_file = audio_files[0]
+        if audio_file.stat().st_size >= MIN_AUDIO_SIZE:
+            return audio_file
+        raise DownloadError(f"SoundCloud yt-dlp: Audio too small ({audio_file.stat().st_size} bytes)")
 
     raise DownloadError("No audio file was created")
 

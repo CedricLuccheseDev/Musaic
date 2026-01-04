@@ -5,7 +5,7 @@ import type { TrackEntry } from '~/types'
 const props = defineProps<{
   loading: boolean
   results: TrackEntry[]
-  sql: string
+  sql?: string
   response: string
 }>()
 

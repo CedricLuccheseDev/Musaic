@@ -76,8 +76,6 @@ function createSoundcloudClient(): SoundcloudInstance {
   const isDev = process.env.NODE_ENV === 'development'
   const useProxy = !!clientId && !isDev // Use proxy in production only
 
-  console.log(`[SoundCloud] Client ID: ${clientId ? 'yes (' + clientId.slice(0, 8) + '...)' : 'NO'}, Proxy: ${useProxy ? 'yes' : 'no'}, Env: ${isDev ? 'dev' : 'prod'}`)
-
   if (clientId) {
     return new Soundcloud(clientId, undefined, useProxy ? { proxy: PROXY_URL } : undefined)
   }
@@ -251,12 +249,33 @@ export async function searchTracks(query: string, limit = SEARCH_LIMIT): Promise
   return tracks.map(mapToTrackEntry)
 }
 
-export async function searchWithArtistDetection(query: string, limit = SEARCH_LIMIT, offset = 0): Promise<SearchResult> {
+export interface SearchFilters {
+  genres?: string
+  bpm?: { from: number; to: number }
+}
+
+export async function searchWithArtistDetection(
+  query: string,
+  limit = SEARCH_LIMIT,
+  offset = 0,
+  filters?: SearchFilters
+): Promise<SearchResult> {
   const soundcloud = createSoundcloudClient()
+
+  // Build search params with optional filters
+  const baseParams = { q: query, limit, offset }
+  const extraParams: Record<string, unknown> = {}
+  if (filters?.genres) {
+    extraParams.genres = filters.genres
+  }
+  if (filters?.bpm) {
+    extraParams['bpm[from]'] = filters.bpm.from
+    extraParams['bpm[to]'] = filters.bpm.to
+  }
 
   // Search tracks and users in parallel with error handling
   const [tracksResult, usersResult] = await Promise.allSettled([
-    soundcloud.tracks.search({ q: query, limit, offset }),
+    soundcloud.tracks.search({ ...baseParams, ...extraParams } as Parameters<typeof soundcloud.tracks.search>[0]),
     offset === 0 ? soundcloud.users.search({ q: query }) : Promise.resolve({ collection: [] })
   ])
 
@@ -266,7 +285,6 @@ export async function searchWithArtistDetection(query: string, limit = SEARCH_LI
   }
   const tracksResponse = tracksResult.status === 'fulfilled' ? tracksResult.value : { collection: [], next_href: null }
   const tracks = (tracksResponse.collection || []).map(mapToTrackEntry)
-  console.log(`[SoundCloud] Query: "${query}", Raw tracks: ${tracksResponse.collection?.length || 0}`)
   const hasMore = !!tracksResponse.next_href
   const nextOffset = hasMore ? offset + limit : undefined
 

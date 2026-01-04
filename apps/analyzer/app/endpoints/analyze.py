@@ -37,13 +37,22 @@ def get_analysis_queue():
     return _analysis_queue
 
 
-async def process_track_analysis(soundcloud_id: int, permalink_url: str) -> None:
+async def process_track_analysis(
+    soundcloud_id: int,
+    permalink_url: str,
+    title: str | None = None,
+    artist: str | None = None,
+    duration: int | None = None,
+) -> None:
     """
     Background task to download and analyze a track.
 
     Args:
         soundcloud_id: SoundCloud track ID
         permalink_url: URL to download the track from
+        title: Track title for YouTube fallback
+        artist: Artist name for YouTube fallback
+        duration: Track duration in ms for YouTube matching
     """
     settings = get_settings()
     audio_path = None
@@ -61,7 +70,12 @@ async def process_track_analysis(soundcloud_id: int, permalink_url: str) -> None
         log.sc.download(permalink_url)
         try:
             audio_path = await asyncio.wait_for(
-                download_full_audio_async(permalink_url),
+                download_full_audio_async(
+                    permalink_url,
+                    title=title,
+                    artist=artist,
+                    duration_ms=duration,
+                ),
                 timeout=settings.analysis_timeout_seconds,
             )
         except asyncio.TimeoutError:
@@ -151,8 +165,20 @@ async def analyze_track(
         log.warn(f"Track {soundcloud_id} already in queue")
         return AnalyzingResponse(status="already_analyzing", soundcloud_id=soundcloud_id)
 
+    # Extract metadata for YouTube fallback
+    title = track.get("title")
+    artist = track.get("artist")
+    duration = track.get("duration")
+
     # Queue analysis
-    background_tasks.add_task(process_track_analysis, soundcloud_id, permalink_url)
+    background_tasks.add_task(
+        process_track_analysis,
+        soundcloud_id,
+        permalink_url,
+        title=title,
+        artist=artist,
+        duration=duration,
+    )
 
     log.api.response(200, f"/analyze - Queued track {soundcloud_id}")
 
