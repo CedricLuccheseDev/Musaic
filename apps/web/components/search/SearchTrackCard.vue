@@ -57,20 +57,19 @@ const mp3DownloadUrl = computed(() => {
 
 const cardClass = computed(() => {
   if (isOnAnyDeck.value) {
-    return 'bg-violet-950/50 hover:bg-violet-950/60 border-violet-500/50 ring-1 ring-violet-500/30'
+    return 'bg-violet-950/50 hover:bg-violet-950/70 border-violet-500/50 ring-1 ring-violet-500/30'
   }
   if (props.track.downloadStatus === DownloadStatus.FreeDirectLink) {
-    return 'bg-emerald-950/40 hover:bg-emerald-950/40 border-emerald-800/30'
+    return 'bg-emerald-950/30 hover:bg-emerald-950/50 border-emerald-700/40'
   }
   if (props.track.downloadStatus === DownloadStatus.FreeExternalLink) {
-    return 'bg-emerald-950/30 hover:bg-emerald-950/60 border-emerald-700/40'
+    return 'bg-emerald-950/20 hover:bg-emerald-950/40 border-emerald-800/30'
   }
-  return 'bg-neutral-900/80 hover:bg-neutral-800/80 border-neutral-800/50'
+  return 'bg-neutral-900/60 hover:bg-neutral-900/80 border-neutral-800/50'
 })
 
 /* --- Methods --- */
 function handleCardClick() {
-  // If track is already on a deck, toggle play/pause
   if (isOnDeckA.value) {
     togglePlay('A')
     return
@@ -79,8 +78,6 @@ function handleCardClick() {
     togglePlay('B')
     return
   }
-
-  // Otherwise load to appropriate deck
   const targetDeck = getTargetDeck()
   loadToDeck(props.track, targetDeck)
 }
@@ -109,16 +106,13 @@ function handleDeckClick(deck: 'A' | 'B') {
   const otherDeck = deck === 'A' ? 'B' : 'A'
 
   if (isOnThisDeck) {
-    // Track is already on this deck - eject it
     ejectDeck(deck)
   }
   else if (isOnOtherDeck) {
-    // Track is on the other deck - move it to this deck
     ejectDeck(otherDeck)
     loadToDeck(props.track, deck)
   }
   else {
-    // Track is not loaded anywhere - load to deck
     loadToDeck(props.track, deck)
   }
 }
@@ -134,31 +128,29 @@ onMounted(() => {
 
 <template>
   <div
-    class="group relative overflow-hidden rounded-lg border transition-all duration-300"
+    class="group overflow-hidden rounded-xl border transition-all duration-300"
     :class="[cardClass, isVisible ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0']"
   >
-    <!-- Main clickable area -->
+    <!-- Main content -->
     <div
-      class="flex cursor-pointer items-center gap-2.5 p-2 sm:gap-3 sm:p-2.5"
+      class="flex cursor-pointer items-center gap-3 p-2.5"
       @click="handleCardClick"
     >
-      <!-- Artist badge -->
-      <UTooltip v-if="isFromDetectedArtist && props.detectedArtist" :text="`Track de ${props.detectedArtist.username}`">
-        <div class="relative -mr-1 h-6 w-6 shrink-0 overflow-hidden rounded-full ring-2 ring-cyan-500/50">
+      <!-- Artwork -->
+      <div class="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg transition-transform duration-300 group-hover:scale-105">
+        <!-- Artist badge overlay -->
+        <div
+          v-if="isFromDetectedArtist && detectedArtist"
+          class="absolute -left-1 -top-1 z-10 h-5 w-5 overflow-hidden rounded-full ring-2 ring-cyan-500"
+        >
           <img
-            v-if="props.detectedArtist.avatar_url"
-            :src="props.detectedArtist.avatar_url"
-            :alt="props.detectedArtist.username"
+            v-if="detectedArtist.avatar_url"
+            :src="detectedArtist.avatar_url"
+            :alt="detectedArtist.username"
             class="h-full w-full object-cover"
           >
-          <div v-else class="flex h-full w-full items-center justify-center bg-cyan-900">
-            <UIcon name="i-heroicons-user" class="h-3 w-3 text-cyan-400" />
-          </div>
         </div>
-      </UTooltip>
 
-      <!-- Artwork -->
-      <div class="relative h-11 w-11 shrink-0 overflow-hidden rounded-md sm:h-12 sm:w-12">
         <img
           v-if="track.artwork"
           :src="track.artwork"
@@ -166,55 +158,112 @@ onMounted(() => {
           class="h-full w-full object-cover"
         >
         <div v-else class="flex h-full w-full items-center justify-center bg-neutral-800">
-          <UIcon name="i-heroicons-musical-note" class="h-5 w-5 text-neutral-600" />
+          <UIcon name="i-heroicons-musical-note" class="h-6 w-6 text-neutral-600" />
         </div>
+
         <!-- Play overlay -->
         <div
           class="absolute inset-0 flex items-center justify-center transition-all"
-          :class="isPlaying || isCurrentlyLoading ? 'bg-black/50 opacity-100' : 'bg-black/40 opacity-0 group-hover:opacity-100'"
+          :class="isPlaying || isCurrentlyLoading ? 'bg-black/60 opacity-100' : 'bg-black/40 opacity-0 group-hover:opacity-100'"
         >
-          <UIcon v-if="isCurrentlyLoading" name="i-heroicons-arrow-path" class="h-5 w-5 animate-spin text-white" />
-          <UIcon v-else-if="isPlaying" name="i-heroicons-pause-solid" class="h-5 w-5 text-white" />
-          <UIcon v-else name="i-heroicons-play-solid" class="h-5 w-5 text-white" />
+          <UIcon v-if="isCurrentlyLoading" name="i-heroicons-arrow-path" class="h-6 w-6 animate-spin text-white" />
+          <UIcon v-else-if="isPlaying" name="i-heroicons-pause-solid" class="h-6 w-6 text-white" />
+          <UIcon v-else name="i-heroicons-play-solid" class="h-6 w-6 text-white" />
         </div>
       </div>
 
-      <!-- Info -->
-      <div class="min-w-0 flex-1 overflow-hidden pr-20 sm:pr-24">
-        <a
-          :href="track.permalink_url"
-          target="_blank"
-          rel="noopener"
-          class="block truncate text-sm font-medium text-white hover:text-violet-400 sm:text-base"
-          @click.stop
-        >
-          {{ track.title }}
-        </a>
-        <a
-          :href="artistUrl"
-          target="_blank"
-          rel="noopener"
-          class="block truncate text-xs text-neutral-400 hover:text-violet-400 sm:text-sm"
-          @click.stop
-        >
-          {{ track.artist }}
-        </a>
-        <!-- Meta row -->
-        <div class="mt-0.5 flex items-center gap-2 text-[11px] text-neutral-500 sm:text-xs">
-          <span>{{ formatDuration(track.duration) }}</span>
-          <span v-if="track.playback_count" class="hidden sm:inline">{{ track.playback_count.toLocaleString() }} plays</span>
-          <!-- Analysis -->
-          <template v-if="isAnalyzing">
-            <span class="flex items-center gap-1 text-neutral-500">
-              <UIcon name="i-heroicons-arrow-path" class="h-2.5 w-2.5 animate-spin" />
-              {{ t.analysisProcessing }}
+      <!-- Track info -->
+      <div class="min-w-0 flex-1">
+        <!-- Title row -->
+        <div class="flex items-start gap-2">
+          <div class="min-w-0 flex-1">
+            <div class="truncate">
+              <a
+                :href="track.permalink_url"
+                target="_blank"
+                rel="noopener"
+                class="text-sm font-medium text-white hover:text-violet-400"
+                @click.stop
+              >
+                {{ track.title }}
+              </a>
+            </div>
+            <div class="truncate">
+              <a
+                :href="artistUrl"
+                target="_blank"
+                rel="noopener"
+                class="text-xs text-neutral-400 hover:text-violet-400"
+                @click.stop
+              >
+                {{ track.artist }}
+              </a>
+            </div>
+          </div>
+
+          <!-- Duration + Deck buttons -->
+          <div class="flex shrink-0 items-center gap-2" @click.stop>
+            <span class="text-xs tabular-nums text-neutral-500">
+              {{ formatDuration(track.duration) }}
             </span>
-          </template>
-          <template v-else-if="hasAnalysis">
-            <span v-if="track.bpm_detected" class="text-violet-400">{{ Math.round(track.bpm_detected) }} BPM</span>
+
+            <!-- Deck A -->
+            <button
+              type="button"
+              class="rounded-md px-2 py-1 text-xs font-bold transition-colors"
+              :class="[
+                isOnDeckA
+                  ? 'bg-cyan-500 text-white cursor-pointer'
+                  : hasAnalysis
+                    ? 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 cursor-pointer'
+                    : 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
+              ]"
+              :disabled="!hasAnalysis"
+              @click.stop="handleDeckClick('A')"
+            >
+              A
+            </button>
+
+            <!-- Deck B -->
+            <button
+              type="button"
+              class="rounded-md px-2 py-1 text-xs font-bold transition-colors"
+              :class="[
+                isOnDeckB
+                  ? 'bg-orange-500 text-white cursor-pointer'
+                  : hasAnalysis
+                    ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 cursor-pointer'
+                    : 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
+              ]"
+              :disabled="!hasAnalysis"
+              @click.stop="handleDeckClick('B')"
+            >
+              B
+            </button>
+          </div>
+        </div>
+
+        <!-- Tags row -->
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <!-- Genre tag -->
+          <span
+            v-if="track.genre"
+            class="rounded-md bg-neutral-800 px-2 py-0.5 text-xs text-neutral-400"
+          >
+            {{ track.genre }}
+          </span>
+
+          <!-- Analysis tags -->
+          <template v-if="hasAnalysis">
+            <span
+              v-if="track.bpm_detected"
+              class="rounded-md bg-violet-500/20 px-2 py-0.5 text-xs font-medium text-violet-400"
+            >
+              {{ Math.round(track.bpm_detected) }} BPM
+            </span>
             <span
               v-if="track.key_detected"
-              class="rounded px-1 py-0.5 text-[9px] font-semibold"
+              class="rounded-md px-2 py-0.5 text-xs font-medium"
               :style="{
                 backgroundColor: `${getKeyColor(track.key_detected)}20`,
                 color: getKeyColor(track.key_detected)
@@ -222,125 +271,93 @@ onMounted(() => {
             >
               {{ formatKey(track.key_detected) }}
             </span>
+          </template>
+
+          <!-- Analyzing indicator -->
+          <span v-else-if="isAnalyzing" class="flex items-center gap-1 text-xs text-neutral-500">
+            <UIcon name="i-heroicons-arrow-path" class="h-3 w-3 animate-spin" />
+          </span>
+
+          <!-- Spacer -->
+          <div class="flex-1" />
+
+          <!-- Action buttons -->
+          <div class="flex items-center gap-1.5" @click.stop>
+            <!-- Details -->
             <button
+              v-if="hasAnalysis"
               type="button"
-              class="cursor-pointer text-violet-400 hover:text-violet-300"
+              class="cursor-pointer rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-white/10 hover:text-white"
               @click.stop="showDetails = true"
             >
-              {{ t.analysisDetails }}
+              <UIcon name="i-heroicons-chart-bar" class="h-4 w-4" />
             </button>
+
+            <!-- Similar -->
             <button
+              v-if="hasAnalysis"
               type="button"
-              class="cursor-pointer text-cyan-400 hover:text-cyan-300"
+              class="cursor-pointer rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-white/10 hover:text-cyan-400"
               @click.stop="showSimilar = true"
             >
-              ≈
+              <UIcon name="i-heroicons-squares-2x2" class="h-4 w-4" />
             </button>
-          </template>
+
+            <!-- Download / Link -->
+            <a
+              v-if="isDirectDownload"
+              :href="getDownloadUrl()!"
+              class="flex h-7 items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 text-xs font-medium text-white transition-colors hover:bg-emerald-500"
+              @click.stop
+            >
+              <UIcon name="i-heroicons-arrow-down-tray" class="h-4 w-4" />
+              <span>{{ t.download }}</span>
+            </a>
+            <a
+              v-else-if="isFreeDownload"
+              :href="getDownloadUrl() || track.permalink_url"
+              target="_blank"
+              rel="noopener"
+              class="flex h-7 items-center gap-1.5 rounded-md bg-emerald-600/80 px-2.5 text-xs font-medium text-white transition-colors hover:bg-emerald-500"
+              @click.stop
+            >
+              <UIcon name="i-heroicons-arrow-top-right-on-square" class="h-4 w-4" />
+              <span>{{ t.freeLink }}</span>
+            </a>
+            <a
+              v-else-if="track.purchase_url"
+              :href="track.purchase_url"
+              target="_blank"
+              rel="noopener"
+              class="flex h-7 items-center gap-1.5 rounded-md border border-orange-500/50 px-2.5 text-xs font-medium text-orange-400 transition-colors hover:bg-orange-500/10"
+              @click.stop
+            >
+              <UIcon name="i-heroicons-shopping-cart" class="h-4 w-4" />
+              <span>{{ t.buy }}</span>
+            </a>
+            <a
+              v-else-if="config.public.isDev"
+              :href="mp3DownloadUrl"
+              target="_blank"
+              rel="noopener"
+              class="flex h-7 items-center gap-1.5 rounded-md border border-violet-500/50 px-2.5 text-xs font-medium text-violet-400 transition-colors hover:bg-violet-500/10"
+              @click.stop
+            >
+              <UIcon name="i-heroicons-arrow-down-tray" class="h-4 w-4" />
+              <span>MP3</span>
+            </a>
+            <a
+              v-else
+              :href="track.permalink_url"
+              target="_blank"
+              rel="noopener"
+              class="rounded-md p-1.5 text-neutral-500 transition-colors hover:bg-white/10 hover:text-orange-400"
+              @click.stop
+            >
+              <UIcon name="i-simple-icons-soundcloud" class="h-4 w-4" />
+            </a>
+          </div>
         </div>
-      </div>
-    </div>
-
-    <!-- Action buttons -->
-    <div class="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1.5" @click.stop>
-      <!-- Free Direct Download -->
-      <a
-        v-if="isDirectDownload"
-        :href="getDownloadUrl()!"
-        class="flex h-7 items-center gap-1 rounded-full bg-emerald-600 px-2.5 text-xs font-medium text-white transition-colors hover:bg-emerald-500"
-        @click.stop
-      >
-        <UIcon name="i-heroicons-arrow-down-tray" class="h-3.5 w-3.5" />
-        <span class="hidden sm:inline">{{ t.download }}</span>
-      </a>
-
-      <!-- Free External Link -->
-      <a
-        v-else-if="isFreeDownload"
-        :href="getDownloadUrl() || track.permalink_url"
-        target="_blank"
-        rel="noopener"
-        class="flex h-7 items-center gap-1 rounded-full bg-emerald-600/80 px-2.5 text-xs font-medium text-white transition-colors hover:bg-emerald-500"
-        @click.stop
-      >
-        <UIcon name="i-heroicons-arrow-top-right-on-square" class="h-3.5 w-3.5" />
-        <span class="hidden sm:inline">{{ t.freeLink }}</span>
-      </a>
-
-      <!-- Buy button -->
-      <a
-        v-else-if="track.purchase_url"
-        :href="track.purchase_url"
-        target="_blank"
-        rel="noopener"
-        class="flex h-7 items-center gap-1 rounded-full border border-orange-500/40 px-2.5 text-xs font-medium text-orange-400 transition-colors hover:bg-orange-500/10"
-        @click.stop
-      >
-        <UIcon name="i-heroicons-shopping-cart" class="h-3.5 w-3.5" />
-        <span class="hidden sm:inline">{{ t.buy }}</span>
-      </a>
-
-      <!-- MP3 Download (dev only) -->
-      <a
-        v-else-if="config.public.isDev"
-        :href="mp3DownloadUrl"
-        target="_blank"
-        rel="noopener"
-        class="flex h-7 items-center gap-1 rounded-full border border-violet-500/40 px-2.5 text-xs font-medium text-violet-400 transition-colors hover:bg-violet-500/10"
-        @click.stop
-      >
-        <UIcon name="i-heroicons-arrow-down-tray" class="h-3.5 w-3.5" />
-        <span class="hidden sm:inline">MP3</span>
-      </a>
-
-      <!-- SoundCloud link -->
-      <a
-        v-else
-        :href="track.permalink_url"
-        target="_blank"
-        rel="noopener"
-        class="flex h-7 w-7 items-center justify-center rounded-full text-neutral-500 transition-colors hover:text-orange-400"
-        @click.stop
-      >
-        <UIcon name="i-simple-icons-soundcloud" class="h-4 w-4" />
-      </a>
-
-      <!-- DJ Deck buttons -->
-      <div class="flex items-center gap-1">
-        <UTooltip :text="hasAnalysis ? (isOnDeckA ? t.djEjectFromA : t.djLoadToA) : t.djTrackNotAnalyzed">
-          <button
-            type="button"
-            class="rounded px-1.5 py-0.5 text-[10px] font-bold transition-colors"
-            :class="[
-              isOnDeckA
-                ? 'bg-cyan-500 text-white cursor-pointer'
-                : hasAnalysis
-                  ? 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 cursor-pointer'
-                  : 'bg-neutral-700/30 text-neutral-500 cursor-not-allowed'
-            ]"
-            :disabled="!hasAnalysis"
-            @click.stop="handleDeckClick('A')"
-          >
-            A
-          </button>
-        </UTooltip>
-        <UTooltip :text="hasAnalysis ? (isOnDeckB ? t.djEjectFromB : t.djLoadToB) : t.djTrackNotAnalyzed">
-          <button
-            type="button"
-            class="rounded px-1.5 py-0.5 text-[10px] font-bold transition-colors"
-            :class="[
-              isOnDeckB
-                ? 'bg-orange-500 text-white cursor-pointer'
-                : hasAnalysis
-                  ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 cursor-pointer'
-                  : 'bg-neutral-700/30 text-neutral-500 cursor-not-allowed'
-            ]"
-            :disabled="!hasAnalysis"
-            @click.stop="handleDeckClick('B')"
-          >
-            B
-          </button>
-        </UTooltip>
       </div>
     </div>
 

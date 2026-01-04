@@ -11,7 +11,14 @@ RUN apt-get update && apt-get install -y \
     libsamplerate0-dev \
     libtag1-dev \
     libchromaprint-dev \
+    curl \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Deno for yt-dlp YouTube support (lighter than Node.js)
+RUN curl -fsSL https://deno.land/install.sh | sh
+ENV DENO_INSTALL="/root/.deno"
+ENV PATH="$DENO_INSTALL/bin:$PATH"
 
 WORKDIR /app
 

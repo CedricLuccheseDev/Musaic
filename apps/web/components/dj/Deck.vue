@@ -17,7 +17,8 @@ const {
   toggleBass,
   setMaster,
   ejectDeck,
-  formatTime
+  formatTime,
+  seek
 } = useDjPlayer()
 const { formatKey, getKeyColor } = useKeyNotation()
 
@@ -38,6 +39,10 @@ const displayBpm = computed(() => {
   return { original: Math.round(originalBpm), synced: null }
 })
 
+/* --- Methods --- */
+function handleSeek(time: number) {
+  seek(props.deck, time)
+}
 </script>
 
 <template>
@@ -156,6 +161,16 @@ const displayBpm = computed(() => {
           </button>
         </div>
       </div>
+
+      <!-- Waveform Overview -->
+      <DjWaveformOverview
+        :track="deckState.track"
+        :current-time="deckState.currentTime"
+        :duration="deckState.duration"
+        :waveform-data="deckState.waveformData"
+        :deck="deck"
+        @seek="handleSeek"
+      />
     </template>
   </div>
 </template>

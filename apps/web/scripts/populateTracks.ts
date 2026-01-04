@@ -19,6 +19,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { searchTracks } from '../server/services/soundcloud'
 import { type TrackEntry, DownloadStatus, trackEntryToDbTrack } from '../types'
+import { containsRejectKeyword, isValidDuration } from '../server/config/qualityRules'
 import * as dotenv from 'dotenv'
 
 dotenv.config()
@@ -52,21 +53,23 @@ interface PopulateConfig {
 // ============================================================================
 
 function shouldIncludeTrack(track: TrackEntry, config: PopulateConfig): boolean {
-  const maxDuration = config.maxDuration || 5 * 60 * 1000 // 5 min default
-  const minDuration = config.minDuration || 60 * 1000 // 1 min default
-
-  // Duration check
-  if (track.duration > maxDuration || track.duration < minDuration) {
-    return false
+  // Duration check - use config values or shared defaults
+  if (config.maxDuration || config.minDuration) {
+    const maxDuration = config.maxDuration || 5 * 60 * 1000
+    const minDuration = config.minDuration || 60 * 1000
+    if (track.duration > maxDuration || track.duration < minDuration) {
+      return false
+    }
+  } else {
+    // Use shared quality rules (2-7 min)
+    if (!isValidDuration(track.duration)) {
+      return false
+    }
   }
 
-  // Exclude mixes/sets
+  // Exclude mixes/sets using shared reject keywords
   if (config.excludeMixes !== false) {
-    const titleLower = track.title.toLowerCase()
-    if (titleLower.includes(' mix') ||
-        titleLower.includes(' set') ||
-        titleLower.includes('live at') ||
-        titleLower.includes('dj set')) {
+    if (containsRejectKeyword(track.title)) {
       return false
     }
   }
