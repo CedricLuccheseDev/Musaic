@@ -582,12 +582,28 @@ def _extract_bpm_tempocnn(audio: np.ndarray) -> tuple[float, float]:
         return 0.0, 0.0
 
 
+def _compute_bass_energy(segment: np.ndarray) -> float:
+    """
+    Compute energy in bass frequencies (< 150 Hz).
+
+    Used to identify downbeats which typically have more kick/bass energy.
+    """
+    try:
+        if len(segment) < 100:
+            return 0.0
+        lowpass = es.LowPass(cutoffFrequency=150)
+        bass = lowpass(segment)
+        return float(es.Energy()(bass))
+    except Exception:
+        return 0.0
+
+
 def _extract_beat_offset_from_drop(full_audio: np.ndarray, highlight_time: float, bpm: float) -> float | None:
     """
-    Extract beat offset using BeatTrackerMultiFeature starting from the drop/highlight.
+    Extract beat offset using improved downbeat detection.
 
-    This is more accurate than RhythmExtractor2013 for beat positions.
-    Analyzes the audio starting from the drop to find the first strong beat.
+    Uses bass energy analysis to identify the downbeat (beat 1) which typically
+    has more kick/bass energy than other beats in 4/4 time.
 
     Args:
         full_audio: Full track audio samples
@@ -598,58 +614,66 @@ def _extract_beat_offset_from_drop(full_audio: np.ndarray, highlight_time: float
         Beat offset in seconds (phase relative to track start), or None if detection failed
     """
     try:
-        # Extract segment starting a bit before the drop (to catch the first beat)
-        # and lasting about 10 seconds (enough for stable beat detection)
-        drop_start = max(0, highlight_time - 1.0)  # 1 second before drop
-        drop_end = min(len(full_audio) / SAMPLE_RATE, highlight_time + 10.0)
+        # Extract segment: 1s before drop to 20s after (longer for stability)
+        drop_start = max(0, highlight_time - 1.0)
+        drop_end = min(len(full_audio) / SAMPLE_RATE, highlight_time + 20.0)
 
         start_sample = int(drop_start * SAMPLE_RATE)
         end_sample = int(drop_end * SAMPLE_RATE)
         drop_segment = full_audio[start_sample:end_sample]
 
-        if len(drop_segment) < SAMPLE_RATE * 2:  # Need at least 2 seconds
+        if len(drop_segment) < SAMPLE_RATE * 4:  # Need at least 4 seconds
             return None
 
-        # BeatTrackerMultiFeature combines multiple onset detection methods
+        # Detect beats using BeatTrackerMultiFeature
         beat_tracker = es.BeatTrackerMultiFeature()
-        beats, confidence = beat_tracker(drop_segment)
+        beats, _ = beat_tracker(drop_segment)
 
-        if len(beats) < 4:
+        if len(beats) < 8:
             return None
 
-        # Convert beat times to full track time
-        beats_absolute = beats + drop_start
-
-        # Validate beats against expected BPM
         beat_interval = 60.0 / bpm
-        intervals = np.diff(beats)
 
-        # Find first stable beat pair (consecutive beats matching expected BPM within 10%)
-        tolerance = beat_interval * 0.10
-        stable_beat_idx = None
+        # Analyze bass energy on each beat to find the downbeat
+        bass_energies = []
+        window_samples = int(0.03 * SAMPLE_RATE)  # 30ms window around beat
 
-        for i, interval in enumerate(intervals[:20]):  # Check first 20 intervals
-            if abs(interval - beat_interval) < tolerance:
-                # Check next interval too for stability
-                if i + 1 < len(intervals) and abs(intervals[i + 1] - beat_interval) < tolerance:
-                    stable_beat_idx = i
-                    break
+        for beat_time in beats[:32]:  # Analyze first 32 beats (8 bars)
+            start = int(beat_time * SAMPLE_RATE) - window_samples
+            end = int(beat_time * SAMPLE_RATE) + window_samples
+            if start >= 0 and end < len(drop_segment):
+                segment = drop_segment[start:end]
+                bass_energy = _compute_bass_energy(segment)
+                bass_energies.append((beat_time, bass_energy))
 
-        if stable_beat_idx is not None:
-            first_stable_beat = float(beats_absolute[stable_beat_idx])
-            beat_offset = first_stable_beat % beat_interval
-            return round(beat_offset, 3)
+        if len(bass_energies) < 8:
+            # Fallback: use first beat if not enough data
+            return round((float(beats[0]) + drop_start) % beat_interval, 3)
 
-        # Fallback: find the first beat at or after the highlight time
-        for beat in beats_absolute:
-            if beat >= highlight_time - 0.1:  # Allow 100ms before
-                beat_offset = float(beat) % beat_interval
-                return round(beat_offset, 3)
+        # Group beats by position in measure (0, 1, 2, 3) and find average energy
+        position_energies: list[list[float]] = [[] for _ in range(4)]
+        for i, (_, energy) in enumerate(bass_energies):
+            position_energies[i % 4].append(energy)
 
-        # Last fallback: use first detected beat
-        first_beat = float(beats_absolute[0])
-        beat_offset = first_beat % beat_interval
-        return round(beat_offset, 3)
+        avg_energies = [np.mean(e) if e else 0.0 for e in position_energies]
+
+        # Check if energy distribution is meaningful (not uniform)
+        max_energy = max(avg_energies)
+        min_energy = min(avg_energies)
+        if max_energy > 0 and (max_energy - min_energy) / max_energy > 0.1:
+            # Downbeat is the position with highest average bass energy
+            downbeat_position = int(np.argmax(avg_energies))
+        else:
+            # Energy is uniform, use first stable beat as fallback
+            downbeat_position = 0
+
+        # Calculate offset based on the downbeat
+        if downbeat_position < len(bass_energies):
+            first_downbeat = float(bass_energies[downbeat_position][0]) + drop_start
+            return round(first_downbeat % beat_interval, 3)
+
+        # Fallback: use first detected beat
+        return round((float(beats[0]) + drop_start) % beat_interval, 3)
 
     except Exception:
         return None
