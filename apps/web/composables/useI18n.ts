@@ -23,6 +23,14 @@ const translations = {
     noResults: 'Aucun résultat pour',
     noFilterResults: 'Aucun résultat avec ce filtre',
     endOfResults: 'Fin des résultats',
+    noArtistDetected: 'Aucun artiste correspondant trouvé',
+    artistMatchFuzzy: 'Correspondance approximative',
+
+    // Download Section
+    downloadSection: 'Téléchargements disponibles',
+    downloadZip: 'Télécharger en ZIP',
+    downloading: 'Téléchargement',
+    externalLinks: 'Liens externes gratuits',
 
     // Filters
     all: 'Tous',
@@ -230,6 +238,14 @@ const translations = {
     noResults: 'No results for',
     noFilterResults: 'No results with this filter',
     endOfResults: 'End of results',
+    noArtistDetected: 'No matching artist found',
+    artistMatchFuzzy: 'Fuzzy match',
+
+    // Download Section
+    downloadSection: 'Available downloads',
+    downloadZip: 'Download as ZIP',
+    downloading: 'Downloading',
+    externalLinks: 'External free links',
 
     // Filters
     all: 'All',

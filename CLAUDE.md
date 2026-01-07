@@ -131,3 +131,20 @@ cd apps/web && npx tsx scripts/cleanupLowQualityTracks.ts -y
 
 This removes tracks with quality score < 40 (mixes, too short/long, low engagement).
 Use `-y` or `--force` to skip confirmation prompt.
+
+## Beat Grid Reanalysis
+
+When user says "réanalyse les beatgrids", "recalcule les beat offset", "fix beatgrid" or similar:
+
+### All tracks
+```bash
+curl -X POST http://localhost:9000/analyze/batch/beat-offset
+```
+
+### Specific track (by soundcloud_id)
+```bash
+curl -X POST "http://localhost:9000/analyze/batch/beat-offset?soundcloud_id=<ID>"
+```
+
+This reanalyzes only the beat_offset using the existing BPM. Useful after algorithm improvements.
+The analyzer must be running (`docker-compose up analyzer` or local uvicorn).

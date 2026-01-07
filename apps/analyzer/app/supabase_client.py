@@ -57,7 +57,7 @@ async def update_track_analysis(
         # Rhythm
         bpm_detected=analysis_result["bpm_detected"],
         bpm_confidence=analysis_result["bpm_confidence"],
-        beat_grid=analysis_result.get("beat_grid"),
+        beat_offset=analysis_result.get("beat_offset"),
         # Tonal
         key_detected=analysis_result["key_detected"],
         key_confidence=analysis_result["key_confidence"],
@@ -111,3 +111,20 @@ async def get_track_by_soundcloud_id(soundcloud_id: int) -> dict | None:
     except Exception as e:
         logger.error(f"Failed to get track {soundcloud_id}: {e}")
         return None
+
+
+async def update_track_beat_offset(
+    soundcloud_id: int,
+    beat_offset: float,
+) -> None:
+    """Update only the beat_offset for a track in Supabase."""
+    client = get_supabase_client()
+
+    try:
+        client.table("tracks").update(
+            {"beat_offset": beat_offset}
+        ).eq("soundcloud_id", soundcloud_id).execute()
+        logger.info(f"Updated track {soundcloud_id} beat_offset to {beat_offset}")
+    except Exception as e:
+        logger.error(f"Failed to update track {soundcloud_id} beat_offset: {e}")
+        raise

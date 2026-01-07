@@ -15,6 +15,20 @@ function escapeSqlString(str: string): string {
   return str.replace(/'/g, "''").replace(/\\/g, '\\\\')
 }
 
+// Keywords that indicate user wants to download tracks
+const DOWNLOAD_KEYWORDS = [
+  'télécharger', 'telecharger', 'download', 'dl',
+  'gratuit', 'gratos', 'free',
+  'zip', 'pack',
+  'free download', 'free dl', 'freedl'
+]
+
+// Detect if user wants to download tracks
+function detectDownloadIntent(query: string): boolean {
+  const lower = query.toLowerCase()
+  return DOWNLOAD_KEYWORDS.some(keyword => lower.includes(keyword))
+}
+
 // System prompt for SQL + response generation in one call
 const SYSTEM_PROMPT = `SQL and response generator for music search. Output JSON only.
 
@@ -158,6 +172,7 @@ export interface AiQueryResult {
   phrase: string
   soundcloudQuery: string
   soundcloudFilters?: SoundcloudFilters
+  wantsDownload?: boolean
 }
 
 // Internal function to call the AI API
@@ -226,13 +241,15 @@ function createFallbackQuery(question: string): AiQueryResult {
 
 // Main function with retry and validation
 export async function generateSqlAndPhrase(question: string, retries = 1): Promise<AiQueryResult> {
+  const wantsDownload = detectDownloadIntent(question)
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const result = await callAiApi(question)
 
       // Validate SQL structure
       if (validateSql(result.sql)) {
-        return result
+        return { ...result, wantsDownload }
       }
 
       // Invalid SQL, retry if attempts left
@@ -251,5 +268,5 @@ export async function generateSqlAndPhrase(question: string, retries = 1): Promi
 
   // All retries failed, return fallback
   logger.ai.error('All retries failed, using fallback query')
-  return createFallbackQuery(question)
+  return { ...createFallbackQuery(question), wantsDownload }
 }

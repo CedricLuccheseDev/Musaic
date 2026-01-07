@@ -650,12 +650,21 @@ def _extract_beat_offset_from_drop(full_audio: np.ndarray, highlight_time: float
             # Fallback: use first beat if not enough data
             return round((float(beats[0]) + drop_start) % beat_interval, 3)
 
-        # Group beats by position in measure (0, 1, 2, 3) and find average energy
-        position_energies: list[list[float]] = [[] for _ in range(4)]
-        for i, (_, energy) in enumerate(bass_energies):
-            position_energies[i % 4].append(energy)
+        # Group beats by their TEMPORAL position in measure (0, 1, 2, 3)
+        # Use the first beat as reference point for calculating positions
+        first_beat_time = bass_energies[0][0]
+        position_energies: list[list[tuple[float, float]]] = [[] for _ in range(4)]
 
-        avg_energies = [np.mean(e) if e else 0.0 for e in position_energies]
+        for beat_time, energy in bass_energies:
+            # Calculate which beat position (0-3) this beat occupies
+            beats_from_first = (beat_time - first_beat_time) / beat_interval
+            position = round(beats_from_first) % 4
+            position_energies[position].append((beat_time, energy))
+
+        avg_energies = [
+            np.mean([e for _, e in beats]) if beats else 0.0
+            for beats in position_energies
+        ]
 
         # Check if energy distribution is meaningful (not uniform)
         max_energy = max(avg_energies)
@@ -664,12 +673,13 @@ def _extract_beat_offset_from_drop(full_audio: np.ndarray, highlight_time: float
             # Downbeat is the position with highest average bass energy
             downbeat_position = int(np.argmax(avg_energies))
         else:
-            # Energy is uniform, use first stable beat as fallback
+            # Energy is uniform, use position 0 as fallback
             downbeat_position = 0
 
-        # Calculate offset based on the downbeat
-        if downbeat_position < len(bass_energies):
-            first_downbeat = float(bass_energies[downbeat_position][0]) + drop_start
+        # Find the first beat that is at the downbeat position
+        if position_energies[downbeat_position]:
+            first_downbeat_time = position_energies[downbeat_position][0][0]
+            first_downbeat = first_downbeat_time + drop_start
             return round(first_downbeat % beat_interval, 3)
 
         # Fallback: use first detected beat
@@ -792,6 +802,10 @@ def _extract_rhythm(
     scored.sort(key=lambda x: x[1], reverse=True)
     best_bpm, best_score, _ = scored[0]
 
+    # Round BPM to nearest integer - music BPM is always whole numbers
+    # This prevents micro-drifts in beatgrid calculations
+    best_bpm = round(best_bpm)
+
     final_confidence = min(1.0, best_score / 3.0)
 
     # Use BeatTrackerMultiFeature for more accurate beat offset detection at the drop
@@ -809,8 +823,61 @@ def _extract_rhythm(
         beat_interval = 60.0 / best_bpm
         beat_offset = round(first_beat % beat_interval, 3)
 
-    return round(best_bpm, 1), round(final_confidence, 3), len(beats), beat_offset
+    return float(best_bpm), round(final_confidence, 3), len(beats), beat_offset
 
+
+# =============================================================================
+# BEAT OFFSET REANALYSIS (lightweight)
+# =============================================================================
+
+def reanalyze_beat_offset_from_bytes(
+    audio_bytes: bytes,
+    bpm: float,
+    highlight_time: float | None = None
+) -> float | None:
+    """
+    Reanalyze only the beat offset from audio bytes.
+
+    This is a lightweight function that only recalculates the beat_offset
+    using the existing BPM value. Useful for batch reanalysis after
+    algorithm improvements.
+
+    Args:
+        audio_bytes: Raw audio data (MP3, WAV, etc.)
+        bpm: Existing BPM value from the database
+        highlight_time: Existing highlight_time, or None to recalculate
+
+    Returns:
+        New beat_offset value, or None if detection failed
+    """
+    try:
+        full_audio = _load_audio_from_bytes(audio_bytes)
+
+        if len(full_audio) == 0:
+            return None
+
+        # Round BPM to nearest integer for consistent calculations
+        bpm = round(bpm)
+
+        # Use existing highlight_time or find it
+        if highlight_time is None or highlight_time <= 0:
+            settings = get_settings()
+            _, highlight_time = _find_highlight_and_extract(
+                full_audio,
+                settings.audio_duration_seconds
+            )
+
+        # Calculate beat_offset using the improved algorithm
+        beat_offset = _extract_beat_offset_from_drop(full_audio, highlight_time, bpm)
+
+        # Fallback: try from the beginning if drop detection failed
+        if beat_offset is None:
+            beat_offset = _extract_beat_offset_from_drop(full_audio, 0.0, bpm)
+
+        return beat_offset
+
+    except Exception:
+        return None
 
 
 # =============================================================================
