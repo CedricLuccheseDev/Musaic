@@ -5,6 +5,11 @@ import type {
   SoundcloudInstance,
   SoundcloudConstructor
 } from '~/types/soundcloud'
+import {
+  findBestMatchingUser,
+  calculateMatchScore,
+  type MatchResult
+} from '~/server/utils/stringMatch'
 
 // ============================================================================
 // Constants
@@ -224,6 +229,13 @@ function mapToTrackEntry(track: SoundcloudTrack): TrackEntry {
 // Public API
 // ============================================================================
 
+export interface ArtistMatchInfo {
+  type: MatchResult['type']
+  score: number
+  originalQuery: string
+  matchedUsername: string
+}
+
 export interface ArtistInfo {
   id: number
   username: string
@@ -232,6 +244,7 @@ export interface ArtistInfo {
   track_count: number
   permalink_url: string
   tracks: TrackEntry[]
+  match?: ArtistMatchInfo
 }
 
 export interface SearchResult {
@@ -239,6 +252,8 @@ export interface SearchResult {
   artist?: ArtistInfo
   hasMore?: boolean
   nextOffset?: number
+  artistSearchAttempted?: boolean
+  artistSearchFailed?: boolean
 }
 
 export async function searchTracks(query: string, limit = SEARCH_LIMIT): Promise<TrackEntry[]> {
@@ -247,6 +262,17 @@ export async function searchTracks(query: string, limit = SEARCH_LIMIT): Promise
   const tracks = response.collection || []
 
   return tracks.map(mapToTrackEntry)
+}
+
+export async function getTrackById(soundcloudId: number): Promise<TrackEntry | null> {
+  const soundcloud = createSoundcloudClient()
+  try {
+    const track = await soundcloud.tracks.get(soundcloudId)
+    if (!track) return null
+    return mapToTrackEntry(track)
+  } catch {
+    return null
+  }
 }
 
 export interface SearchFilters {
@@ -288,46 +314,84 @@ export async function searchWithArtistDetection(
   const hasMore = !!tracksResponse.next_href
   const nextOffset = hasMore ? offset + limit : undefined
 
-  // Handle users search result
+  // Handle users search result - only attempt artist detection on first page
+  if (offset !== 0) {
+    return { tracks, hasMore, nextOffset, artistSearchAttempted: false }
+  }
+
   const usersResponse = usersResult.status === 'fulfilled' ? usersResult.value : { collection: [] }
   const users = usersResponse.collection || []
 
-  // Normalize strings for comparison (remove spaces, lowercase)
-  const normalizeForMatch = (s: string) => s.toLowerCase().replace(/\s+/g, '')
-  const queryNorm = normalizeForMatch(query)
-
-  // Find matching artist (exact match or normalized match)
-  const matchingUser = users.find(user => {
-    const usernameNorm = normalizeForMatch(user.username)
-    return usernameNorm === queryNorm || user.username.toLowerCase() === query.toLowerCase()
-  })
-
-  if (matchingUser) {
-    try {
-      // Found matching artist, get their tracks
-      const artistTracks = await soundcloud.users.tracks(matchingUser.id)
-      const mappedArtistTracks = (artistTracks || []).slice(0, ARTIST_TRACKS_LIMIT).map(mapToTrackEntry)
-
-      if (mappedArtistTracks.length > 0) {
-        return {
-          tracks,
-          artist: {
-            id: matchingUser.id,
-            username: matchingUser.username,
-            avatar_url: matchingUser.avatar_url,
-            followers_count: matchingUser.followers_count,
-            track_count: matchingUser.track_count,
-            permalink_url: matchingUser.permalink_url,
-            tracks: mappedArtistTracks
-          },
-          hasMore,
-          nextOffset
-        }
-      }
-    } catch {
-      // Artist tracks fetch failed (404 is common), continue without artist section
+  if (users.length === 0) {
+    return {
+      tracks,
+      hasMore,
+      nextOffset,
+      artistSearchAttempted: true,
+      artistSearchFailed: usersResult.status === 'rejected'
     }
   }
 
-  return { tracks, hasMore, nextOffset }
+  // Find best matching user using improved matching algorithm
+  const bestMatch = findBestMatchingUser(query, users, 50) // Minimum score of 50
+
+  if (!bestMatch) {
+    // Log for debugging - no user met the threshold
+    console.log(
+      `[SoundCloud] No matching artist found for "${query}". Top candidates:`,
+      users
+        .slice(0, 3)
+        .map(u => ({ username: u.username, score: calculateMatchScore(query, u.username) }))
+    )
+    return { tracks, hasMore, nextOffset, artistSearchAttempted: true }
+  }
+
+  const { user: matchingUser, match: matchInfo } = bestMatch
+
+  // Log the match for debugging
+  console.log(
+    `[SoundCloud] Artist match for "${query}": "${matchingUser.username}" (${matchInfo.type}, score: ${matchInfo.score})`
+  )
+
+  try {
+    // Found matching artist, get their tracks
+    const artistTracks = await soundcloud.users.tracks(matchingUser.id)
+    const mappedArtistTracks = (artistTracks || []).slice(0, ARTIST_TRACKS_LIMIT).map(mapToTrackEntry)
+
+    if (mappedArtistTracks.length > 0) {
+      return {
+        tracks,
+        artist: {
+          id: matchingUser.id,
+          username: matchingUser.username,
+          avatar_url: matchingUser.avatar_url,
+          followers_count: matchingUser.followers_count,
+          track_count: matchingUser.track_count,
+          permalink_url: matchingUser.permalink_url,
+          tracks: mappedArtistTracks,
+          match: {
+            type: matchInfo.type,
+            score: matchInfo.score,
+            originalQuery: query,
+            matchedUsername: matchingUser.username
+          }
+        },
+        hasMore,
+        nextOffset,
+        artistSearchAttempted: true
+      }
+    }
+  } catch (err) {
+    // Artist tracks fetch failed (404 is common)
+    console.error(`[SoundCloud] Failed to fetch tracks for artist "${matchingUser.username}":`, err)
+    return {
+      tracks,
+      hasMore,
+      nextOffset,
+      artistSearchAttempted: true,
+      artistSearchFailed: true
+    }
+  }
+
+  return { tracks, hasMore, nextOffset, artistSearchAttempted: true }
 }

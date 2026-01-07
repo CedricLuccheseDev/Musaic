@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { TrackEntry } from '~/types'
+import JSZip from 'jszip'
+import { DownloadStatus, type TrackEntry } from '~/types'
 
 /* --- Props --- */
 const props = defineProps<{
@@ -7,14 +8,30 @@ const props = defineProps<{
   results: TrackEntry[]
   sql?: string
   response: string
+  wantsDownload?: boolean
 }>()
 
 /* --- States --- */
 const { t } = useI18n()
 const collapsed = ref(false)
 const artistCollapsed = ref<Record<string, boolean>>({})
+const isDownloading = ref(false)
+const downloadProgress = ref(0)
+const downloadedCount = ref(0)
 
 /* --- Computed --- */
+const directDownloadTracks = computed(() =>
+  props.results.filter(t => t.downloadStatus === DownloadStatus.FreeDirectLink)
+)
+
+const externalLinkTracks = computed(() =>
+  props.results.filter(t => t.downloadStatus === DownloadStatus.FreeExternalLink && t.purchase_url)
+)
+
+const hasDownloadableTracks = computed(() =>
+  directDownloadTracks.value.length > 0 || externalLinkTracks.value.length > 0
+)
+
 const resultsByArtist = computed(() => {
   const groups: Record<string, TrackEntry[]> = {}
   for (const track of props.results) {
@@ -36,6 +53,56 @@ function toggleArtist(artist: string) {
 
 function isArtistCollapsed(artist: string): boolean {
   return artistCollapsed.value[artist] ?? false
+}
+
+async function downloadAsZip() {
+  if (directDownloadTracks.value.length === 0) return
+
+  isDownloading.value = true
+  downloadProgress.value = 0
+  downloadedCount.value = 0
+
+  const zip = new JSZip()
+  const tracks = directDownloadTracks.value
+
+  for (let i = 0; i < tracks.length; i++) {
+    const track = tracks[i]
+    try {
+      const response = await $fetch<Blob>(`/api/download/${track.id}`, {
+        responseType: 'blob'
+      })
+
+      const filename = `${track.artist} - ${track.title}.mp3`
+        .replace(/[/\\?%*:|"<>]/g, '-')
+
+      zip.file(filename, response)
+      downloadedCount.value = i + 1
+      downloadProgress.value = Math.round(((i + 1) / tracks.length) * 100)
+    } catch (err) {
+      console.error(`Failed to download ${track.title}:`, err)
+    }
+  }
+
+  try {
+    const blob = await zip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    })
+
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `musaic-tracks-${Date.now()}.zip`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('Failed to generate ZIP:', err)
+  } finally {
+    isDownloading.value = false
+  }
 }
 </script>
 
@@ -92,6 +159,70 @@ function isArtistCollapsed(artist: string): boolean {
             <p class="flex-1 rounded-2xl rounded-tl-none bg-purple-500/10 px-4 py-2 text-sm text-purple-200">
               {{ props.response }}
             </p>
+          </div>
+
+          <!-- Download Section (when user wants to download) -->
+          <div v-if="wantsDownload && hasDownloadableTracks" class="mb-5 space-y-3">
+            <!-- ZIP Download Button -->
+            <button
+              v-if="directDownloadTracks.length > 0"
+              type="button"
+              :disabled="isDownloading"
+              class="flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border border-purple-500/30 bg-purple-500/10 p-4 transition-all hover:border-purple-400/50 hover:bg-purple-500/20 disabled:cursor-wait disabled:opacity-70"
+              @click="downloadAsZip"
+            >
+              <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/20">
+                  <UIcon
+                    :name="isDownloading ? 'i-heroicons-arrow-path' : 'i-heroicons-archive-box-arrow-down'"
+                    class="h-5 w-5 text-purple-400"
+                    :class="{ 'animate-spin': isDownloading }"
+                  />
+                </div>
+                <div class="text-left">
+                  <div class="font-medium text-white">{{ t.downloadZip }}</div>
+                  <div class="text-sm text-purple-300/70">{{ directDownloadTracks.length }} tracks MP3</div>
+                </div>
+              </div>
+              <div v-if="isDownloading" class="text-sm text-purple-300">
+                {{ downloadedCount }}/{{ directDownloadTracks.length }}
+              </div>
+              <UIcon v-else name="i-heroicons-arrow-down-tray" class="h-5 w-5 text-purple-400" />
+            </button>
+
+            <!-- Progress bar -->
+            <div v-if="isDownloading" class="h-1 overflow-hidden rounded-full bg-purple-900/50">
+              <div
+                class="h-full bg-purple-500 transition-all duration-300"
+                :style="{ width: `${downloadProgress}%` }"
+              />
+            </div>
+
+            <!-- External Links List -->
+            <div v-if="externalLinkTracks.length > 0" class="space-y-2">
+              <div class="text-xs font-medium uppercase tracking-wide text-purple-400/60">
+                {{ t.externalLinks }} ({{ externalLinkTracks.length }})
+              </div>
+              <div class="grid gap-2 sm:grid-cols-2">
+                <a
+                  v-for="track in externalLinkTracks"
+                  :key="track.id"
+                  :href="track.purchase_url!"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="flex cursor-pointer items-center gap-3 rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 transition-all hover:border-purple-400/40 hover:bg-purple-500/15"
+                >
+                  <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-purple-500/20">
+                    <UIcon name="i-heroicons-link" class="h-4 w-4 text-purple-400" />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="truncate text-sm font-medium text-white">{{ track.title }}</div>
+                    <div class="truncate text-xs text-purple-300/60">{{ track.artist }}</div>
+                  </div>
+                  <UIcon name="i-heroicons-arrow-top-right-on-square" class="h-4 w-4 shrink-0 text-purple-400/60" />
+                </a>
+              </div>
+            </div>
           </div>
 
           <!-- SQL Query preview -->

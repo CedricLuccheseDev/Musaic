@@ -1,4 +1,4 @@
-import { searchWithArtistDetection, type SearchResult } from '~/server/services/soundcloud'
+import { searchWithArtistDetection, getTrackById, type SearchResult } from '~/server/services/soundcloud'
 import { upsertTracks, enrichTracksWithAnalysis } from '~/server/services/trackStorage'
 import { generateSqlAndPhrase } from '~/server/services/aiQuery'
 import { createClient } from '@supabase/supabase-js'
@@ -8,6 +8,9 @@ import { logger } from '~/server/utils/logger'
 interface CascadeSearchResult extends SearchResult {
   source: 'database' | 'soundcloud'
   response?: string
+  artistSearchAttempted?: boolean
+  artistSearchFailed?: boolean
+  wantsDownload?: boolean
 }
 
 export default defineEventHandler(async (event): Promise<CascadeSearchResult> => {
@@ -21,6 +24,36 @@ export default defineEventHandler(async (event): Promise<CascadeSearchResult> =>
   }
 
   const offsetNum = typeof offset === 'string' ? parseInt(offset, 10) : 0
+
+  // Check for direct SoundCloud ID search (format: "id:123456")
+  const idMatch = q.match(/^id:(\d+)$/i)
+  if (idMatch) {
+    const soundcloudId = parseInt(idMatch[1], 10)
+    logger.sc.search(`id:${soundcloudId}`, 1)
+
+    const track = await getTrackById(soundcloudId)
+    if (!track) {
+      return {
+        source: 'soundcloud',
+        tracks: [],
+        hasMore: false
+      }
+    }
+
+    // Enrich with analysis data
+    const enrichedTracks = await enrichTracksWithAnalysis([track])
+
+    // Store in database
+    upsertTracks([track]).catch(err => {
+      logger.db.error(err instanceof Error ? err.message : 'Failed to store track')
+    })
+
+    return {
+      source: 'soundcloud',
+      tracks: enrichedTracks,
+      hasMore: false
+    }
+  }
 
   // For pagination (offset > 0), skip AI query and go directly to SoundCloud
   if (offsetNum > 0) {
@@ -48,7 +81,8 @@ export default defineEventHandler(async (event): Promise<CascadeSearchResult> =>
       source: 'database',
       tracks: dbResults,
       response: aiResult.phrase,
-      hasMore: false
+      hasMore: false,
+      wantsDownload: aiResult.wantsDownload
     }
   }
 
@@ -58,7 +92,8 @@ export default defineEventHandler(async (event): Promise<CascadeSearchResult> =>
     aiResult.soundcloudQuery,
     offsetNum,
     aiResult.soundcloudFilters,
-    aiResult.phrase
+    aiResult.phrase,
+    aiResult.wantsDownload
   )
 })
 
@@ -101,7 +136,8 @@ async function searchSoundCloud(
   query: string,
   offset: number,
   filters?: { genres?: string; bpm?: { from: number; to: number } },
-  aiPhrase?: string
+  aiPhrase?: string,
+  wantsDownload?: boolean
 ): Promise<CascadeSearchResult> {
   let result: SearchResult
   try {
@@ -134,6 +170,9 @@ async function searchSoundCloud(
     ...result,
     tracks: enrichedTracks,
     artist: result.artist ? { ...result.artist, tracks: enrichedArtistTracks } : undefined,
-    response: aiPhrase
+    response: aiPhrase,
+    artistSearchAttempted: result.artistSearchAttempted,
+    artistSearchFailed: result.artistSearchFailed,
+    wantsDownload
   }
 }

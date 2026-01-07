@@ -518,14 +518,19 @@ export function useDjPlayer() {
   function getBeatGrid(deckState: DeckState): number[] {
     // Generate beat grid from BPM and beat_offset
     if (deckState.track?.bpm_detected && deckState.duration > 0) {
-      const bpm = deckState.track.bpm_detected
+      // Round BPM to nearest integer - music BPM is always whole numbers
+      const bpm = Math.round(deckState.track.bpm_detected)
       const beatInterval = 60 / bpm
       const beats: number[] = []
 
       // Start from beat_offset (phase), default to 0 if not available
       const offset = deckState.track.beat_offset ?? 0
-      for (let t = offset; t < deckState.duration; t += beatInterval) {
-        beats.push(t)
+
+      // Calculate each beat position directly to avoid floating point accumulation
+      // Using multiplication instead of repeated addition prevents micro-drifts
+      const beatCount = Math.ceil((deckState.duration - offset) / beatInterval)
+      for (let i = 0; i < beatCount; i++) {
+        beats.push(offset + i * beatInterval)
       }
       return beats
     }

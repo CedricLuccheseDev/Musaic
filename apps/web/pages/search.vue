@@ -8,6 +8,9 @@ type FilterType = 'all' | 'free' | 'paid'
 interface CascadeSearchResult extends SearchResult {
   source: 'database' | 'soundcloud'
   response?: string
+  artistSearchAttempted?: boolean
+  artistSearchFailed?: boolean
+  wantsDownload?: boolean
 }
 
 /* --- Constants --- */
@@ -63,6 +66,9 @@ const isLoading = computed(() => status.value === 'pending')
 const resultSource = computed(() => searchResult.value?.source)
 const aiResponse = computed(() => searchResult.value?.response || '')
 const detectedArtist = computed(() => searchResult.value?.artist)
+const artistSearchAttempted = computed(() => searchResult.value?.artistSearchAttempted)
+const artistSearchFailed = computed(() => searchResult.value?.artistSearchFailed)
+const wantsDownload = computed(() => searchResult.value?.wantsDownload)
 const filteredTracks = computed(() => applyFilter(allTracks.value))
 const hasMore = computed(() => hasMoreFromApi.value && allTracks.value.length < MAX_RESULTS)
 
@@ -235,6 +241,7 @@ onUnmounted(() => {
           :loading="false"
           :results="filteredTracks"
           :response="aiResponse"
+          :wants-download="wantsDownload"
         />
 
         <!-- SoundCloud Results (source: soundcloud) -->
@@ -252,6 +259,8 @@ onUnmounted(() => {
             :is-loading-more="isLoadingMore"
             :initial-batch-size="initialBatchSize"
             :detected-artist="detectedArtist"
+            :artist-search-attempted="artistSearchAttempted"
+            :artist-search-failed="artistSearchFailed"
           />
         </template>
       </template>
