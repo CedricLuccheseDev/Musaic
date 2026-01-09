@@ -2,6 +2,14 @@ import type { TrackEntry } from '~/types'
 
 export type DeckId = 'A' | 'B'
 
+// Waveform sample with frequency band data for colored display
+export interface WaveformSample {
+  low: number // Bass (20-250Hz)
+  mid: number // Mids (250-4000Hz)
+  high: number // Highs (4000-20000Hz)
+  total: number // Overall amplitude
+}
+
 interface DeckState {
   track: TrackEntry | null
   isPlaying: boolean
@@ -9,8 +17,9 @@ interface DeckState {
   currentTime: number
   duration: number
   bassOn: boolean
-  playbackRate: number
-  waveformData: number[] | null
+  playbackRate: number // Tempo multiplier (for BPM sync display and visual scaling)
+  timeAdvanceRate: number // Actual rate at which currentTime advances (1.0 with SoundTouch, playbackRate without)
+  waveformData: WaveformSample[] | null
   beatOffsetCorrection: number // Correction to align beat grid with master deck
 }
 
@@ -32,6 +41,7 @@ const createDeckState = (): DeckState => ({
   duration: 0,
   bassOn: true,
   playbackRate: 1.0,
+  timeAdvanceRate: 1.0,
   waveformData: null,
   beatOffsetCorrection: 0
 })
@@ -52,6 +62,7 @@ interface DeckAudio {
   sourceNode: MediaElementAudioSourceNode
   gainNode: GainNode
   bassFilter: BiquadFilterNode
+  soundTouchNode: AudioWorkletNode | null
 }
 
 const audioNodes: { A: DeckAudio | null; B: DeckAudio | null } = {
@@ -60,9 +71,62 @@ const audioNodes: { A: DeckAudio | null; B: DeckAudio | null } = {
 }
 
 // Waveform generation settings
-const WAVEFORM_SAMPLES_PER_SECOND = 50 // 50 samples per second for smooth scrolling
+const WAVEFORM_SAMPLES_PER_SECOND = 100 // 100 samples per second for detailed waveform
 
-async function generateWaveformData(url: string): Promise<number[]> {
+// Waveform cache
+const waveformCache = new Map<number, WaveformSample[]>()
+
+// Yield to main thread to prevent audio glitches
+function yieldToMain(): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, 0))
+}
+
+// Simple IIR low-pass filter with periodic yielding
+async function applyLowPassAsync(samples: Float32Array, cutoff: number, sampleRate: number): Promise<Float32Array> {
+  const rc = 1 / (2 * Math.PI * cutoff)
+  const dt = 1 / sampleRate
+  const alpha = dt / (rc + dt)
+  const output = new Float32Array(samples.length)
+  output[0] = samples[0]
+
+  const chunkSize = 50000 // Process in chunks to yield periodically
+  for (let i = 1; i < samples.length; i++) {
+    output[i] = output[i - 1] + alpha * (samples[i] - output[i - 1])
+    if (i % chunkSize === 0) await yieldToMain()
+  }
+  return output
+}
+
+// Simple IIR high-pass filter with periodic yielding
+async function applyHighPassAsync(samples: Float32Array, cutoff: number, sampleRate: number): Promise<Float32Array> {
+  const rc = 1 / (2 * Math.PI * cutoff)
+  const dt = 1 / sampleRate
+  const alpha = rc / (rc + dt)
+  const output = new Float32Array(samples.length)
+  output[0] = samples[0]
+
+  const chunkSize = 50000
+  for (let i = 1; i < samples.length; i++) {
+    output[i] = alpha * (output[i - 1] + samples[i] - samples[i - 1])
+    if (i % chunkSize === 0) await yieldToMain()
+  }
+  return output
+}
+
+function computeRMS(samples: Float32Array, start: number, end: number): number {
+  let sum = 0
+  for (let i = start; i < end; i++) {
+    sum += samples[i] * samples[i]
+  }
+  return Math.sqrt(sum / (end - start))
+}
+
+async function generateWaveformData(url: string, trackId?: number): Promise<WaveformSample[]> {
+  // Check cache first
+  if (trackId && waveformCache.has(trackId)) {
+    return waveformCache.get(trackId)!
+  }
+
   try {
     const response = await fetch(url)
     const arrayBuffer = await response.arrayBuffer()
@@ -70,37 +134,68 @@ async function generateWaveformData(url: string): Promise<number[]> {
     const audioContext = new AudioContext()
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
 
+    const sampleRate = audioBuffer.sampleRate
     const channelData = audioBuffer.getChannelData(0)
     const duration = audioBuffer.duration
+
+    // Pre-filter with async versions that yield to main thread
+    const lowBand = await applyLowPassAsync(channelData, 250, sampleRate)
+    const highFiltered = await applyHighPassAsync(channelData, 250, sampleRate)
+    const midBand = await applyLowPassAsync(highFiltered, 4000, sampleRate)
+    const highBand = await applyHighPassAsync(channelData, 4000, sampleRate)
 
     const totalSamples = Math.ceil(duration * WAVEFORM_SAMPLES_PER_SECOND)
     const samplesPerChunk = Math.floor(channelData.length / totalSamples)
 
-    const waveform: number[] = []
+    const waveform: WaveformSample[] = []
 
     for (let i = 0; i < totalSamples; i++) {
       const start = i * samplesPerChunk
       const end = Math.min(start + samplesPerChunk, channelData.length)
 
-      // Calculate RMS (root mean square) for this chunk
-      let sum = 0
-      for (let j = start; j < end; j++) {
-        sum += channelData[j] * channelData[j]
-      }
-      const rms = Math.sqrt(sum / (end - start))
+      // RMS for each frequency band
+      const lowRMS = computeRMS(lowBand, start, end)
+      const midRMS = computeRMS(midBand, start, end)
+      const highRMS = computeRMS(highBand, start, end)
+      const totalRMS = computeRMS(channelData, start, end)
 
-      // Normalize to 0-1 range (typical RMS values are 0-0.5)
-      const normalized = Math.min(1, rms * 3)
-      waveform.push(normalized)
+      // Normalize to 0-1 with band-specific scaling
+      const total = Math.min(1, totalRMS * 3)
+      const low = Math.min(1, lowRMS * 4)
+      const mid = Math.min(1, midRMS * 4)
+      const high = Math.min(1, highRMS * 6) // Highs are usually quieter
+
+      waveform.push({ low, mid, high, total })
+
+      // Yield every 500 samples to prevent blocking
+      if (i % 500 === 0) await yieldToMain()
     }
 
     await audioContext.close()
+
+    // Cache the result
+    if (trackId) {
+      waveformCache.set(trackId, waveform)
+      // Limit cache size
+      if (waveformCache.size > 20) {
+        const firstKey = waveformCache.keys().next().value
+        if (firstKey !== undefined) waveformCache.delete(firstKey)
+      }
+    }
+
     return waveform
   }
   catch (error) {
     console.error('[DjPlayer] Waveform generation error:', error)
     return []
   }
+}
+
+// Preload a track's waveform into cache
+async function preloadWaveform(trackId: number): Promise<void> {
+  if (waveformCache.has(trackId)) return
+  const url = `/api/stream/${trackId}`
+  await generateWaveformData(url, trackId)
 }
 
 export function useDjPlayer() {
@@ -113,6 +208,24 @@ export function useDjPlayer() {
     if (!state.masterDeck) return 0
     const masterDeckState = getDeckState(state.masterDeck)
     return masterDeckState.track?.bpm_detected ?? 0
+  }
+
+  // Track which audio contexts have registered the worklet
+  const workletRegistered = new WeakSet<AudioContext>()
+
+  async function initSoundTouchWorklet(audioContext: AudioContext): Promise<AudioWorkletNode | null> {
+    try {
+      // Only register once per context
+      if (!workletRegistered.has(audioContext)) {
+        await audioContext.audioWorklet.addModule('/js/soundtouch-worklet.js')
+        workletRegistered.add(audioContext)
+      }
+      return new AudioWorkletNode(audioContext, 'soundtouch-processor')
+    }
+    catch (error) {
+      console.warn('[DjPlayer] AudioWorklet not supported, falling back to native playbackRate:', error)
+      return null
+    }
   }
 
   function initDeckAudio(deck: DeckId): DeckAudio {
@@ -131,6 +244,7 @@ export function useDjPlayer() {
     bassFilter.frequency.value = 200
     bassFilter.gain.value = 0
 
+    // Initial connection without SoundTouch (will be reconnected after worklet loads)
     sourceNode.connect(bassFilter)
     bassFilter.connect(gainNode)
     gainNode.connect(audioContext.destination)
@@ -172,8 +286,62 @@ export function useDjPlayer() {
       deckState.isPlaying = false
     })
 
-    audioNodes[deck] = { audioElement, audioContext, sourceNode, gainNode, bassFilter }
+    audioNodes[deck] = { audioElement, audioContext, sourceNode, gainNode, bassFilter, soundTouchNode: null }
     return audioNodes[deck]!
+  }
+
+  // Initialize SoundTouch worklet and reconnect audio chain
+  async function setupSoundTouch(deck: DeckId): Promise<void> {
+    const audio = audioNodes[deck]
+    if (!audio || audio.soundTouchNode) return // Already initialized
+
+    // TEMPORARY: Disable SoundTouch to test if it's causing visual stuttering
+    const ENABLE_SOUNDTOUCH = false
+
+    if (!ENABLE_SOUNDTOUCH) {
+      console.log(`[DjPlayer] SoundTouch disabled for testing - using native playbackRate for deck ${deck}`)
+      return
+    }
+
+    const soundTouchNode = await initSoundTouchWorklet(audio.audioContext)
+    if (soundTouchNode) {
+      // Disconnect current chain
+      audio.sourceNode.disconnect()
+
+      // Reconnect with SoundTouch: source → soundtouch → bassFilter → gain → destination
+      audio.sourceNode.connect(soundTouchNode)
+      soundTouchNode.connect(audio.bassFilter)
+
+      audio.soundTouchNode = soundTouchNode
+      console.log(`[DjPlayer] SoundTouch worklet initialized for deck ${deck}`)
+    }
+  }
+
+  // Set tempo using SoundTouch (with fallback to native playbackRate)
+  function setDeckTempo(deck: DeckId, tempo: number): void {
+    const audio = audioNodes[deck]
+    const deckState = getDeckState(deck)
+    if (!audio) return
+
+    deckState.playbackRate = tempo
+
+    if (audio.soundTouchNode) {
+      // Use SoundTouch for high-quality pitch-preserved time-stretching
+      const tempoParam = audio.soundTouchNode.parameters.get('tempo')
+      if (tempoParam) {
+        tempoParam.setValueAtTime(tempo, audio.audioContext.currentTime)
+      }
+      // Keep native playbackRate at 1.0 when using SoundTouch
+      audio.audioElement.playbackRate = 1.0
+      // currentTime advances at normal speed (1.0) with SoundTouch
+      deckState.timeAdvanceRate = 1.0
+    }
+    else {
+      // Fallback to native playbackRate (causes pitch shift)
+      audio.audioElement.playbackRate = tempo
+      // currentTime advances at tempo speed without SoundTouch
+      deckState.timeAdvanceRate = tempo
+    }
   }
 
   function updateCrossfaderGains() {
@@ -216,12 +384,19 @@ export function useDjPlayer() {
     const streamUrl = `/api/stream/${track.id}`
     audio.audioElement.src = streamUrl
 
-    // Generate waveform in background
-    generateWaveformData(streamUrl).then((waveform) => {
-      if (deckState.track?.id === track.id) {
-        deckState.waveformData = waveform
-      }
-    })
+    // Initialize SoundTouch worklet (async, non-blocking)
+    setupSoundTouch(deck)
+
+    // DEBUG: Skip waveform generation to test if it's causing stuttering
+    const SKIP_WAVEFORM_GENERATION = true
+    if (!SKIP_WAVEFORM_GENERATION) {
+      // Generate waveform in background (with caching)
+      generateWaveformData(streamUrl, track.id).then((waveform) => {
+        if (deckState.track?.id === track.id) {
+          deckState.waveformData = waveform
+        }
+      })
+    }
 
     // If no master deck set yet and this track has BPM, set this as master
     if (!state.masterDeck && track.bpm_detected) {
@@ -233,12 +408,10 @@ export function useDjPlayer() {
     if (state.syncEnabled && track.bpm_detected && masterBpm > 0 && state.masterDeck !== deck) {
       const rate = masterBpm / track.bpm_detected
       const clampedRate = Math.max(0.92, Math.min(1.08, rate))
-      deckState.playbackRate = clampedRate
-      audio.audioElement.playbackRate = clampedRate
+      setDeckTempo(deck, clampedRate)
     }
     else {
-      deckState.playbackRate = 1.0
-      audio.audioElement.playbackRate = 1.0
+      setDeckTempo(deck, 1.0)
     }
 
     state.activeDeck = deck
@@ -495,8 +668,8 @@ export function useDjPlayer() {
       }
     }
 
-    // Restore original playback rate
-    audio.audioElement.playbackRate = deckState.playbackRate
+    // Restore original playback rate/tempo
+    setDeckTempo(deck, deckState.playbackRate)
 
     // Resume if was playing
     if (scrubState[deck].wasPlaying) {
@@ -518,8 +691,8 @@ export function useDjPlayer() {
   function getBeatGrid(deckState: DeckState): number[] {
     // Generate beat grid from BPM and beat_offset
     if (deckState.track?.bpm_detected && deckState.duration > 0) {
-      // Round BPM to nearest integer - music BPM is always whole numbers
-      const bpm = Math.round(deckState.track.bpm_detected)
+      // Use BPM with decimal precision to avoid drift over long tracks
+      const bpm = deckState.track.bpm_detected
       const beatInterval = 60 / bpm
       const beats: number[] = []
 
@@ -565,20 +738,17 @@ export function useDjPlayer() {
     if (!state.syncEnabled || masterBpm <= 0) return
 
     for (const deck of ['A', 'B'] as DeckId[]) {
-      const audio = audioNodes[deck]
       const deckState = getDeckState(deck)
 
-      if (audio && deckState.track?.bpm_detected) {
+      if (deckState.track?.bpm_detected) {
         if (deck === state.masterDeck) {
           // Master deck always plays at 1.0
-          deckState.playbackRate = 1.0
-          audio.audioElement.playbackRate = 1.0
+          setDeckTempo(deck, 1.0)
         }
         else {
           const rate = masterBpm / deckState.track.bpm_detected
           const clampedRate = Math.max(0.92, Math.min(1.08, rate))
-          deckState.playbackRate = clampedRate
-          audio.audioElement.playbackRate = clampedRate
+          setDeckTempo(deck, clampedRate)
         }
       }
     }
@@ -590,13 +760,7 @@ export function useDjPlayer() {
     if (!state.syncEnabled) {
       // Reset all decks to 1.0 playback rate
       for (const deck of ['A', 'B'] as DeckId[]) {
-        const audio = audioNodes[deck]
-        const deckState = getDeckState(deck)
-
-        if (audio) {
-          deckState.playbackRate = 1.0
-          audio.audioElement.playbackRate = 1.0
-        }
+        setDeckTempo(deck, 1.0)
       }
     }
     else {
@@ -712,6 +876,7 @@ export function useDjPlayer() {
     deckState.duration = 0
     deckState.bassOn = true
     deckState.playbackRate = 1.0
+    deckState.timeAdvanceRate = 1.0
     deckState.waveformData = null
     deckState.beatOffsetCorrection = 0
 
@@ -813,6 +978,7 @@ export function useDjPlayer() {
     ejectDeck,
     formatTime,
     cleanup,
-    getTargetDeck
+    getTargetDeck,
+    preloadWaveform
   }
 }
