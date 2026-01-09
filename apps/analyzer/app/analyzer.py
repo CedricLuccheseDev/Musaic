@@ -600,10 +600,10 @@ def _compute_bass_energy(segment: np.ndarray) -> float:
 
 def _extract_beat_offset_from_drop(full_audio: np.ndarray, highlight_time: float, bpm: float) -> float | None:
     """
-    Extract beat offset using improved downbeat detection.
+    Extract beat offset using onset detection for precise transient alignment.
 
-    Uses bass energy analysis to identify the downbeat (beat 1) which typically
-    has more kick/bass energy than other beats in 4/4 time.
+    Combines beat tracking with onset detection to find the exact position
+    of kick drum transients, which gives more accurate beat grid alignment.
 
     Args:
         full_audio: Full track audio samples
@@ -614,76 +614,136 @@ def _extract_beat_offset_from_drop(full_audio: np.ndarray, highlight_time: float
         Beat offset in seconds (phase relative to track start), or None if detection failed
     """
     try:
-        # Extract segment: 1s before drop to 20s after (longer for stability)
-        drop_start = max(0, highlight_time - 1.0)
-        drop_end = min(len(full_audio) / SAMPLE_RATE, highlight_time + 20.0)
+        # Extract segment: 0.5s before drop to 15s after
+        drop_start = max(0, highlight_time - 0.5)
+        drop_end = min(len(full_audio) / SAMPLE_RATE, highlight_time + 15.0)
 
         start_sample = int(drop_start * SAMPLE_RATE)
         end_sample = int(drop_end * SAMPLE_RATE)
         drop_segment = full_audio[start_sample:end_sample]
 
-        if len(drop_segment) < SAMPLE_RATE * 4:  # Need at least 4 seconds
-            return None
-
-        # Detect beats using BeatTrackerMultiFeature
-        beat_tracker = es.BeatTrackerMultiFeature()
-        beats, _ = beat_tracker(drop_segment)
-
-        if len(beats) < 8:
+        if len(drop_segment) < SAMPLE_RATE * 2:
             return None
 
         beat_interval = 60.0 / bpm
 
-        # Analyze bass energy on each beat to find the downbeat
-        bass_energies = []
-        window_samples = int(0.03 * SAMPLE_RATE)  # 30ms window around beat
+        # Method 1: Onset detection for precise transient timing
+        # Use 'hfc' (High Frequency Content) which is good for percussive onsets
+        frame_size = 1024
+        hop_size = 512
 
-        for beat_time in beats[:32]:  # Analyze first 32 beats (8 bars)
-            start = int(beat_time * SAMPLE_RATE) - window_samples
-            end = int(beat_time * SAMPLE_RATE) + window_samples
-            if start >= 0 and end < len(drop_segment):
+        windowing = es.Windowing(type='hann')
+        spectrum = es.Spectrum(size=frame_size)
+        onset_hfc = es.OnsetDetection(method='hfc')
+        onset_complex = es.OnsetDetection(method='complex')
+
+        hfc_values = []
+        complex_values = []
+
+        for frame in es.FrameGenerator(drop_segment, frameSize=frame_size, hopSize=hop_size):
+            windowed = windowing(frame)
+            spec = spectrum(windowed)
+            hfc_values.append(onset_hfc(spec, spec))
+            complex_values.append(onset_complex(spec, spec))
+
+        # Combine onset detection functions
+        hfc_array = np.array(hfc_values)
+        complex_array = np.array(complex_values)
+
+        # Normalize and combine
+        if hfc_array.max() > 0:
+            hfc_array = hfc_array / hfc_array.max()
+        if complex_array.max() > 0:
+            complex_array = complex_array / complex_array.max()
+
+        combined = (hfc_array + complex_array) / 2
+
+        # Find onset peaks using Essentia's Onsets algorithm
+        onsets_algo = es.Onsets()
+        # Convert to 2D array as required by Onsets
+        onset_matrix = np.vstack([hfc_array, complex_array])
+        onset_times = onsets_algo(onset_matrix, [1, 1])
+
+        # Method 2: Beat tracking as reference
+        beat_tracker = es.BeatTrackerMultiFeature()
+        beats, _ = beat_tracker(drop_segment)
+
+        if len(beats) < 4:
+            # Fallback: if beat tracking fails, use first strong onset
+            if len(onset_times) > 0:
+                first_onset = float(onset_times[0]) + drop_start
+                return round(first_onset % beat_interval, 3)
+            return None
+
+        # Find the best onset near each beat (within 50ms tolerance)
+        tolerance = 0.050  # 50ms
+        refined_beats = []
+
+        for beat_time in beats[:16]:  # Check first 16 beats
+            # Find onsets near this beat
+            nearby_onsets = [
+                ot for ot in onset_times
+                if abs(ot - beat_time) < tolerance
+            ]
+
+            if nearby_onsets:
+                # Use the onset closest to the beat
+                best_onset = min(nearby_onsets, key=lambda x: abs(x - beat_time))
+                refined_beats.append(best_onset)
+            else:
+                refined_beats.append(beat_time)
+
+        if not refined_beats:
+            return round((float(beats[0]) + drop_start) % beat_interval, 3)
+
+        # Analyze bass energy to find downbeat position
+        bass_energies = []
+        window_samples = int(0.025 * SAMPLE_RATE)  # 25ms window
+
+        for beat_time in refined_beats:
+            start = int(beat_time * SAMPLE_RATE) - window_samples // 2
+            end = start + window_samples
+            if 0 <= start and end < len(drop_segment):
                 segment = drop_segment[start:end]
                 bass_energy = _compute_bass_energy(segment)
                 bass_energies.append((beat_time, bass_energy))
 
-        if len(bass_energies) < 8:
-            # Fallback: use first beat if not enough data
-            return round((float(beats[0]) + drop_start) % beat_interval, 3)
+        if len(bass_energies) < 4:
+            first_beat = refined_beats[0] + drop_start
+            return round(first_beat % beat_interval, 3)
 
-        # Group beats by their TEMPORAL position in measure (0, 1, 2, 3)
-        # Use the first beat as reference point for calculating positions
+        # Group by position in bar (0, 1, 2, 3)
         first_beat_time = bass_energies[0][0]
         position_energies: list[list[tuple[float, float]]] = [[] for _ in range(4)]
 
         for beat_time, energy in bass_energies:
-            # Calculate which beat position (0-3) this beat occupies
             beats_from_first = (beat_time - first_beat_time) / beat_interval
             position = round(beats_from_first) % 4
             position_energies[position].append((beat_time, energy))
 
+        # Find position with highest average bass energy (likely downbeat)
         avg_energies = [
-            np.mean([e for _, e in beats]) if beats else 0.0
-            for beats in position_energies
+            np.mean([e for _, e in pos_beats]) if pos_beats else 0.0
+            for pos_beats in position_energies
         ]
 
-        # Check if energy distribution is meaningful (not uniform)
         max_energy = max(avg_energies)
         min_energy = min(avg_energies)
-        if max_energy > 0 and (max_energy - min_energy) / max_energy > 0.1:
-            # Downbeat is the position with highest average bass energy
+
+        if max_energy > 0 and (max_energy - min_energy) / max_energy > 0.15:
             downbeat_position = int(np.argmax(avg_energies))
         else:
-            # Energy is uniform, use position 0 as fallback
             downbeat_position = 0
 
-        # Find the first beat that is at the downbeat position
+        # Get the first beat at the downbeat position
         if position_energies[downbeat_position]:
             first_downbeat_time = position_energies[downbeat_position][0][0]
             first_downbeat = first_downbeat_time + drop_start
             return round(first_downbeat % beat_interval, 3)
 
-        # Fallback: use first detected beat
-        return round((float(beats[0]) + drop_start) % beat_interval, 3)
+        # Fallback
+        first_beat = refined_beats[0] + drop_start
+        return round(first_beat % beat_interval, 3)
 
     except Exception:
         return None
@@ -802,9 +862,29 @@ def _extract_rhythm(
     scored.sort(key=lambda x: x[1], reverse=True)
     best_bpm, best_score, _ = scored[0]
 
-    # Round BPM to nearest integer - music BPM is always whole numbers
-    # This prevents micro-drifts in beatgrid calculations
-    best_bpm = round(best_bpm)
+    # Refine BPM using beat intervals for higher precision
+    # The consensus gives us the approximate BPM, but beat intervals give exact timing
+    if len(beats) > 10:
+        intervals = np.diff(beats)
+        # Filter intervals that match the consensus BPM (within 5%)
+        expected_interval = 60.0 / best_bpm
+        tolerance = expected_interval * 0.05
+        matching_intervals = intervals[
+            (intervals > expected_interval - tolerance) &
+            (intervals < expected_interval + tolerance)
+        ]
+        if len(matching_intervals) > 5:
+            # Use mean of matching intervals for precise BPM
+            precise_interval = float(np.mean(matching_intervals))
+            refined_bpm = 60.0 / precise_interval
+            # Only use refined BPM if it's close to consensus (sanity check)
+            if abs(refined_bpm - best_bpm) < 1.0:
+                best_bpm = refined_bpm
+
+    # Keep 2 decimal precision for BPM to minimize beat grid drift
+    # (~3ms per minute with 0.01 BPM precision vs ~30ms with 0.1)
+    # Frontend displays as integer, but calculations use full precision
+    best_bpm = round(best_bpm, 2)
 
     final_confidence = min(1.0, best_score / 3.0)
 
@@ -856,8 +936,8 @@ def reanalyze_beat_offset_from_bytes(
         if len(full_audio) == 0:
             return None
 
-        # Round BPM to nearest integer for consistent calculations
-        bpm = round(bpm)
+        # Keep 1 decimal precision for BPM
+        bpm = round(bpm, 1)
 
         # Use existing highlight_time or find it
         if highlight_time is None or highlight_time <= 0:

@@ -29,6 +29,7 @@
     "@nuxt/icon": "^1.12.0",
     "@nuxt/ui": "^3.1.1",
     "@nuxtjs/supabase": "^2.0.3",
+    "@soundtouchjs/audio-worklet": "^0.2.1",
     "@vueuse/motion": "^3.0.3",
     "jszip": "^3.10.1",
     "nuxt": "^3.17.2",

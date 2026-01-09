@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TrackEntry } from '~/types'
+import type { WaveformSample } from '~/composables/useDjPlayer'
 
 /* --- Props --- */
 const props = defineProps<{
@@ -7,9 +8,10 @@ const props = defineProps<{
   currentTime: number
   duration: number
   deck: 'A' | 'B'
-  waveformData: number[] | null
+  waveformData: WaveformSample[] | null
   isPlaying: boolean
-  playbackRate: number
+  playbackRate: number // Tempo multiplier for visual scaling
+  timeAdvanceRate: number // Actual rate at which currentTime advances (for smooth prediction)
   beatOffsetCorrection?: number // Correction to align beat grid with other deck
 }>()
 
@@ -32,15 +34,23 @@ const animationFrame = ref<number | null>(null)
 const canvasWidth = ref(0)
 const canvasHeight = ref(0)
 
-// For smooth playback: we predict time based on last known position
-const lastKnownTime = ref(0)
-const lastUpdateTimestamp = ref(0)
-const displayTime = ref(0)
+// Animation state - plain JS variables to avoid Vue reactivity overhead in hot path
+let displayTime = 0
+let lastFrameTimestamp = 0
+
+// Cached gradients (recreated only on canvas resize)
+let gradientLeft: CanvasGradient | null = null
+let gradientRight: CanvasGradient | null = null
 
 /* --- Constants --- */
-const SAMPLES_PER_SECOND = 50
-const BAR_WIDTH = 2
+const SAMPLES_PER_SECOND = 100
+const BAR_WIDTH = 1
 const BAR_GAP = 1
+
+// Rekordbox-style colors for frequency bands
+const COLOR_LOW = { r: 30, g: 100, b: 220 } // Blue for bass
+const COLOR_MID = { r: 50, g: 200, b: 100 } // Green for mids
+const COLOR_HIGH = { r: 230, g: 80, b: 60 } // Red/orange for highs
 
 /* --- Computed --- */
 // Beat interval in audio time (based on original BPM)
@@ -100,6 +110,18 @@ function setupCanvas() {
   canvas.style.width = `${width}px`
   canvas.style.height = `${height}px`
 
+  // Pre-create gradients (only on resize, not every frame)
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    gradientLeft = ctx.createLinearGradient(0, 0, 40, 0)
+    gradientLeft.addColorStop(0, 'rgba(23, 23, 23, 1)')
+    gradientLeft.addColorStop(1, 'rgba(23, 23, 23, 0)')
+
+    gradientRight = ctx.createLinearGradient(width - 40, 0, width, 0)
+    gradientRight.addColorStop(0, 'rgba(23, 23, 23, 0)')
+    gradientRight.addColorStop(1, 'rgba(23, 23, 23, 1)')
+  }
+
   return true
 }
 
@@ -114,69 +136,88 @@ function drawWaveform() {
   const height = canvasHeight.value
   if (width === 0 || height === 0) return
 
+  // Cache all reactive/computed values ONCE at start to avoid reactivity overhead
+  const pxPerSec = pixelsPerSecond.value
+  const beatInt = beatInterval.value
+  const beatOff = beatOffset.value
+  const highlightT = highlightTime.value
+  const duration = props.duration
+  const waveformData = props.waveformData
+
   const dpr = window.devicePixelRatio || 1
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, width, height)
 
   const centerX = width / 2
-  const currentPos = displayTime.value * pixelsPerSecond.value
+  const currentPos = displayTime * pxPerSec
   const startX = currentPos - centerX
 
-  // Deck colors
-  const waveColor = props.deck === 'A' ? 'rgba(6, 182, 212, 0.85)' : 'rgba(249, 115, 22, 0.85)'
+  // DEBUG: Skip waveform rendering to test if it's the cause of stuttering
+  // If stuttering stops without this, the problem is in waveform rendering
+  // If stuttering continues, the problem is elsewhere
+  const SKIP_WAVEFORM_RENDERING = true
 
-  // Draw waveform bars
-  if (props.waveformData && props.waveformData.length > 0) {
-    const startSample = Math.max(0, Math.floor(startX / (BAR_WIDTH + BAR_GAP)) - 1)
-    const endSample = Math.min(props.waveformData.length, Math.ceil((currentPos + centerX) / (BAR_WIDTH + BAR_GAP)) + 1)
+  if (!SKIP_WAVEFORM_RENDERING && waveformData && waveformData.length > 0) {
+    const barSpacing = BAR_WIDTH + BAR_GAP
+    const startSample = Math.floor(startX / barSpacing)
+    const visibleBars = Math.ceil(width / barSpacing) + 2
+    const endSample = Math.min(waveformData.length, startSample + visibleBars)
 
-    ctx.fillStyle = waveColor
-    for (let i = startSample; i < endSample; i++) {
-      const value = props.waveformData[i] || 0
-      const x = i * (BAR_WIDTH + BAR_GAP) - startX
-      const barHeight = Math.max(2, value * (height - 4))
-      const y = (height - barHeight) / 2
-      ctx.fillRect(Math.round(x), Math.round(y), BAR_WIDTH, Math.round(barHeight))
+    for (let i = Math.max(0, startSample); i < endSample; i++) {
+      const sample = waveformData[i]
+      if (!sample) continue
+
+      const x = Math.floor(i * barSpacing - startX)
+      const barHeight = Math.max(2, sample.total * (height - 4))
+      const y = Math.floor((height - barHeight) / 2)
+
+      // Use cached color or compute once
+      const total = sample.low + sample.mid + sample.high
+      if (total > 0.001) {
+        const lowRatio = sample.low / total
+        const midRatio = sample.mid / total
+        const highRatio = sample.high / total
+        const r = Math.round(COLOR_LOW.r * lowRatio + COLOR_MID.r * midRatio + COLOR_HIGH.r * highRatio)
+        const g = Math.round(COLOR_LOW.g * lowRatio + COLOR_MID.g * midRatio + COLOR_HIGH.g * highRatio)
+        const b = Math.round(COLOR_LOW.b * lowRatio + COLOR_MID.b * midRatio + COLOR_HIGH.b * highRatio)
+        ctx.fillStyle = `rgb(${r},${g},${b})`
+      }
+      else {
+        ctx.fillStyle = props.deck === 'A' ? 'rgb(6,182,212)' : 'rgb(249,115,22)'
+      }
+      ctx.fillRect(x, y, BAR_WIDTH, Math.floor(barHeight))
     }
   }
 
-  // Draw beat grid lines ON TOP of waveform
-  // Calculate beats dynamically based on current position
-  if (beatInterval.value > 0) {
-    const visibleSeconds = width / pixelsPerSecond.value
-    const offset = beatOffset.value
-
-    // Calculate how many beats from the offset to the current time
-    const beatsFromOffset = (displayTime.value - offset) / beatInterval.value
-    // Find the first beat index that's visible (before current time by half screen)
-    const firstVisibleBeatIndex = Math.floor(beatsFromOffset - visibleSeconds / 2 / beatInterval.value) - 1
-    const lastVisibleBeatIndex = Math.ceil(beatsFromOffset + visibleSeconds / 2 / beatInterval.value) + 1
+  // Draw beat grid lines
+  if (beatInt > 0) {
+    const visibleSeconds = width / pxPerSec
+    const beatsFromOffset = (displayTime - beatOff) / beatInt
+    const firstVisibleBeatIndex = Math.floor(beatsFromOffset - visibleSeconds / 2 / beatInt) - 1
+    const lastVisibleBeatIndex = Math.ceil(beatsFromOffset + visibleSeconds / 2 / beatInt) + 1
 
     for (let i = firstVisibleBeatIndex; i <= lastVisibleBeatIndex; i++) {
-      const beatTime = offset + i * beatInterval.value
+      const beatTime = beatOff + i * beatInt
       if (beatTime < 0) continue
-      if (beatTime > props.duration) break
+      if (beatTime > duration) break
 
-      const x = (beatTime * pixelsPerSecond.value) - startX
+      const x = (beatTime * pxPerSec) - startX
       const isDownbeat = i % 4 === 0
 
-      // Draw vertical line
       if (isDownbeat) {
-        // Downbeat - bright white, thicker
         ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
-        ctx.fillRect(Math.round(x) - 1, 0, 2, height)
+        ctx.fillRect(Math.floor(x) - 1, 0, 2, height)
       }
       else {
-        // Regular beat - dimmer, thinner
         ctx.fillStyle = 'rgba(255, 255, 255, 0.35)'
-        ctx.fillRect(Math.round(x), 0, 1, height)
+        ctx.fillRect(Math.floor(x), 0, 1, height)
       }
     }
   }
 
   // Draw drop/highlight marker
-  if (highlightTime.value > 0) {
-    const dropX = (highlightTime.value * pixelsPerSecond.value) - startX
+  if (highlightT > 0) {
+    const dropX = (highlightT * pxPerSec) - startX
     if (dropX >= -10 && dropX <= width + 10) {
       ctx.fillStyle = props.deck === 'A' ? 'rgb(34, 211, 238)' : 'rgb(251, 146, 60)'
       ctx.fillRect(Math.round(dropX) - 1, 0, 3, height)
@@ -195,31 +236,44 @@ function drawWaveform() {
   ctx.fillStyle = 'rgb(239, 68, 68)'
   ctx.fillRect(Math.round(centerX) - 1, 0, 2, height)
 
-  // Edge fade gradients
-  const gradientLeft = ctx.createLinearGradient(0, 0, 40, 0)
-  gradientLeft.addColorStop(0, 'rgba(23, 23, 23, 1)')
-  gradientLeft.addColorStop(1, 'rgba(23, 23, 23, 0)')
-  ctx.fillStyle = gradientLeft
-  ctx.fillRect(0, 0, 40, height)
-
-  const gradientRight = ctx.createLinearGradient(width - 40, 0, width, 0)
-  gradientRight.addColorStop(0, 'rgba(23, 23, 23, 0)')
-  gradientRight.addColorStop(1, 'rgba(23, 23, 23, 1)')
-  ctx.fillStyle = gradientRight
-  ctx.fillRect(width - 40, 0, 40, height)
+  // Edge fade gradients (use pre-cached gradients)
+  if (gradientLeft) {
+    ctx.fillStyle = gradientLeft
+    ctx.fillRect(0, 0, 40, height)
+  }
+  if (gradientRight) {
+    ctx.fillStyle = gradientRight
+    ctx.fillRect(width - 40, 0, 40, height)
+  }
 }
 
 function animate(timestamp: number) {
-  if (!isDragging.value) {
-    if (props.isPlaying) {
-      // Predict current time based on elapsed time since last update
-      const elapsed = (timestamp - lastUpdateTimestamp.value) / 1000
-      const predicted = lastKnownTime.value + (elapsed * props.playbackRate)
-      displayTime.value = Math.min(predicted, props.duration || predicted)
+  // Calculate delta time since last frame
+  const deltaTime = lastFrameTimestamp > 0 ? (timestamp - lastFrameTimestamp) / 1000 : 0
+  lastFrameTimestamp = timestamp
+
+  // Cache props ONCE at start to avoid repeated Vue reactivity access
+  const isPlaying = props.isPlaying
+  const currentTime = props.currentTime
+  const duration = props.duration
+  const timeAdvanceRate = props.timeAdvanceRate
+  const dragging = isDragging.value
+
+  if (!dragging) {
+    if (isPlaying && deltaTime > 0) {
+      // Advance display time based on playback rate
+      displayTime += deltaTime * timeAdvanceRate
+
+      // Smooth drift correction towards actual audio position
+      const drift = currentTime - displayTime
+      const blendFactor = Math.min(1, deltaTime * 3)
+      displayTime += drift * blendFactor
+
+      // Clamp to valid range
+      displayTime = Math.max(0, Math.min(displayTime, duration || displayTime))
     }
-    else {
-      // Not playing - just use the prop value directly
-      displayTime.value = props.currentTime
+    else if (!isPlaying) {
+      displayTime = currentTime
     }
   }
 
@@ -232,7 +286,7 @@ function handleMouseDown(event: MouseEvent) {
 
   isDragging.value = true
   dragStartX.value = event.clientX
-  dragStartTime.value = displayTime.value
+  dragStartTime.value = displayTime
   lastDragX.value = event.clientX
   lastDragTimestamp.value = performance.now()
 
@@ -258,19 +312,14 @@ function handleMouseMove(event: MouseEvent) {
   lastDragTimestamp.value = now
 
   const newTime = Math.max(0, Math.min(props.duration, dragStartTime.value + deltaSeconds))
-  displayTime.value = newTime
+  displayTime = newTime
 
   emit('scrub', newTime, velocity)
 }
 
 function handleMouseUp() {
   isDragging.value = false
-  // Sync our prediction with actual position after drag
-  lastKnownTime.value = props.currentTime
-  lastUpdateTimestamp.value = performance.now()
-
   emit('scrubEnd')
-
   document.removeEventListener('mousemove', handleMouseMove)
   document.removeEventListener('mouseup', handleMouseUp)
 }
@@ -280,7 +329,7 @@ function handleTouchStart(event: TouchEvent) {
 
   isDragging.value = true
   dragStartX.value = event.touches[0].clientX
-  dragStartTime.value = displayTime.value
+  dragStartTime.value = displayTime
   lastDragX.value = event.touches[0].clientX
   lastDragTimestamp.value = performance.now()
 
@@ -304,24 +353,20 @@ function handleTouchMove(event: TouchEvent) {
   lastDragTimestamp.value = now
 
   const newTime = Math.max(0, Math.min(props.duration, dragStartTime.value + deltaSeconds))
-  displayTime.value = newTime
+  displayTime = newTime
 
   emit('scrub', newTime, velocity)
 }
 
 function handleTouchEnd() {
   isDragging.value = false
-  lastKnownTime.value = props.currentTime
-  lastUpdateTimestamp.value = performance.now()
-
   emit('scrubEnd')
 }
 
 /* --- Lifecycle --- */
 onMounted(() => {
-  displayTime.value = props.currentTime
-  lastKnownTime.value = props.currentTime
-  lastUpdateTimestamp.value = performance.now()
+  displayTime = props.currentTime
+  lastFrameTimestamp = 0
 
   nextTick(() => {
     setupCanvas()
@@ -344,35 +389,27 @@ onUnmounted(() => {
   document.removeEventListener('mouseup', handleMouseUp)
 })
 
-// When currentTime prop updates (from timeupdate event), sync our prediction
+// When currentTime prop updates, handle seeks (big jumps)
 watch(() => props.currentTime, (newTime) => {
-  lastKnownTime.value = newTime
-  lastUpdateTimestamp.value = performance.now()
-
-  // If not playing, always sync immediately to avoid jumps on play
-  // If big jump while playing, also snap
-  if (!props.isPlaying) {
-    displayTime.value = newTime
-  }
-  else if (Math.abs(newTime - displayTime.value) > 0.5) {
-    displayTime.value = newTime
+  // If not playing, sync immediately
+  // If big jump (>0.5s = seek), also snap
+  if (!props.isPlaying || Math.abs(newTime - displayTime) > 0.5) {
+    displayTime = newTime
   }
 })
 
 // When play state changes, sync immediately
 watch(() => props.isPlaying, (isPlaying) => {
   if (isPlaying) {
-    // Starting playback - sync to current time
-    displayTime.value = props.currentTime
-    lastKnownTime.value = props.currentTime
-    lastUpdateTimestamp.value = performance.now()
+    // Starting playback - sync to current time and reset frame counter
+    displayTime = props.currentTime
+    lastFrameTimestamp = 0
   }
 })
 
 watch(() => props.track?.id, () => {
-  displayTime.value = props.currentTime
-  lastKnownTime.value = props.currentTime
-  lastUpdateTimestamp.value = performance.now()
+  displayTime = props.currentTime
+  lastFrameTimestamp = 0
 })
 
 watch(() => props.waveformData, () => {

@@ -44,12 +44,13 @@ OUTPUT FORMAT (strict JSON, no markdown):
 }
 
 SOUNDCLOUD QUERY RULES:
-- soundcloudQuery: reformulate user intent into effective SoundCloud search keywords (artists, genres, style keywords)
+- soundcloudQuery: reformulate user intent into effective SoundCloud search keywords
 - soundcloudFilters.genres: comma-separated SC genres (dubstep, house, techno, drum-n-bass, trap, etc.) - only if clearly relevant
 - soundcloudFilters.bpm: only if user mentions BPM or tempo-related terms
 - Keep soundcloudQuery short (3-6 keywords max)
-- Include artist names if mentioned
-- Include style/vibe keywords
+- IMPORTANT: If query looks like an ARTIST NAME (single word, proper noun, username-like), keep it AS-IS without adding genre keywords
+- Only add genre/style keywords when user explicitly mentions genres or describes a mood/vibe
+- Artist name examples to keep as-is: "Quyver", "Skrillex", "Netsky", "Illenium" → soundcloudQuery should be the artist name only
 
 SCHEMA: tracks(soundcloud_id PK, title, artist, genre, duration ms, download_status, downloadable, playback_count, likes_count, tags[], soundcloud_created_at, label,
   -- Audio analysis (from Essentia via musaic-analyzer)
@@ -156,6 +157,9 @@ User: "Netsky liquid"
 
 User: "bass sans vocals"
 → {"sql":"SELECT * FROM tracks WHERE (genre ILIKE '%bass%' OR genre ILIKE '%dubstep%') AND instrumentalness > 0.7 AND analysis_status='completed' ORDER BY playback_count DESC LIMIT 20","phrase":"Bass music instrumental","soundcloudQuery":"instrumental bass dubstep","soundcloudFilters":{"genres":"dubstep"}}
+
+User: "Quyver"
+→ {"sql":"SELECT * FROM tracks WHERE artist ILIKE '%quyver%' ORDER BY playback_count DESC LIMIT 20","phrase":"Tracks by Quyver","soundcloudQuery":"quyver","soundcloudFilters":{}}
 
 User: "Hospital Records"
 → {"sql":"SELECT * FROM tracks WHERE label ILIKE '%hospital%' ORDER BY playback_count DESC LIMIT 20","phrase":"Tracks from Hospital Records","soundcloudQuery":"hospital records dnb","soundcloudFilters":{"genres":"drum-n-bass"}}

@@ -603,3 +603,155 @@ async def reanalyze_all_beat_offsets(
         total_tracks=total,
         message=msg,
     )
+
+
+# =============================================================================
+# FULL REANALYSIS (BPM + beat_offset)
+# =============================================================================
+
+full_reanalysis_state = {
+    "is_running": False,
+    "total_tracks": 0,
+    "processed": 0,
+    "successful": 0,
+    "failed": 0,
+}
+
+
+async def process_full_reanalysis() -> None:
+    """Background task to fully reanalyze all completed tracks (BPM + beat_offset)."""
+    global full_reanalysis_state
+
+    settings = get_settings()
+    download_semaphore = asyncio.Semaphore(3)
+    analyze_semaphore = asyncio.Semaphore(2)
+
+    try:
+        client = create_client(settings.supabase_url, settings.supabase_service_key)
+
+        # Get all completed tracks
+        response = (
+            client.table("tracks")
+            .select("soundcloud_id, title, permalink_url, highlight_time")
+            .eq("analysis_status", "completed")
+            .order("created_at", desc=True)
+            .execute()
+        )
+
+        tracks = response.data or []
+        if not tracks:
+            log.info("No tracks to reanalyze")
+            return
+
+        full_reanalysis_state["total_tracks"] = len(tracks)
+        log.info(f"Starting full reanalysis of {len(tracks)} tracks")
+
+        for track in tracks:
+            soundcloud_id = track["soundcloud_id"]
+            title = track.get("title", "Unknown")
+            url = track.get("permalink_url")
+
+            try:
+                if not url:
+                    log.warn(f"[{soundcloud_id}] No permalink_url, skipping")
+                    full_reanalysis_state["failed"] += 1
+                    full_reanalysis_state["processed"] += 1
+                    continue
+
+                async with download_semaphore:
+                    audio_bytes = await asyncio.wait_for(
+                        stream_audio_to_memory(url),
+                        timeout=settings.analysis_timeout_seconds,
+                    )
+
+                async with analyze_semaphore:
+                    result = analyze_audio_from_bytes(audio_bytes)
+
+                # Update database with new values
+                await update_track_analysis(soundcloud_id, result.model_dump())
+
+                full_reanalysis_state["successful"] += 1
+                full_reanalysis_state["processed"] += 1
+                log.success(f"[{full_reanalysis_state['processed']}/{len(tracks)}] {title}: BPM={result.bpm_detected}")
+
+            except asyncio.TimeoutError:
+                log.error(f"[{soundcloud_id}] Timeout downloading audio")
+                full_reanalysis_state["failed"] += 1
+                full_reanalysis_state["processed"] += 1
+
+            except Exception as e:
+                log.error(f"[{soundcloud_id}] Reanalysis failed: {e}")
+                full_reanalysis_state["failed"] += 1
+                full_reanalysis_state["processed"] += 1
+
+        log.success(
+            f"Full reanalysis complete: {full_reanalysis_state['successful']} successful, "
+            f"{full_reanalysis_state['failed']} failed"
+        )
+
+    except Exception as e:
+        log.error(f"Full reanalysis error: {e}")
+    finally:
+        full_reanalysis_state["is_running"] = False
+
+
+@router.post(
+    "/analyze/batch/full-reanalysis",
+    response_model=BatchAnalysisResponse,
+)
+async def reanalyze_all_tracks_full(
+    background_tasks: BackgroundTasks,
+) -> BatchAnalysisResponse:
+    """
+    Force full reanalysis of ALL completed tracks (BPM + beat_offset).
+
+    Use this after algorithm improvements to recalculate all values.
+    """
+    global full_reanalysis_state
+
+    log.api.request("POST", "/analyze/batch/full-reanalysis")
+
+    if full_reanalysis_state["is_running"]:
+        return BatchAnalysisResponse(
+            status="already_running",
+            total_tracks=full_reanalysis_state["total_tracks"],
+            message="Full reanalysis is already in progress",
+        )
+
+    settings = get_settings()
+    client = create_client(settings.supabase_url, settings.supabase_service_key)
+
+    response = (
+        client.table("tracks")
+        .select("soundcloud_id", count="exact")
+        .eq("analysis_status", "completed")
+        .execute()
+    )
+    total = response.count or 0
+
+    if total == 0:
+        return BatchAnalysisResponse(
+            status="no_tracks",
+            total_tracks=0,
+            message="No completed tracks to reanalyze",
+        )
+
+    # Reset state
+    full_reanalysis_state = {
+        "is_running": True,
+        "total_tracks": total,
+        "processed": 0,
+        "successful": 0,
+        "failed": 0,
+    }
+
+    background_tasks.add_task(process_full_reanalysis)
+
+    msg = f"Started full reanalysis (BPM + beat_offset) for {total} tracks"
+    log.success(msg)
+
+    return BatchAnalysisResponse(
+        status="started",
+        total_tracks=total,
+        message=msg,
+    )
