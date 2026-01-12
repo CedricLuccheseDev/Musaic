@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { DownloadStatus, type TrackEntry } from '~/types'
 import type { SearchResult } from '~/server/services/soundcloud'
+import type { ClarificationOption } from '~/server/services/aiQuery'
 
 /* --- Types --- */
 type FilterType = 'all' | 'free' | 'paid'
+type QueryType = 'url' | 'track' | 'artist' | 'genre' | 'id'
 
 interface CascadeSearchResult extends SearchResult {
   source: 'database' | 'soundcloud'
@@ -11,6 +13,13 @@ interface CascadeSearchResult extends SearchResult {
   artistSearchAttempted?: boolean
   artistSearchFailed?: boolean
   wantsDownload?: boolean
+  queryType?: QueryType
+  mainTrack?: TrackEntry
+  similarTracks?: TrackEntry[]
+  artistTracks?: TrackEntry[]
+  needsClarification?: boolean
+  clarificationQuestion?: string
+  clarificationOptions?: ClarificationOption[]
 }
 
 /* --- Constants --- */
@@ -28,6 +37,7 @@ const { t } = useI18n()
 const { canUseAi, aiGenerationsLeft, isPremium, incrementAiUsage } = useProfile()
 const route = useRoute()
 const { watchTracks } = useTrackUpdates()
+const { initHistory, saveSearch, getRecentSearches } = useSearchHistory()
 
 /* --- States --- */
 const headerMounted = ref(false)
@@ -40,6 +50,16 @@ const nextOffset = ref<number | undefined>(undefined)
 const isLoadingMore = ref(false)
 const initialBatchSize = ref(0)
 const searchError = ref<string | null>(null)
+
+// Search More (SoundCloud fallback for AI results)
+const searchMoreTracks = ref<TrackEntry[]>([])
+const searchMoreLoading = ref(false)
+const searchMoreHasMore = ref(false)
+const searchMoreOffset = ref(0)
+const searchMoreInitialBatch = ref(0)
+
+// Clarification skip state
+const clarificationSkipped = ref(false)
 
 /* --- Data --- */
 const { data: searchResult, status } = useFetch<CascadeSearchResult>('/api/search', {
@@ -71,6 +91,28 @@ const artistSearchFailed = computed(() => searchResult.value?.artistSearchFailed
 const wantsDownload = computed(() => searchResult.value?.wantsDownload)
 const filteredTracks = computed(() => applyFilter(allTracks.value))
 const hasMore = computed(() => hasMoreFromApi.value && allTracks.value.length < MAX_RESULTS)
+
+// New: Adaptive layout computed properties
+const queryType = computed(() => searchResult.value?.queryType)
+const mainTrack = computed(() => searchResult.value?.mainTrack)
+const similarTracks = computed(() => searchResult.value?.similarTracks)
+const artistTracks = computed(() => searchResult.value?.artistTracks)
+
+// New: Clarification computed properties
+const needsClarification = computed(() =>
+  searchResult.value?.needsClarification && !clarificationSkipped.value
+)
+const clarificationQuestion = computed(() => searchResult.value?.clarificationQuestion || '')
+const clarificationOptions = computed(() => searchResult.value?.clarificationOptions || [])
+
+// Recent searches for display
+const recentSearches = computed(() => getRecentSearches(5))
+
+// Search More filtered tracks
+const filteredSearchMoreTracks = computed(() => applyFilter(searchMoreTracks.value))
+const showSearchMoreButton = computed(() =>
+  resultSource.value === 'database' && filteredTracks.value.length > 0 && searchMoreTracks.value.length === 0
+)
 
 /* --- Methods --- */
 function applyFilter(tracks: TrackEntry[]): TrackEntry[] {
@@ -109,7 +151,14 @@ function handleScroll() {
   const documentHeight = document.documentElement.scrollHeight
   const scrollPercent = (scrollTop + windowHeight) / documentHeight
   if (scrollPercent >= 0.6) {
-    loadMore()
+    // Load more from SoundCloud source
+    if (resultSource.value === 'soundcloud') {
+      loadMore()
+    }
+    // Load more from "Search More" section (when AI results + SoundCloud fallback)
+    else if (searchMoreTracks.value.length > 0 && searchMoreHasMore.value) {
+      loadMoreSoundCloud()
+    }
   }
 }
 
@@ -136,6 +185,51 @@ function search() {
   navigateTo({ path: '/search', query: { q: searchInput.value } })
 }
 
+// Handle clarification option selection
+function handleClarificationSelect(clarifiedQuery: string) {
+  searchInput.value = clarifiedQuery
+  search()
+}
+
+// Handle clarification skip ("Je ne sais pas") - search SoundCloud directly
+function handleClarificationSkip() {
+  clarificationSkipped.value = true
+  // Trigger SoundCloud search with original query
+  handleSearchMore()
+}
+
+// Handle "Search More" from AI results - fetch SoundCloud results
+async function handleSearchMore() {
+  if (searchMoreLoading.value || !query.value) return
+
+  searchMoreLoading.value = true
+  try {
+    const response = await $fetch<CascadeSearchResult>('/api/search', {
+      query: { q: query.value, offset: searchMoreOffset.value, skipAi: 'true' }
+    })
+
+    if (searchMoreOffset.value === 0) {
+      searchMoreTracks.value = response.tracks || []
+      searchMoreInitialBatch.value = searchMoreTracks.value.length
+    } else {
+      searchMoreTracks.value = [...searchMoreTracks.value, ...(response.tracks || [])]
+    }
+
+    searchMoreHasMore.value = response.hasMore || false
+    searchMoreOffset.value = response.nextOffset || 0
+  } catch (err) {
+    console.error('[Search] Failed to fetch more from SoundCloud:', err)
+  } finally {
+    searchMoreLoading.value = false
+  }
+}
+
+// Load more SoundCloud results (for search more section)
+async function loadMoreSoundCloud() {
+  if (searchMoreLoading.value || !searchMoreHasMore.value) return
+  await handleSearchMore()
+}
+
 /* --- Watchers --- */
 watch(searchResult, (result) => {
   if (result) {
@@ -143,6 +237,11 @@ watch(searchResult, (result) => {
     initialBatchSize.value = allTracks.value.length
     hasMoreFromApi.value = result.hasMore || false
     nextOffset.value = result.nextOffset
+
+    // Save successful search to history (skip clarification)
+    if (!result.needsClarification && query.value) {
+      saveSearch(query.value, result.queryType || 'genre', result.tracks?.length)
+    }
   }
 }, { immediate: true })
 
@@ -152,6 +251,13 @@ watch(query, (newQuery, oldQuery) => {
     allTracks.value = []
     hasMoreFromApi.value = false
     nextOffset.value = undefined
+    // Reset search more state
+    searchMoreTracks.value = []
+    searchMoreHasMore.value = false
+    searchMoreOffset.value = 0
+    searchMoreInitialBatch.value = 0
+    // Reset clarification skip state
+    clarificationSkipped.value = false
   }
 }, { immediate: true })
 
@@ -164,6 +270,7 @@ onMounted(() => {
   headerMounted.value = true
   window.addEventListener('scroll', handleScroll, { passive: true })
   checkInitialLoad()
+  initHistory()
 })
 
 // Real-time track updates when analysis completes
@@ -181,18 +288,28 @@ onUnmounted(() => {
     <!-- Teleport SearchBar to header center slots -->
     <Teleport v-if="headerMounted" to="#header-center-desktop">
       <div class="w-full max-w-xl">
-        <SearchBar v-model="searchInput" :loading="isLoading" @search="search" />
+        <SearchBar
+          v-model="searchInput"
+          :loading="isLoading"
+          :recent-searches="recentSearches"
+          @search="search"
+        />
       </div>
     </Teleport>
     <Teleport v-if="headerMounted" to="#header-center-mobile">
-      <SearchBar v-model="searchInput" :loading="isLoading" @search="search" />
+      <SearchBar
+        v-model="searchInput"
+        :loading="isLoading"
+        :recent-searches="recentSearches"
+        @search="search"
+      />
     </Teleport>
 
   <!-- Results -->
   <main class="relative mx-auto w-full max-w-4xl flex-1 px-4 py-6 pb-32 md:px-6 md:py-10">
     <ClientOnly>
       <!-- Main results container -->
-      <template v-if="query && (isLoading || filteredTracks.length)">
+      <template v-if="query && (isLoading || filteredTracks.length || needsClarification || searchMoreLoading || filteredSearchMoreTracks.length)">
         <!-- Main title with filters -->
         <div class="flex items-center gap-3 pb-2">
           <UIcon name="i-heroicons-magnifying-glass" class="h-6 w-6 text-violet-400" />
@@ -235,6 +352,16 @@ onUnmounted(() => {
           <span>{{ t.aiGenerating }}</span>
         </div>
 
+        <!-- Clarification needed -->
+        <SearchClarification
+          v-else-if="needsClarification"
+          :question="clarificationQuestion"
+          :options="clarificationOptions"
+          :original-query="query"
+          @select="handleClarificationSelect"
+          @skip="handleClarificationSkip"
+        />
+
         <!-- AI Results (source: database) -->
         <SearchAiSection
           v-else-if="resultSource === 'database' && filteredTracks.length"
@@ -242,26 +369,59 @@ onUnmounted(() => {
           :results="filteredTracks"
           :response="aiResponse"
           :wants-download="wantsDownload"
+          :query-type="queryType"
+          :main-track="mainTrack"
+          :similar-tracks="similarTracks"
+          :artist-tracks="artistTracks"
+        />
+
+        <!-- SoundCloud Section (search more button or results) -->
+        <SearchSoundcloudSection
+          v-if="resultSource === 'database' && (showSearchMoreButton || filteredSearchMoreTracks.length)"
+          :loading="false"
+          :results="filteredSearchMoreTracks"
+          :has-more="searchMoreHasMore"
+          :is-loading-more="searchMoreLoading"
+          :initial-batch-size="searchMoreInitialBatch"
+          :show-search-button="showSearchMoreButton && searchMoreTracks.length === 0"
+          :search-button-loading="searchMoreLoading"
+          class="mt-4"
+          @search-more="handleSearchMore"
         />
 
         <!-- SoundCloud Results (source: soundcloud) -->
         <template v-else-if="resultSource === 'soundcloud'">
-          <!-- AI No Match Message -->
-          <div class="mt-6 flex items-center gap-2 text-sm text-neutral-500">
-            <UIcon name="i-heroicons-sparkles" class="h-4 w-4" />
-            <span>{{ t.aiNoMatch }}</span>
-          </div>
-
-          <SearchSoundcloudSection
+          <!-- Direct track result (URL/Track search) -->
+          <SearchAiSection
+            v-if="mainTrack && (queryType === 'url' || queryType === 'track' || queryType === 'id')"
             :loading="false"
             :results="filteredTracks"
-            :has-more="hasMore"
-            :is-loading-more="isLoadingMore"
-            :initial-batch-size="initialBatchSize"
-            :detected-artist="detectedArtist"
-            :artist-search-attempted="artistSearchAttempted"
-            :artist-search-failed="artistSearchFailed"
+            :response="aiResponse"
+            :query-type="queryType"
+            :main-track="mainTrack"
+            :similar-tracks="similarTracks"
+            :artist-tracks="artistTracks"
           />
+
+          <!-- Standard SoundCloud results -->
+          <template v-else>
+            <!-- AI No Match Message -->
+            <div class="mt-6 flex items-center gap-2 text-sm text-neutral-500">
+              <UIcon name="i-heroicons-sparkles" class="h-4 w-4" />
+              <span>{{ t.aiNoMatch }}</span>
+            </div>
+
+            <SearchSoundcloudSection
+              :loading="false"
+              :results="filteredTracks"
+              :has-more="hasMore"
+              :is-loading-more="isLoadingMore"
+              :initial-batch-size="initialBatchSize"
+              :detected-artist="detectedArtist"
+              :artist-search-attempted="artistSearchAttempted"
+              :artist-search-failed="artistSearchFailed"
+            />
+          </template>
         </template>
       </template>
 

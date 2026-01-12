@@ -109,6 +109,107 @@ Start batch analysis.
 }
 ```
 
+#### `POST /api/dashboard/analyze-single`
+
+Analyze a single track by SoundCloud ID.
+
+**Body:**
+```json
+{
+  "soundcloud_id": 123456789
+}
+```
+
+**Response:**
+```json
+{
+  "status": "completed",
+  "soundcloud_id": 123456789
+}
+```
+
+### Download
+
+#### `GET /api/download/[id]`
+
+Download a track as MP3 file.
+
+**Params:**
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | string | SoundCloud ID |
+
+**Response:** Audio file (audio/mpeg) with `Content-Disposition: attachment`
+
+### Issues
+
+#### `POST /api/issues`
+
+Report an issue or bug.
+
+**Body:**
+```json
+{
+  "email": "user@example.com",
+  "subject": "Bug report",
+  "message": "Description of the issue..."
+}
+```
+
+**Response:**
+```json
+{
+  "success": true
+}
+```
+
+### Similar Tracks
+
+#### `GET /api/similar/[id]`
+
+Find acoustically similar tracks using vector similarity.
+
+**Params:**
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | string | SoundCloud ID |
+| `limit` | number | Max results (default: 10, max: 50) |
+
+**Response:**
+```json
+{
+  "tracks": [
+    {
+      "soundcloud_id": 123456,
+      "title": "Similar Track",
+      "artist": "Artist",
+      "similarity": 85
+    }
+  ]
+}
+```
+
+### Analyze Fallback
+
+#### `POST /api/analyze-fallback`
+
+Fallback analysis when server-side download fails. Streams audio from SoundCloud and sends to analyzer.
+
+**Body:**
+```json
+{
+  "soundcloud_id": 123456789
+}
+```
+
+**Response:**
+```json
+{
+  "status": "completed",
+  "soundcloud_id": 123456789
+}
+```
+
 ---
 
 ## Analyzer API (FastAPI)
@@ -128,7 +229,7 @@ Health check and queue status.
 {
   "status": "healthy",
   "queue_size": 0,
-  "is_processing": false
+  "version": "0.1.0"
 }
 ```
 
@@ -194,6 +295,57 @@ Get current batch status.
   "successful": 40,
   "failed": 2,
   "current_track": "Artist - Track Title"
+}
+```
+
+#### `POST /analyze/batch/beat-offset`
+
+Reanalyze beat_offset for completed tracks (lightweight, uses existing BPM).
+
+**Query params:**
+| Param | Type | Description |
+|-------|------|-------------|
+| `soundcloud_id` | number | Optional - reanalyze only this track |
+
+**Response:**
+```json
+{
+  "status": "started",
+  "total_tracks": 150,
+  "message": "Started beat_offset reanalysis for 150 track(s)"
+}
+```
+
+#### `POST /analyze/batch/full-reanalysis`
+
+Force full reanalysis of all completed tracks (BPM + beat_offset).
+
+**Response:**
+```json
+{
+  "status": "started",
+  "total_tracks": 150,
+  "message": "Started full reanalysis (BPM + beat_offset) for 150 tracks"
+}
+```
+
+### Analyze Bytes
+
+#### `POST /analyze-bytes`
+
+Analyze audio from uploaded bytes (for geo-blocked or restricted tracks).
+
+**Body:** `multipart/form-data`
+| Field | Type | Description |
+|-------|------|-------------|
+| `soundcloud_id` | number | Track SoundCloud ID |
+| `audio` | file | Audio file (audio/*) |
+
+**Response:**
+```json
+{
+  "status": "completed",
+  "soundcloud_id": 123456789
 }
 ```
 

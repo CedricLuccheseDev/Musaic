@@ -9,7 +9,13 @@ const props = defineProps<{
   sql?: string
   response: string
   wantsDownload?: boolean
+  // Adaptive layout props
+  queryType?: 'url' | 'track' | 'artist' | 'genre' | 'id'
+  mainTrack?: TrackEntry
+  similarTracks?: TrackEntry[]
+  artistTracks?: TrackEntry[]
 }>()
+
 
 /* --- States --- */
 const { t } = useI18n()
@@ -45,6 +51,27 @@ const resultsByArtist = computed(() => {
 })
 
 const artistCount = computed(() => Object.keys(resultsByArtist.value).length)
+
+// Adaptive layout helpers
+const isDirectTrackSearch = computed(() =>
+  props.queryType === 'url' || props.queryType === 'track' || props.queryType === 'id'
+)
+
+const showMainTrackSection = computed(() =>
+  isDirectTrackSearch.value && props.mainTrack
+)
+
+const showSimilarSection = computed(() =>
+  props.similarTracks && props.similarTracks.length > 0
+)
+
+const showArtistTracksSection = computed(() =>
+  props.artistTracks && props.artistTracks.length > 0
+)
+
+// Sections collapsed state
+const similarCollapsed = ref(false)
+const artistTracksCollapsed = ref(false)
 
 /* --- Methods --- */
 function toggleArtist(artist: string) {
@@ -233,43 +260,112 @@ async function downloadAsZip() {
             <pre class="mt-2 overflow-x-auto rounded-lg bg-black/30 p-3 text-xs text-purple-300/80"><code>{{ sql }}</code></pre>
           </details>
 
-          <!-- Track list grouped by artist -->
-          <div v-for="(tracks, artist) in resultsByArtist" :key="artist" class="mb-3 last:mb-0">
-            <!-- Artist header (collapsible) -->
-            <button
-              type="button"
-              class="group flex w-full cursor-pointer items-center gap-2 rounded-lg py-2 text-left"
-              @click="toggleArtist(artist as string)"
-            >
-              <UIcon
-                name="i-heroicons-chevron-right"
-                class="h-4 w-4 text-purple-400/60 transition-all duration-200 group-hover:scale-110 group-hover:text-purple-300"
-                :class="{ 'rotate-90': !isArtistCollapsed(artist as string) }"
-              />
-              <UIcon name="i-heroicons-user-circle" class="h-5 w-5 text-purple-400/70 transition-all duration-200 group-hover:scale-110 group-hover:text-purple-300" />
-              <h3 class="flex-1 text-sm font-medium text-purple-300 transition-colors duration-200 group-hover:text-purple-200">{{ artist }}</h3>
-              <span class="text-xs text-purple-400/50 transition-colors duration-200 group-hover:text-purple-300">{{ tracks.length }} tracks</span>
-            </button>
+          <!-- ADAPTIVE LAYOUT: Direct Track Search (URL/Track/ID) -->
+          <template v-if="showMainTrackSection">
+            <!-- Featured Main Track -->
+            <div class="mb-4">
+              <div class="mb-2 flex items-center gap-2">
+                <UIcon name="i-heroicons-star" class="h-4 w-4 text-amber-400" />
+                <span class="text-sm font-medium text-amber-300">Track trouv\u00e9e</span>
+              </div>
+              <div class="rounded-xl border border-purple-500/30 bg-purple-500/5 p-1">
+                <SearchTrackCard :track="mainTrack!" :index="0" />
+              </div>
+            </div>
 
-            <!-- Tracks for this artist (collapsible) -->
-            <Transition
-              enter-active-class="transition-all duration-200 ease-out"
-              enter-from-class="opacity-0 max-h-0"
-              enter-to-class="opacity-100 max-h-[1000px]"
-              leave-active-class="transition-all duration-150 ease-in"
-              leave-from-class="opacity-100 max-h-[1000px]"
-              leave-to-class="opacity-0 max-h-0"
-            >
-              <div v-if="!isArtistCollapsed(artist as string)" class="mt-2 space-y-2 overflow-hidden">
+            <!-- Similar Tracks Section -->
+            <div v-if="showSimilarSection" class="mb-4">
+              <button
+                type="button"
+                class="group flex w-full cursor-pointer items-center gap-2 py-2 text-left"
+                @click="similarCollapsed = !similarCollapsed"
+              >
+                <UIcon
+                  name="i-heroicons-chevron-right"
+                  class="h-4 w-4 text-purple-400/60 transition-all duration-200"
+                  :class="{ 'rotate-90': !similarCollapsed }"
+                />
+                <UIcon name="i-heroicons-musical-note" class="h-4 w-4 text-purple-400/70" />
+                <span class="flex-1 text-sm font-medium text-purple-300">Tracks similaires</span>
+                <span class="text-xs text-purple-400/50">{{ similarTracks!.length }}</span>
+              </button>
+              <div v-if="!similarCollapsed" class="mt-2 space-y-2">
                 <SearchTrackCard
-                  v-for="(track, index) in tracks"
-                  :key="`ai-${track.id}`"
+                  v-for="(track, index) in similarTracks"
+                  :key="`similar-${track.id}`"
                   :track="track"
                   :index="index"
                 />
               </div>
-            </Transition>
-          </div>
+            </div>
+
+            <!-- Artist Tracks Section -->
+            <div v-if="showArtistTracksSection" class="mb-4">
+              <button
+                type="button"
+                class="group flex w-full cursor-pointer items-center gap-2 py-2 text-left"
+                @click="artistTracksCollapsed = !artistTracksCollapsed"
+              >
+                <UIcon
+                  name="i-heroicons-chevron-right"
+                  class="h-4 w-4 text-purple-400/60 transition-all duration-200"
+                  :class="{ 'rotate-90': !artistTracksCollapsed }"
+                />
+                <UIcon name="i-heroicons-user-circle" class="h-4 w-4 text-purple-400/70" />
+                <span class="flex-1 text-sm font-medium text-purple-300">Plus de {{ mainTrack?.artist }}</span>
+                <span class="text-xs text-purple-400/50">{{ artistTracks!.length }}</span>
+              </button>
+              <div v-if="!artistTracksCollapsed" class="mt-2 space-y-2">
+                <SearchTrackCard
+                  v-for="(track, index) in artistTracks"
+                  :key="`artist-${track.id}`"
+                  :track="track"
+                  :index="index"
+                />
+              </div>
+            </div>
+          </template>
+
+          <!-- STANDARD LAYOUT: Genre/Mood Search (grouped by artist) -->
+          <template v-else>
+            <div v-for="(tracks, artist) in resultsByArtist" :key="artist" class="mb-3 last:mb-0">
+              <!-- Artist header (collapsible) -->
+              <button
+                type="button"
+                class="group flex w-full cursor-pointer items-center gap-2 rounded-lg py-2 text-left"
+                @click="toggleArtist(artist as string)"
+              >
+                <UIcon
+                  name="i-heroicons-chevron-right"
+                  class="h-4 w-4 text-purple-400/60 transition-all duration-200 group-hover:scale-110 group-hover:text-purple-300"
+                  :class="{ 'rotate-90': !isArtistCollapsed(artist as string) }"
+                />
+                <UIcon name="i-heroicons-user-circle" class="h-5 w-5 text-purple-400/70 transition-all duration-200 group-hover:scale-110 group-hover:text-purple-300" />
+                <h3 class="flex-1 text-sm font-medium text-purple-300 transition-colors duration-200 group-hover:text-purple-200">{{ artist }}</h3>
+                <span class="text-xs text-purple-400/50 transition-colors duration-200 group-hover:text-purple-300">{{ tracks.length }} tracks</span>
+              </button>
+
+              <!-- Tracks for this artist (collapsible) -->
+              <Transition
+                enter-active-class="transition-all duration-200 ease-out"
+                enter-from-class="opacity-0 max-h-0"
+                enter-to-class="opacity-100 max-h-[1000px]"
+                leave-active-class="transition-all duration-150 ease-in"
+                leave-from-class="opacity-100 max-h-[1000px]"
+                leave-to-class="opacity-0 max-h-0"
+              >
+                <div v-if="!isArtistCollapsed(artist as string)" class="mt-2 space-y-2 overflow-hidden">
+                  <SearchTrackCard
+                    v-for="(track, index) in tracks"
+                    :key="`ai-${track.id}`"
+                    :track="track"
+                    :index="index"
+                  />
+                </div>
+              </Transition>
+            </div>
+          </template>
+
         </div>
       </Transition>
     </template>

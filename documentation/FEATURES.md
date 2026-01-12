@@ -93,6 +93,29 @@ Find acoustically similar tracks using pgvector cosine similarity.
 3. Cosine distance measures similarity between vectors
 4. Lower distance = more similar tracks
 
+**API Usage:**
+```
+GET /api/similar/{soundcloud_id}?limit=10
+```
+
+Returns tracks with a `similarity` score (0-100%, higher is more similar).
+
+### 5. Quality Scoring
+
+Tracks are scored (0-100) based on multiple factors to filter out low-quality content.
+
+**Scoring Criteria:**
+- Duration: Optimal 2-8 minutes, penalized if too short (<1min) or too long (>15min)
+- Engagement: Likes, plays, reposts, comments from SoundCloud
+- Title analysis: Penalized for "mix", "set", "live", "podcast" keywords
+- Download availability: Bonus for free download tracks
+
+**Usage:**
+Cleanup script removes tracks with `quality_score < 40`:
+```bash
+cd apps/web && npx tsx scripts/cleanupLowQualityTracks.ts -y
+```
+
 ---
 
 ## Database Schema
@@ -107,12 +130,33 @@ Find acoustically similar tracks using pgvector cosine similarity.
 | `duration` | INTEGER | Duration in ms |
 | `genre` | TEXT | Genre tag |
 | `bpm_detected` | REAL | BPM (60-200) |
+| `bpm_confidence` | REAL | BPM confidence (0-1) |
 | `key_detected` | TEXT | Musical key (e.g. "A minor") |
+| `key_confidence` | REAL | Key detection confidence (0-1) |
 | `energy` | REAL | Energy level (0-1) |
 | `danceability` | REAL | Danceability (0-1) |
+| `loudness` | REAL | Loudness in dB |
+| `dynamic_complexity` | REAL | Dynamic range complexity (0-1) |
+| `spectral_centroid` | REAL | Brightness measure |
+| `dissonance` | REAL | Dissonance level (0-1) |
+| `speechiness` | REAL | Speech presence (0-1) |
+| `instrumentalness` | REAL | Instrumental vs vocal (0-1) |
+| `acousticness` | REAL | Acoustic vs electronic (0-1) |
+| `valence` | REAL | Musical positivity (0-1) |
+| `liveness` | REAL | Live performance indicator (0-1) |
+| `beat_offset` | REAL | First beat position in seconds |
+| `highlight_time` | INTEGER | Best moment for preview (seconds) |
 | `embedding` | VECTOR(1280) | Audio feature vector |
-| `analysis_status` | TEXT | pending/processing/completed |
+| `analysis_status` | TEXT | pending/processing/completed/failed |
 | `download_status` | TEXT | FreeDirectLink/FreeExternalLink/No |
+| `download_count` | INTEGER | SoundCloud download count |
+| `playback_count` | INTEGER | SoundCloud play count |
+| `likes_count` | INTEGER | SoundCloud likes count |
+| `reposts_count` | INTEGER | SoundCloud reposts count |
+| `comment_count` | INTEGER | SoundCloud comment count |
+| `quality_score` | INTEGER | Computed quality score (0-100) |
+| `analyzed_at` | TIMESTAMP | Last analysis timestamp |
+| `created_at` | TIMESTAMP | Record creation timestamp |
 
 ### profiles table
 

@@ -10,6 +10,7 @@ import {
   calculateMatchScore,
   type MatchResult
 } from '~/server/utils/stringMatch'
+import { containsRejectKeyword } from '~/server/config/qualityRules'
 
 // ============================================================================
 // Constants
@@ -17,6 +18,16 @@ import {
 
 const SEARCH_LIMIT = 25
 const ARTIST_TRACKS_LIMIT = 20
+
+// Duration filter: exclude tracks < 2 min and > 7 min (in milliseconds)
+const DURATION_MIN_MS = 120000  // 2 minutes
+const DURATION_MAX_MS = 420000  // 7 minutes
+
+// Helper to check if a track duration is within acceptable range
+function isValidDuration(durationMs: number | undefined): boolean {
+  if (!durationMs) return false
+  return durationMs >= DURATION_MIN_MS && durationMs <= DURATION_MAX_MS
+}
 const FREE_KEYWORDS = ['free download', 'free dl', 'freedl', 'free']
 
 const FREE_DOWNLOAD_DOMAINS = [
@@ -258,10 +269,19 @@ export interface SearchResult {
 
 export async function searchTracks(query: string, limit = SEARCH_LIMIT): Promise<TrackEntry[]> {
   const soundcloud = createSoundcloudClient()
-  const response = await soundcloud.tracks.search({ q: query, limit })
+  const response = await soundcloud.tracks.search({
+    q: query,
+    limit: limit + 10, // Fetch extra to compensate for filtered tracks
+    'duration[from]': DURATION_MIN_MS,
+    'duration[to]': DURATION_MAX_MS
+  } as Parameters<typeof soundcloud.tracks.search>[0])
   const tracks = response.collection || []
 
-  return tracks.map(mapToTrackEntry)
+  // Filter out mixes/sets and tracks outside 2-7 min range, then map to TrackEntry
+  return tracks
+    .filter(t => !containsRejectKeyword(t.title) && isValidDuration(t.duration))
+    .slice(0, limit)
+    .map(mapToTrackEntry)
 }
 
 export async function getTrackById(soundcloudId: number): Promise<TrackEntry | null> {
@@ -290,7 +310,11 @@ export async function searchWithArtistDetection(
 
   // Build search params with optional filters
   const baseParams = { q: query, limit, offset }
-  const extraParams: Record<string, unknown> = {}
+  const extraParams: Record<string, unknown> = {
+    // Default duration filter: 2-7 minutes (exclude very short/long tracks)
+    'duration[from]': DURATION_MIN_MS,
+    'duration[to]': DURATION_MAX_MS
+  }
   if (filters?.genres) {
     extraParams.genres = filters.genres
   }
@@ -310,7 +334,10 @@ export async function searchWithArtistDetection(
     console.error('[SoundCloud] Track search failed:', tracksResult.reason)
   }
   const tracksResponse = tracksResult.status === 'fulfilled' ? tracksResult.value : { collection: [], next_href: null }
-  const tracks = (tracksResponse.collection || []).map(mapToTrackEntry)
+  // Filter out mixes/sets and tracks outside 2-7 min range
+  const tracks = (tracksResponse.collection || [])
+    .filter(t => !containsRejectKeyword(t.title) && isValidDuration(t.duration))
+    .map(mapToTrackEntry)
   const hasMore = !!tracksResponse.next_href
   const nextOffset = hasMore ? offset + limit : undefined
 
@@ -356,7 +383,11 @@ export async function searchWithArtistDetection(
   try {
     // Found matching artist, get their tracks
     const artistTracks = await soundcloud.users.tracks(matchingUser.id)
-    const mappedArtistTracks = (artistTracks || []).slice(0, ARTIST_TRACKS_LIMIT).map(mapToTrackEntry)
+    // Filter out mixes/sets and tracks outside 2-7 min range
+    const mappedArtistTracks = (artistTracks || [])
+      .filter(t => !containsRejectKeyword(t.title) && isValidDuration(t.duration))
+      .slice(0, ARTIST_TRACKS_LIMIT)
+      .map(mapToTrackEntry)
 
     if (mappedArtistTracks.length > 0) {
       return {
@@ -394,4 +425,115 @@ export async function searchWithArtistDetection(
   }
 
   return { tracks, hasMore, nextOffset, artistSearchAttempted: true }
+}
+
+// Resolve a SoundCloud URL to a track
+export async function resolveTrackUrl(url: string): Promise<TrackEntry | null> {
+  const soundcloud = createSoundcloudClient()
+
+  // Extract username and track slug from URL
+  const urlMatch = url.match(/soundcloud\.com\/([^/]+)\/([^/?\s]+)/)
+  if (!urlMatch) return null
+
+  const [, username, trackSlug] = urlMatch
+
+  // Search for the track by combining username and slug
+  // This is more reliable than trying to resolve the URL directly
+  const searchQuery = `${username} ${trackSlug.replace(/-/g, ' ')}`
+  try {
+    const response = await soundcloud.tracks.search({ q: searchQuery, limit: 10 })
+    const tracks = response.collection || []
+
+    // Find the track that matches the URL
+    const matchingTrack = tracks.find(track => {
+      const trackUrl = track.permalink_url.toLowerCase()
+      return trackUrl.includes(username.toLowerCase()) &&
+             trackUrl.includes(trackSlug.toLowerCase())
+    })
+
+    if (matchingTrack) {
+      return mapToTrackEntry(matchingTrack)
+    }
+
+    // If no exact match, return the first result if it's from the same user
+    const firstResult = tracks[0]
+    if (firstResult?.user?.username.toLowerCase() === username.toLowerCase()) {
+      return mapToTrackEntry(firstResult)
+    }
+
+    return null
+  } catch (err) {
+    console.error('[SoundCloud] URL resolution failed:', err)
+    return null
+  }
+}
+
+// Search for an exact track by artist and title
+export async function searchExactTrack(artistName: string, trackTitle: string): Promise<TrackEntry | null> {
+  const soundcloud = createSoundcloudClient()
+
+  // Search with both artist and title
+  const searchQuery = `${artistName} ${trackTitle}`
+  try {
+    const response = await soundcloud.tracks.search({ q: searchQuery, limit: 20 })
+    const tracks = response.collection || []
+
+    // Normalize strings for comparison
+    const normalizeStr = (s: string) => s.toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    const normalizedArtist = normalizeStr(artistName)
+    const normalizedTitle = normalizeStr(trackTitle)
+
+    // Find best matching track
+    let bestMatch: typeof tracks[0] | null = null
+    let bestScore = 0
+
+    for (const track of tracks) {
+      const trackArtist = normalizeStr(track.user?.username || '')
+      const trackTitle = normalizeStr(track.title)
+
+      // Calculate match score
+      let score = 0
+
+      // Artist match
+      if (trackArtist === normalizedArtist) score += 50
+      else if (trackArtist.includes(normalizedArtist) || normalizedArtist.includes(trackArtist)) score += 30
+
+      // Title match
+      if (trackTitle === normalizedTitle) score += 50
+      else if (trackTitle.includes(normalizedTitle) || normalizedTitle.includes(trackTitle)) score += 30
+
+      if (score > bestScore) {
+        bestScore = score
+        bestMatch = track
+      }
+    }
+
+    // Require at least a reasonable match score
+    if (bestMatch && bestScore >= 60) {
+      return mapToTrackEntry(bestMatch)
+    }
+
+    // Fallback: return first result if search terms appear in it
+    if (tracks.length > 0) {
+      const first = tracks[0]
+      const firstArtist = normalizeStr(first.user?.username || '')
+      const firstTitle = normalizeStr(first.title)
+
+      if (
+        (firstArtist.includes(normalizedArtist) || normalizedArtist.includes(firstArtist)) &&
+        (firstTitle.includes(normalizedTitle) || normalizedTitle.includes(firstTitle))
+      ) {
+        return mapToTrackEntry(first)
+      }
+    }
+
+    return null
+  } catch (err) {
+    console.error('[SoundCloud] Exact track search failed:', err)
+    return null
+  }
 }

@@ -1,9 +1,54 @@
-import { searchWithArtistDetection, getTrackById, type SearchResult } from '~/server/services/soundcloud'
+import { searchWithArtistDetection, getTrackById, resolveTrackUrl, searchExactTrack, type SearchResult } from '~/server/services/soundcloud'
 import { upsertTracks, enrichTracksWithAnalysis } from '~/server/services/trackStorage'
-import { generateSqlAndPhrase } from '~/server/services/aiQuery'
+import { generateSqlAndPhrase, type ClarificationOption } from '~/server/services/aiQuery'
 import { createClient } from '@supabase/supabase-js'
-import { type DbTrackWithAnalysis, dbTrackToTrackEntry } from '~/types'
+import { type DbTrackWithAnalysis, dbTrackToTrackEntry, type TrackEntry } from '~/types'
 import { logger } from '~/server/utils/logger'
+
+// Query type detection
+type QueryType = 'url' | 'track' | 'artist' | 'genre' | 'id'
+
+interface QueryAnalysis {
+  type: QueryType
+  soundcloudUrl?: string
+  artistName?: string
+  trackTitle?: string
+  soundcloudId?: number
+}
+
+function analyzeQuery(query: string): QueryAnalysis {
+  const q = query.trim()
+
+  // 1. Direct SoundCloud ID (format: "id:123456")
+  const idMatch = q.match(/^id:(\d+)$/i)
+  if (idMatch) {
+    return { type: 'id', soundcloudId: parseInt(idMatch[1], 10) }
+  }
+
+  // 2. SoundCloud URL
+  const urlMatch = q.match(/soundcloud\.com\/([^/]+)\/([^/?\s]+)/)
+  if (urlMatch) {
+    return {
+      type: 'url',
+      soundcloudUrl: q.includes('http') ? q : `https://${q}`,
+      artistName: urlMatch[1],
+      trackTitle: urlMatch[2]
+    }
+  }
+
+  // 3. Format "Artiste - Titre" (with various dash types)
+  const trackMatch = q.match(/^(.+?)\s*[-–—]\s*(.+)$/)
+  if (trackMatch && trackMatch[1].length > 1 && trackMatch[2].length > 1) {
+    return {
+      type: 'track',
+      artistName: trackMatch[1].trim(),
+      trackTitle: trackMatch[2].trim()
+    }
+  }
+
+  // 4. Default to genre/mood search (AI will decide)
+  return { type: 'genre' }
+}
 
 interface CascadeSearchResult extends SearchResult {
   source: 'database' | 'soundcloud'
@@ -11,6 +56,15 @@ interface CascadeSearchResult extends SearchResult {
   artistSearchAttempted?: boolean
   artistSearchFailed?: boolean
   wantsDownload?: boolean
+  // New: query type and adaptive results
+  queryType?: QueryType
+  mainTrack?: TrackEntry
+  similarTracks?: TrackEntry[]
+  artistTracks?: TrackEntry[]
+  // New: clarification
+  needsClarification?: boolean
+  clarificationQuestion?: string
+  clarificationOptions?: ClarificationOption[]
 }
 
 export default defineEventHandler(async (event): Promise<CascadeSearchResult> => {
@@ -25,34 +79,22 @@ export default defineEventHandler(async (event): Promise<CascadeSearchResult> =>
 
   const offsetNum = typeof offset === 'string' ? parseInt(offset, 10) : 0
 
-  // Check for direct SoundCloud ID search (format: "id:123456")
-  const idMatch = q.match(/^id:(\d+)$/i)
-  if (idMatch) {
-    const soundcloudId = parseInt(idMatch[1], 10)
-    logger.sc.search(`id:${soundcloudId}`, 1)
+  // Analyze query type
+  const analysis = analyzeQuery(q)
 
-    const track = await getTrackById(soundcloudId)
-    if (!track) {
-      return {
-        source: 'soundcloud',
-        tracks: [],
-        hasMore: false
-      }
-    }
+  // Handle direct ID search
+  if (analysis.type === 'id' && analysis.soundcloudId) {
+    return await handleIdSearch(analysis.soundcloudId)
+  }
 
-    // Enrich with analysis data
-    const enrichedTracks = await enrichTracksWithAnalysis([track])
+  // Handle SoundCloud URL
+  if (analysis.type === 'url' && analysis.soundcloudUrl) {
+    return await handleUrlSearch(analysis.soundcloudUrl)
+  }
 
-    // Store in database
-    upsertTracks([track]).catch(err => {
-      logger.db.error(err instanceof Error ? err.message : 'Failed to store track')
-    })
-
-    return {
-      source: 'soundcloud',
-      tracks: enrichedTracks,
-      hasMore: false
-    }
+  // Handle "Artist - Title" format
+  if (analysis.type === 'track' && analysis.artistName && analysis.trackTitle) {
+    return await handleTrackSearch(analysis.artistName, analysis.trackTitle)
   }
 
   // For pagination (offset > 0), skip AI query and go directly to SoundCloud
@@ -60,19 +102,137 @@ export default defineEventHandler(async (event): Promise<CascadeSearchResult> =>
     return await searchSoundCloud(q, offsetNum)
   }
 
-  // Step 1: Generate AI query (SQL + SoundCloud query + filters)
-  let aiResult
-  try {
-    aiResult = await generateSqlAndPhrase(q)
-    logger.ai.query(q)
-    logger.ai.sql(aiResult.sql)
-  } catch (err) {
-    logger.ai.error(err instanceof Error ? err.message : 'AI query generation failed')
-    // Fallback to SoundCloud on AI error
-    return await searchSoundCloud(q, offsetNum)
+  // Default: AI-powered search (genre/mood/artist)
+  return await handleAiSearch(q, offsetNum)
+})
+
+// Handler: Direct SoundCloud ID
+async function handleIdSearch(soundcloudId: number): Promise<CascadeSearchResult> {
+  logger.sc.search(`id:${soundcloudId}`, 1)
+
+  const track = await getTrackById(soundcloudId)
+  if (!track) {
+    return { source: 'soundcloud', tracks: [], hasMore: false, queryType: 'id' }
   }
 
-  // Step 2: Try database search first
+  const [enrichedTracks, similarTracks] = await Promise.all([
+    enrichTracksWithAnalysis([track]),
+    fetchSimilarTracks(soundcloudId)
+  ])
+
+  upsertTracks([track]).catch(err => {
+    logger.db.error(err instanceof Error ? err.message : 'Failed to store track')
+  })
+
+  return {
+    source: 'soundcloud',
+    tracks: enrichedTracks,
+    hasMore: false,
+    queryType: 'id',
+    mainTrack: enrichedTracks[0],
+    similarTracks
+  }
+}
+
+// Handler: SoundCloud URL resolution
+async function handleUrlSearch(url: string): Promise<CascadeSearchResult> {
+  logger.sc.search(`url:${url}`, 1)
+
+  try {
+    const track = await resolveTrackUrl(url)
+    if (!track) {
+      return { source: 'soundcloud', tracks: [], hasMore: false, queryType: 'url' }
+    }
+
+    const [enrichedTracks, similarTracks, artistTracks] = await Promise.all([
+      enrichTracksWithAnalysis([track]),
+      fetchSimilarTracks(track.id),
+      fetchArtistTracks(track.artist)
+    ])
+
+    upsertTracks([track]).catch(err => {
+      logger.db.error(err instanceof Error ? err.message : 'Failed to store track')
+    })
+
+    return {
+      source: 'soundcloud',
+      tracks: enrichedTracks,
+      hasMore: false,
+      queryType: 'url',
+      mainTrack: enrichedTracks[0],
+      similarTracks,
+      artistTracks,
+      response: `Track trouvée: ${track.title}`
+    }
+  } catch (err) {
+    logger.sc.error(`URL resolution failed: ${err instanceof Error ? err.message : 'Unknown'}`)
+    return { source: 'soundcloud', tracks: [], hasMore: false, queryType: 'url' }
+  }
+}
+
+// Handler: "Artist - Title" format
+async function handleTrackSearch(artistName: string, trackTitle: string): Promise<CascadeSearchResult> {
+  logger.sc.search(`track:${artistName} - ${trackTitle}`, 1)
+
+  try {
+    const track = await searchExactTrack(artistName, trackTitle)
+    if (!track) {
+      // Fallback to regular search if exact match not found
+      return await searchSoundCloud(`${artistName} ${trackTitle}`, 0)
+    }
+
+    const [enrichedTracks, similarTracks, artistTracks] = await Promise.all([
+      enrichTracksWithAnalysis([track]),
+      fetchSimilarTracks(track.id),
+      fetchArtistTracks(artistName)
+    ])
+
+    upsertTracks([track]).catch(err => {
+      logger.db.error(err instanceof Error ? err.message : 'Failed to store track')
+    })
+
+    return {
+      source: 'soundcloud',
+      tracks: enrichedTracks,
+      hasMore: false,
+      queryType: 'track',
+      mainTrack: enrichedTracks[0],
+      similarTracks,
+      artistTracks,
+      response: `"${trackTitle}" de ${artistName}`
+    }
+  } catch (err) {
+    logger.sc.error(`Track search failed: ${err instanceof Error ? err.message : 'Unknown'}`)
+    return await searchSoundCloud(`${artistName} ${trackTitle}`, 0)
+  }
+}
+
+// Handler: AI-powered search
+async function handleAiSearch(query: string, offset: number): Promise<CascadeSearchResult> {
+  let aiResult
+  try {
+    aiResult = await generateSqlAndPhrase(query)
+    logger.ai.query(query)
+    if (aiResult.sql) logger.ai.sql(aiResult.sql)
+  } catch (err) {
+    logger.ai.error(err instanceof Error ? err.message : 'AI query generation failed')
+    return await searchSoundCloud(query, offset)
+  }
+
+  // Handle clarification needed
+  if (aiResult.needsClarification) {
+    return {
+      source: 'database',
+      tracks: [],
+      hasMore: false,
+      queryType: 'genre',
+      needsClarification: true,
+      clarificationQuestion: aiResult.clarificationQuestion,
+      clarificationOptions: aiResult.clarificationOptions
+    }
+  }
+
+  // Try database search first
   const dbResults = await executeDbQuery(aiResult.sql)
 
   if (dbResults.length > 0) {
@@ -82,20 +242,67 @@ export default defineEventHandler(async (event): Promise<CascadeSearchResult> =>
       tracks: dbResults,
       response: aiResult.phrase,
       hasMore: false,
-      wantsDownload: aiResult.wantsDownload
+      wantsDownload: aiResult.wantsDownload,
+      queryType: 'genre'
     }
   }
 
-  // Step 3: Fallback to SoundCloud with AI-optimized query and filters
+  // Fallback to SoundCloud
   logger.ai.result(0, 'No DB results, falling back to SoundCloud')
   return await searchSoundCloud(
     aiResult.soundcloudQuery,
-    offsetNum,
+    offset,
     aiResult.soundcloudFilters,
     aiResult.phrase,
     aiResult.wantsDownload
   )
-})
+}
+
+// Helper: Fetch similar tracks from database
+async function fetchSimilarTracks(trackId: number): Promise<TrackEntry[]> {
+  const config = useRuntimeConfig()
+  const supabaseUrl = config.supabaseUrl as string
+  const supabaseKey = config.supabaseKey as string
+
+  if (!supabaseUrl || !supabaseKey) return []
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey)
+    const { data, error } = await supabase.rpc('find_similar_tracks', {
+      source_track_id: trackId,
+      limit_count: 10
+    })
+
+    if (error || !data) return []
+    return data.map((row: DbTrackWithAnalysis) => dbTrackToTrackEntry(row))
+  } catch {
+    return []
+  }
+}
+
+// Helper: Fetch artist tracks from database
+async function fetchArtistTracks(artistName: string): Promise<TrackEntry[]> {
+  const config = useRuntimeConfig()
+  const supabaseUrl = config.supabaseUrl as string
+  const supabaseKey = config.supabaseKey as string
+
+  if (!supabaseUrl || !supabaseKey) return []
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey)
+    const { data, error } = await supabase
+      .from('tracks')
+      .select('*')
+      .ilike('artist', `%${artistName}%`)
+      .order('playback_count', { ascending: false })
+      .limit(10)
+
+    if (error || !data) return []
+    return data.map((row: DbTrackWithAnalysis) => dbTrackToTrackEntry(row))
+  } catch {
+    return []
+  }
+}
 
 // Helper: Execute SQL query on database
 async function executeDbQuery(sql: string): Promise<ReturnType<typeof dbTrackToTrackEntry>[]> {

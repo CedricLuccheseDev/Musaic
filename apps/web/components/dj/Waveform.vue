@@ -152,12 +152,7 @@ function drawWaveform() {
   const currentPos = displayTime * pxPerSec
   const startX = currentPos - centerX
 
-  // DEBUG: Skip waveform rendering to test if it's the cause of stuttering
-  // If stuttering stops without this, the problem is in waveform rendering
-  // If stuttering continues, the problem is elsewhere
-  const SKIP_WAVEFORM_RENDERING = true
-
-  if (!SKIP_WAVEFORM_RENDERING && waveformData && waveformData.length > 0) {
+  if (waveformData && waveformData.length > 0) {
     const barSpacing = BAR_WIDTH + BAR_GAP
     const startSample = Math.floor(startX / barSpacing)
     const visibleBars = Math.ceil(width / barSpacing) + 2

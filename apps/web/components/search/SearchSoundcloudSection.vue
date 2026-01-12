@@ -13,6 +13,14 @@ const props = defineProps<{
   detectedArtist?: ArtistInfo
   artistSearchAttempted?: boolean
   artistSearchFailed?: boolean
+  // Search more mode (when used after AI results)
+  showSearchButton?: boolean
+  searchButtonLoading?: boolean
+}>()
+
+/* --- Emits --- */
+const emit = defineEmits<{
+  'search-more': []
 }>()
 
 /* --- States --- */
@@ -162,6 +170,30 @@ function shouldShowAd(index: number): boolean {
         </div>
       </Transition>
     </template>
+
+    <!-- Search more button (when used after AI results with no SC results yet) -->
+    <div v-else-if="showSearchButton" class="py-6">
+      <button
+        type="button"
+        class="group flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-orange-500/30 bg-orange-500/10 py-4 transition-all hover:border-orange-400/50 hover:bg-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+        :disabled="searchButtonLoading"
+        @click="emit('search-more')"
+      >
+        <UIcon
+          v-if="searchButtonLoading"
+          name="i-heroicons-arrow-path"
+          class="h-5 w-5 animate-spin text-orange-400"
+        />
+        <UIcon
+          v-else
+          name="i-simple-icons-soundcloud"
+          class="h-5 w-5 text-orange-400 transition-transform group-hover:scale-110"
+        />
+        <span class="font-medium text-orange-400 transition-colors group-hover:text-orange-300">
+          {{ searchButtonLoading ? t.searching : 'Chercher plus sur SoundCloud' }}
+        </span>
+      </button>
+    </div>
 
     <!-- No results after filter -->
     <div v-else class="py-12 text-center">
