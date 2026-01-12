@@ -1,5 +1,7 @@
 """Audio downloader using yt-dlp for SoundCloud and YouTube tracks."""
 
+from __future__ import annotations
+
 import asyncio
 import json
 import subprocess
@@ -8,9 +10,13 @@ import aiofiles
 import httpx
 import io
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from app.config import get_settings
 from app.logger import log
+
+if TYPE_CHECKING:
+    from app.config import Settings
 
 
 class DownloadError(Exception):
@@ -88,7 +94,7 @@ async def _search_youtube(query: str, expected_duration_ms: int) -> str | None:
     return best_match
 
 
-def _download_from_youtube(url: str, temp_dir: Path, settings) -> Path:
+def _download_from_youtube(url: str, temp_dir: Path, settings: "Settings") -> Path:
     """
     Download audio from YouTube URL using yt-dlp.
 
@@ -183,7 +189,6 @@ async def _get_stream_url(
         raise StreamUnavailableError(f"API error ({response.status_code})")
 
     track_data = response.json()
-    title = track_data.get("title", "Unknown")
 
     # Check if track is streamable
     if not track_data.get("streamable", True):
@@ -463,7 +468,7 @@ async def download_full_audio_async(
     raise DownloadError("All download methods failed (SoundCloud + YouTube)")
 
 
-def _download_with_ytdlp(url: str, temp_dir: Path, settings) -> Path:
+def _download_with_ytdlp(url: str, temp_dir: Path, settings: Settings) -> Path:
     """
     Fallback download using yt-dlp (synchronous, runs in thread).
 

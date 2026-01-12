@@ -58,7 +58,7 @@ Only include sections that are used.
 
 ```bash
 # Frontend (run all before commit)
-cd apps/web && npm run lint && npm run test && npx nuxi typecheck && npm run build
+cd apps/web && bun run lint && bun run test && bun run nuxi typecheck && bun run build
 
 # Backend
 python3 -m py_compile apps/analyzer/app/*.py
@@ -70,7 +70,7 @@ These are the same checks that run in CI. All must pass before committing.
 
 ```bash
 # Frontend
-cd apps/web && npm run test
+cd apps/web && bun run test
 
 # Backend
 cd apps/analyzer && python -m pytest
@@ -108,7 +108,7 @@ Extract 20-40 artist names, label names, and genre terms.
 
 ### Step 3: Run Script
 ```bash
-cd apps/web && npx tsx scripts/populateTracks.ts '<JSON_CONFIG>'
+cd apps/web && bun scripts/populateTracks.ts '<JSON_CONFIG>'
 ```
 
 Config format:
@@ -126,7 +126,7 @@ Config format:
 When user says "lance le clean", "cleanup", "nettoie la db" or similar:
 
 ```bash
-cd apps/web && npx tsx scripts/cleanupLowQualityTracks.ts -y
+cd apps/web && bun scripts/cleanupLowQualityTracks.ts -y
 ```
 
 This removes tracks with quality score < 40 (mixes, too short/long, low engagement).
@@ -148,3 +148,34 @@ curl -X POST "http://localhost:9000/analyze/batch/beat-offset?soundcloud_id=<ID>
 
 This reanalyzes only the beat_offset using the existing BPM. Useful after algorithm improvements.
 The analyzer must be running (`docker-compose up analyzer` or local uvicorn).
+
+## Full Reanalysis
+
+When user says "réanalyse tout", "full reanalysis", "recalcule tout" or similar:
+
+```bash
+curl -X POST http://localhost:9000/analyze/batch/full-reanalysis
+```
+
+This fully reanalyzes all completed tracks (BPM + beat_offset). Use after major algorithm changes.
+
+## Analysis Status Check
+
+To check the status of track analysis:
+
+```bash
+cd apps/web && bun scripts/checkAnalysisStatus.ts
+```
+
+## Database Seeding
+
+To seed the database with initial data:
+
+```bash
+cd apps/web && bun run seed
+```
+
+Or directly:
+```bash
+cd apps/web && bun scripts/seed-database.ts
+```

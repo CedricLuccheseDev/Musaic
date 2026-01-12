@@ -1,26 +1,18 @@
-# Stage 1: Dependencies (cached layer)
-FROM node:20-alpine AS deps
+# Stage 1: Dependencies
+FROM oven/bun:1 AS deps
 WORKDIR /app
-
-# Copy only package files first (better cache)
-COPY apps/web/package.json apps/web/package-lock.json* ./
-RUN npm ci --prefer-offline --no-audit --no-fund
+COPY apps/web/package.json apps/web/bun.lockb* ./
+RUN bun install --frozen-lockfile
 
 # Stage 2: Builder
-FROM node:20-alpine AS builder
+FROM oven/bun:1 AS builder
 WORKDIR /app
-
-# Copy dependencies
 COPY --from=deps /app/node_modules ./node_modules
-
-# Copy web app
 COPY apps/web/ .
-
-# Build with reduced telemetry
 ENV NUXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN bun run build
 
-# Stage 3: Runner (minimal image)
+# Stage 3: Runner (Node.js car output Nuxt = Node)
 FROM node:20-alpine AS runner
 WORKDIR /app
 

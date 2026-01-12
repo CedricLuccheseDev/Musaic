@@ -1,15 +1,21 @@
 """Batch analysis endpoints."""
 
+from __future__ import annotations
+
 import asyncio
 import time
 from collections import deque
 from threading import Lock
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, BackgroundTasks
 from supabase import create_client
 
 from app.analyzer import AnalysisError, analyze_audio, analyze_audio_from_bytes, reanalyze_beat_offset_from_bytes
 from app.config import get_settings
+
+if TYPE_CHECKING:
+    from app.config import Settings
 from app.downloader import (
     DownloadError,
     stream_audio_to_memory,
@@ -54,7 +60,7 @@ async def analyze_single_track_streaming(
     track: dict,
     download_semaphore: asyncio.Semaphore,
     analyze_semaphore: asyncio.Semaphore,
-    settings,
+    settings: Settings,
 ) -> bool:
     """
     Analyze a track using streaming (no file download).
@@ -409,7 +415,7 @@ async def reanalyze_beat_offset_single_track(
     track: dict,
     download_semaphore: asyncio.Semaphore,
     analyze_semaphore: asyncio.Semaphore,
-    settings,
+    settings: Settings,
 ) -> bool:
     """Reanalyze beat_offset for a single track."""
     global beat_offset_state
