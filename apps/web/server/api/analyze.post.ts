@@ -1,20 +1,10 @@
-import { logger } from '~/server/utils/logger'
+import { sendAnalysisRequest } from '~/server/utils/analyzer'
 
 interface AnalyzeRequest {
   soundcloud_ids: number[]
 }
 
 export default defineEventHandler(async (event) => {
-  const config = useRuntimeConfig()
-  const analyzerUrl = config.analyzerUrl as string
-
-  if (!analyzerUrl) {
-    throw createError({
-      statusCode: 503,
-      message: 'Analyzer service not configured'
-    })
-  }
-
   const body = await readBody<AnalyzeRequest>(event)
 
   if (!body.soundcloud_ids || !Array.isArray(body.soundcloud_ids) || body.soundcloud_ids.length === 0) {
@@ -24,35 +14,8 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Limit batch size
-  const ids = body.soundcloud_ids.slice(0, 100)
+  // Use analyzer service with batch size limit of 100
+  const result = await sendAnalysisRequest(body.soundcloud_ids, { batchSize: 100 })
 
-  try {
-    const response = await fetch(`${analyzerUrl}/analyze/batch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ soundcloud_ids: ids })
-    })
-
-    if (!response.ok) {
-      const error = await response.text()
-      logger.error('Server', `Analyzer error: ${error}`)
-      throw createError({
-        statusCode: response.status,
-        message: `Analyzer error: ${error}`
-      })
-    }
-
-    const result = await response.json()
-    return result
-  } catch (error) {
-    if (error instanceof Error && 'statusCode' in error) {
-      throw error
-    }
-    logger.error('Server', `Analyzer unreachable: ${error}`)
-    throw createError({
-      statusCode: 503,
-      message: 'Analyzer service unavailable'
-    })
-  }
+  return result
 })

@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
-import { type DbTrack, dbTrackToTrackEntry } from '~/types'
+import { getSimilarTracks } from '~/server/services/database'
+import { logger } from '~/server/utils/logger'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
@@ -13,40 +13,19 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const config = useRuntimeConfig()
-  const supabaseUrl = config.supabaseUrl as string
-  const supabaseKey = config.supabaseKey as string
+  try {
+    const tracks = await getSimilarTracks(Number(id), limit)
 
-  if (!supabaseUrl || !supabaseKey) {
-    throw createError({
-      statusCode: 500,
-      message: 'Supabase not configured'
-    })
-  }
+    if (tracks.length === 0) {
+      return { tracks: [], message: 'No similar tracks found' }
+    }
 
-  const supabase = createClient(supabaseUrl, supabaseKey)
-
-  const { data, error } = await supabase.rpc('find_similar_tracks', {
-    source_track_id: Number(id),
-    limit_count: limit
-  })
-
-  if (error) {
-    console.error('Similar tracks error:', error)
+    return { tracks }
+  } catch (error) {
+    logger.db.error(`Failed to get similar tracks for ${id}: ${error}`)
     throw createError({
       statusCode: 500,
       message: 'Failed to find similar tracks'
     })
   }
-
-  if (!data || data.length === 0) {
-    return { tracks: [], message: 'No similar tracks found' }
-  }
-
-  const tracks = (data as (DbTrack & { distance: number })[]).map((row) => ({
-    ...dbTrackToTrackEntry(row),
-    similarity: Math.round((1 - row.distance) * 100)
-  }))
-
-  return { tracks }
 })

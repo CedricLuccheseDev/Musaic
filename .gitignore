@@ -77,3 +77,6 @@ logs/
 
 # ----- Misc -----
 *-player-script.js
+
+# ----- Claude Code (local instructions) -----
+CLAUDE.md

@@ -1,7 +1,8 @@
 // Search history composable - localStorage based
 // Phase 2 will add Supabase sync for logged-in users
 
-const STORAGE_KEY = 'musaic_search_history'
+import { useLocalStorage } from '~/composables/utils/useLocalStorage'
+
 const MAX_HISTORY = 15
 
 export interface SearchHistoryEntry {
@@ -11,38 +12,38 @@ export interface SearchHistoryEntry {
   resultCount?: number
 }
 
+function isValidSearchHistory(value: unknown): value is SearchHistoryEntry[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      entry =>
+        typeof entry === 'object' &&
+        entry !== null &&
+        'query' in entry &&
+        'timestamp' in entry &&
+        'queryType' in entry &&
+        typeof entry.query === 'string' &&
+        typeof entry.timestamp === 'number'
+    )
+  )
+}
+
 export function useSearchHistory() {
   const history = useState<SearchHistoryEntry[]>('searchHistory', () => [])
 
-  // Load history from localStorage on client
-  function loadHistory(): SearchHistoryEntry[] {
-    if (import.meta.server) return []
-
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (!stored) return []
-      const parsed = JSON.parse(stored) as SearchHistoryEntry[]
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return []
+  // Use shared localStorage utility
+  const historyStorage = useLocalStorage<SearchHistoryEntry[]>(
+    'musaic_search_history',
+    [],
+    {
+      validator: isValidSearchHistory
     }
-  }
-
-  // Save history to localStorage
-  function persistHistory(entries: SearchHistoryEntry[]) {
-    if (import.meta.server) return
-
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
-    } catch {
-      // localStorage might be full or disabled
-    }
-  }
+  )
 
   // Initialize history on mount
   function initHistory() {
     if (import.meta.server) return
-    history.value = loadHistory()
+    history.value = historyStorage.load()
   }
 
   // Save a new search
@@ -71,7 +72,7 @@ export function useSearchHistory() {
     const updated = [newEntry, ...filtered].slice(0, MAX_HISTORY)
 
     history.value = updated
-    persistHistory(updated)
+    historyStorage.save(updated)
   }
 
   // Get recent searches (optionally filtered by partial match)
@@ -97,7 +98,7 @@ export function useSearchHistory() {
   // Clear all history
   function clearHistory() {
     history.value = []
-    persistHistory([])
+    historyStorage.clear()
   }
 
   // Remove a specific entry
@@ -106,7 +107,7 @@ export function useSearchHistory() {
       entry => entry.query.toLowerCase() !== query.toLowerCase()
     )
     history.value = updated
-    persistHistory(updated)
+    historyStorage.save(updated)
   }
 
   return {

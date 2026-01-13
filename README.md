@@ -3,6 +3,9 @@
 Music search platform for DJs and producers.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+[![CI](https://github.com/CedricLuccheseDev/Musaic/actions/workflows/ci.yml/badge.svg)](https://github.com/CedricLuccheseDev/Musaic/actions/workflows/ci.yml)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](documentation/CONTRIBUTING.md)
+[![Code of Conduct](https://img.shields.io/badge/code%20of%20conduct-contributor%20covenant-purple.svg)](documentation/CODE_OF_CONDUCT.md)
 
 ## Features
 
@@ -57,18 +60,20 @@ Musaic/
 
 - [Features & Architecture](documentation/FEATURES.md)
 - [API Reference](documentation/API.md)
+- [Contributing Guide](documentation/CONTRIBUTING.md)
 - [Code Standards](documentation/STANDARDS.md)
-- [Contributing](documentation/CONTRIBUTING.md)
+- [Code of Conduct](documentation/CODE_OF_CONDUCT.md)
+- [Security Policy](documentation/SECURITY.md)
 
 ## Contributing
 
-Contributions are welcome! Please read the [Contributing Guide](documentation/CONTRIBUTING.md) first.
+Contributions are welcome! See [Contributing Guide](documentation/CONTRIBUTING.md) for setup instructions.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
+**Quick start:**
+1. Create branch from `dev`: `git checkout -b feature/your-feature`
+2. Make changes following [code standards](documentation/STANDARDS.md)
+3. Run tests & validation
+4. Create PR to `dev`
 
 ## License
 

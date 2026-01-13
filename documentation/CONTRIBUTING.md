@@ -75,38 +75,20 @@ python -m app.main
 ## Development Workflow
 
 1. Create a branch from `dev`: `git checkout -b feature/your-feature`
-2. Make changes following [code standards](STANDARDS.md)
-3. Test your changes locally
-4. Run linting: `npm run lint` (frontend)
-5. Commit with conventional format
-6. Push and create a PR targeting `dev`
+2. Make changes following [STANDARDS.md](STANDARDS.md)
+3. Run validation locally (see commands above)
+4. Commit: `git commit -m "feat(scope): description"`
+5. Push and create a PR to `dev`
 
-## Commit Convention
-
-Format: `type(scope): description`
-
-### Types
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation
-- `refactor`: Code refactoring
-- `test`: Tests
-- `chore`: Maintenance
-
-### Examples
-```
-feat(web): Add dark mode toggle
-fix(analyzer): Handle timeout on large files
-docs: Update API documentation
-```
+See [STANDARDS.md](STANDARDS.md) for commit conventions and code style.
 
 ## Pull Requests
 
-- Target the `dev` branch
-- Describe your changes clearly
-- Ensure CI passes (lint, tests, build)
+- Target `dev` branch
 - One feature/fix per PR
+- Clear description of changes
+- CI must pass
 
-## Need Help?
+## Questions?
 
-Open an issue on GitHub if you have questions.
+Open an issue on GitHub.
