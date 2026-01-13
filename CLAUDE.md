@@ -1,99 +1,31 @@
-# Claude Code Guidelines - Musaic Monorepo
+# Claude Code Guidelines - Musaic
 
-## Project Structure
+## Code Standards
 
-```
-Musaic/
-├── apps/
-│   ├── web/          # Frontend (Nuxt 3 / TypeScript)
-│   └── analyzer/     # Backend (FastAPI / Python)
-├── documentation/    # Project documentation
-└── supabase/         # Database migrations
-```
+See [documentation/STANDARDS.md](documentation/STANDARDS.md) for complete style guide.
 
-## Code Style
-
-### General
+**Quick reference:**
+- TypeScript: camelCase files/vars, PascalCase components/types
+- Python: snake_case, PascalCase classes
+- No `eslint-disable` or `type:ignore`
 - Comments in English
-- SOLID architecture principles
-- No eslint-disable or type:ignore comments
 
-### TypeScript (apps/web/)
-- camelCase for folders, files, and variables
-- PascalCase for components and types
-- Script above template in Vue files
-
-### Python (apps/analyzer/)
-- snake_case for files, functions, variables
-- PascalCase for classes
-- Docstrings for public functions
-
-## Vue Script Sections
-
-In Vue `<script setup>` blocks, organize code with section comments:
-
-```vue
-<script setup lang="ts">
-/* --- Props --- */
-/* --- Emits --- */
-/* --- States --- */
-/* --- Computed --- */
-/* --- Methods --- */
-/* --- Watchers --- */
-/* --- Lifecycle --- */
-</script>
-```
-
-Only include sections that are used.
-
-## Components
-
-- Max 100 lines per component
-- Independent components: props, slots, emits
-- Use Nuxt UI components
-
-## Validation
-
-**IMPORTANT: Before committing, run all CI checks locally:**
+## Validation Before Commit
 
 ```bash
-# Frontend (run all before commit)
+# Frontend
 cd apps/web && bun run lint && bun run test && bun run nuxi typecheck && bun run build
 
 # Backend
 python3 -m py_compile apps/analyzer/app/*.py
 ```
 
-These are the same checks that run in CI. All must pass before committing.
-
-## Testing
-
-```bash
-# Frontend
-cd apps/web && bun run test
-
-# Backend
-cd apps/analyzer && python -m pytest
-```
-
-## CI/CD
-
-GitHub Actions runs on every push:
-1. Frontend: Lint → Tests → TypeCheck → Build
-2. Backend: Syntax check
-3. Release: Auto-tag on main
-
 ## Git Commits
 
-When committing, use simple commit messages without signatures or generated-by footers.
+Simple conventional format, no signatures:
 
 ```bash
-# Good
-git commit -m "feat: Add similar tracks feature"
-
-# Bad (don't add these)
-# 🤖 Generated with [Claude Code](https://claude.com/claude-code)
-# Co-Authored-By: ...
+git commit -m "feat(web): add feature"
 ```
 
 ## Database Population

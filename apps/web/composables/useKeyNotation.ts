@@ -2,6 +2,8 @@
  * Musical key notation system with Camelot wheel colors and conversions
  */
 
+import { useLocalStorage } from '~/composables/utils/useLocalStorage'
+
 export type KeyNotation = 'standard' | 'camelot'
 
 interface KeyInfo {
@@ -56,21 +58,18 @@ const KEY_MAP: Record<string, KeyInfo> = {
 }
 
 /* --- State --- */
-const STORAGE_KEY = 'musaic_key_notation'
-const notation = ref<KeyNotation>('standard')
-
-function loadNotation() {
-  if (import.meta.server) return
-  const stored = localStorage.getItem(STORAGE_KEY)
-  if (stored === 'standard' || stored === 'camelot') {
-    notation.value = stored
+const notationStorage = useLocalStorage<KeyNotation>(
+  'musaic_key_notation',
+  'standard',
+  {
+    validator: (value): value is KeyNotation => {
+      return value === 'standard' || value === 'camelot'
+    }
   }
-}
+)
 
-function saveNotation() {
-  if (import.meta.server) return
-  localStorage.setItem(STORAGE_KEY, notation.value)
-}
+// Initialize on first import
+notationStorage.init()
 
 export function useKeyNotation() {
   /* --- Methods --- */
@@ -83,7 +82,7 @@ export function useKeyNotation() {
     if (!key) return '-'
     const info = KEY_MAP[key]
     if (!info) return key
-    return notation.value === 'camelot' ? info.camelot : info.standard
+    return notationStorage.value.value === 'camelot' ? info.camelot : info.standard
   }
 
   function getKeyColor(key: string | null): string {
@@ -99,20 +98,17 @@ export function useKeyNotation() {
   }
 
   function setNotation(value: KeyNotation) {
-    notation.value = value
-    saveNotation()
+    notationStorage.value.value = value
+    notationStorage.save()
   }
 
   function toggleNotation() {
-    notation.value = notation.value === 'standard' ? 'camelot' : 'standard'
-    saveNotation()
+    notationStorage.value.value = notationStorage.value.value === 'standard' ? 'camelot' : 'standard'
+    notationStorage.save()
   }
 
-  // Load on first use
-  loadNotation()
-
   return {
-    notation: readonly(notation),
+    notation: readonly(notationStorage.value),
     formatKey,
     getKeyInfo,
     getKeyColor,

@@ -1,3 +1,5 @@
+import { useLocalStorage } from '~/composables/utils/useLocalStorage'
+
 interface Profile {
   id: string
   is_premium: boolean
@@ -16,28 +18,40 @@ const FREE_AI_LIMIT = 5
 /* --- State --- */
 const profile = ref<Profile | null>(null)
 const loadingProfile = ref(false)
-const aiUsage = ref<AiUsage>({ count: 0, date: '' })
 
 function getTodayKey(): string {
   return new Date().toISOString().split('T')[0]
 }
 
-function loadAiUsage() {
-  if (import.meta.server) return
-  const stored = localStorage.getItem('musaic_ai_usage')
-  if (stored) {
-    const parsed = JSON.parse(stored) as AiUsage
-    if (parsed.date === getTodayKey()) {
-      aiUsage.value = parsed
-    } else {
-      aiUsage.value = { count: 0, date: getTodayKey() }
+// Use shared localStorage utility
+const aiUsageStorage = useLocalStorage<AiUsage>(
+  'musaic_ai_usage',
+  { count: 0, date: getTodayKey() },
+  {
+    validator: (value): value is AiUsage => {
+      return (
+        typeof value === 'object' &&
+        value !== null &&
+        'count' in value &&
+        'date' in value &&
+        typeof value.count === 'number' &&
+        typeof value.date === 'string'
+      )
     }
+  }
+)
+
+function loadAiUsage() {
+  const stored = aiUsageStorage.load()
+  if (stored.date === getTodayKey()) {
+    aiUsageStorage.value.value = stored
+  } else {
+    aiUsageStorage.value.value = { count: 0, date: getTodayKey() }
   }
 }
 
 function saveAiUsage() {
-  if (import.meta.server) return
-  localStorage.setItem('musaic_ai_usage', JSON.stringify(aiUsage.value))
+  aiUsageStorage.save()
 }
 
 export function useProfile() {
@@ -56,7 +70,7 @@ export function useProfile() {
     if (config.public.isDev) return Infinity
     if (isPremium.value) return Infinity
     loadAiUsage()
-    return Math.max(0, FREE_AI_LIMIT - aiUsage.value.count)
+    return Math.max(0, FREE_AI_LIMIT - aiUsageStorage.value.value.count)
   })
 
   const canUseAi = computed(() => aiGenerationsLeft.value > 0)
@@ -101,8 +115,8 @@ export function useProfile() {
 
   function incrementAiUsage() {
     loadAiUsage()
-    aiUsage.value = {
-      count: aiUsage.value.count + 1,
+    aiUsageStorage.value.value = {
+      count: aiUsageStorage.value.value.count + 1,
       date: getTodayKey()
     }
     saveAiUsage()

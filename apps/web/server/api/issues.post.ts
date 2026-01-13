@@ -1,33 +1,29 @@
-import { createClient } from '@supabase/supabase-js'
+import { saveIssue } from '~/server/services/database'
 
 export default defineEventHandler(async (event) => {
-  const config = useRuntimeConfig()
   const body = await readBody(event)
 
   const { email, subject, message } = body
 
   if (!email || !subject || !message) {
-    throw createError({ statusCode: 400, message: 'Missing required fields' })
+    throw createError({ statusCode: 400, message: 'Missing required fields: email, subject, message' })
   }
 
-  const supabaseUrl = config.supabaseUrl as string
-  const supabaseKey = config.supabaseKey as string
+  // Extract optional metadata
+  const headers = getHeaders(event)
+  const userAgent = headers['user-agent'] || null
+  const url = headers['referer'] || null
 
-  if (!supabaseUrl || !supabaseKey) {
-    throw createError({ statusCode: 500, message: 'Supabase not configured' })
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseKey)
-
-  const { error } = await supabase.from('issues').insert({
+  const success = await saveIssue({
     email,
     subject,
     message,
-    created_at: new Date().toISOString()
+    user_agent: userAgent,
+    url
   })
 
-  if (error) {
-    throw createError({ statusCode: 500, message: error.message })
+  if (!success) {
+    throw createError({ statusCode: 500, message: 'Failed to save issue' })
   }
 
   return { success: true }

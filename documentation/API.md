@@ -2,7 +2,8 @@
 
 ## Web API (Nuxt/Nitro)
 
-Base URL: `https://musaic.clhub.fr/api`
+Base URL (production): `https://musaic.clhub.fr/api`
+Base URL (local): `http://localhost:3000/api`
 
 ### Search
 
@@ -214,9 +215,10 @@ Fallback analysis when server-side download fails. Streams audio from SoundCloud
 
 ## Analyzer API (FastAPI)
 
-Base URL: `https://analyzer.musaic.clhub.fr`
+Base URL (production): `https://analyzer.musaic.clhub.fr`
+Base URL (local): `http://localhost:9000`
 
-Swagger UI: `/docs`
+Interactive docs: `/docs` (Swagger UI)
 
 ### Health
 
