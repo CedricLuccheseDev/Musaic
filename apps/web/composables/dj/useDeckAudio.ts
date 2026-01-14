@@ -56,6 +56,7 @@ export function useDeckAudio() {
 
     audioElement.addEventListener('pause', () => {
       deckState.isPlaying = false
+      deckState.currentTime = audioElement.currentTime
     })
 
     audioElement.addEventListener('ended', () => {
@@ -63,8 +64,21 @@ export function useDeckAudio() {
       deckState.currentTime = 0
     })
 
+    // Track last seen audio time (non-reactive) to detect seeks
+    let lastSeenAudioTime = 0
+
     audioElement.addEventListener('timeupdate', () => {
-      deckState.currentTime = audioElement.currentTime || 0
+      const newTime = audioElement.currentTime || 0
+      const actualDelta = Math.abs(newTime - lastSeenAudioTime)
+
+      // Detect seek: jump is much larger than normal playback advance (~250ms)
+      const isSeek = lastSeenAudioTime > 0 && actualDelta > 2.0
+
+      lastSeenAudioTime = newTime
+
+      if (isSeek || deckState.currentTime === 0) {
+        deckState.currentTime = newTime
+      }
     })
 
     audioElement.addEventListener('durationchange', () => {

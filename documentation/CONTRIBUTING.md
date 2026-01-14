@@ -41,6 +41,7 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your-anon-key
 ANTHROPIC_API_KEY=sk-ant-xxx  # Use your own key or contact maintainer
 ANALYZER_URL=http://localhost:8000
+ANALYZER_API_KEY=your-shared-secret  # Same key in both web and analyzer
 ```
 
 > **Note:** For the AI search feature, you need an Anthropic API key. You can use your own key from [console.anthropic.com](https://console.anthropic.com), or contact the maintainer to request access.
@@ -65,6 +66,7 @@ Edit `.env` with your credentials:
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_KEY=your-service-role-key
 SOUNDCLOUD_CLIENT_ID=your-client-id
+ANALYZER_API_KEY=your-shared-secret  # Same key as in web/.env
 ```
 
 Then run:
@@ -89,6 +91,41 @@ See [STANDARDS.md](STANDARDS.md) for commit conventions and code style.
 - Clear description of changes
 - CI must pass
 
-## Questions?
+## Security Setup
+
+### API Key Authentication
+
+The analyzer service requires authentication via a shared API key to prevent unauthorized access.
+
+1. **Generate a secure key:**
+   ```bash
+   openssl rand -hex 32
+   ```
+
+2. **Add the same key to both services:**
+
+   In `apps/web/.env`:
+   ```env
+   ANALYZER_API_KEY=your-generated-key
+   ```
+
+   In `apps/analyzer/.env`:
+   ```env
+   ANALYZER_API_KEY=your-generated-key
+   ```
+
+3. **For production (Dokploy/Docker):**
+   - Set `ANALYZER_API_KEY` as an environment variable in both services
+   - Ensure the analyzer port (9000) is NOT publicly exposed
+   - Use internal Docker networking between services
+
+### Security Checklist
+
+- [ ] API key set in both web and analyzer services
+- [ ] Analyzer port not exposed to internet (internal only)
+- [ ] HTTPS enabled via reverse proxy (Nginx/Traefik)
+- [ ] Rate limiting configured in [security.ts](../apps/web/server/middleware/security.ts)
+
+## Need Help?
 
 Open an issue on GitHub.

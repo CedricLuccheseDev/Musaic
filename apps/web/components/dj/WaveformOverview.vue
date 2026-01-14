@@ -11,10 +11,6 @@ const props = defineProps<{
   deck: 'A' | 'B'
 }>()
 
-// Rekordbox-style colors for frequency bands
-const COLOR_LOW = { r: 30, g: 100, b: 220 } // Blue for bass
-const COLOR_MID = { r: 50, g: 200, b: 100 } // Green for mids
-const COLOR_HIGH = { r: 230, g: 80, b: 60 } // Red/orange for highs
 
 /* --- Emits --- */
 const emit = defineEmits<{
@@ -81,6 +77,9 @@ function drawWaveform() {
   const barWidth = Math.max(1, width / props.waveformData.length)
   const progressX = (props.currentTime / props.duration) * width
 
+  // Single color per deck
+  const baseColor = props.deck === 'A' ? { r: 6, g: 182, b: 212 } : { r: 251, g: 146, b: 60 }
+
   for (let i = 0; i < props.waveformData.length; i++) {
     const sample = props.waveformData[i]
     if (!sample) continue
@@ -89,29 +88,9 @@ function drawWaveform() {
     const barHeight = Math.max(1, sample.total * (height - 2))
     const y = (height - barHeight) / 2
 
-    // Get frequency-based color
-    const total = sample.low + sample.mid + sample.high
-    let r: number, g: number, b: number
-
-    if (total > 0.001) {
-      const lowRatio = sample.low / total
-      const midRatio = sample.mid / total
-      const highRatio = sample.high / total
-
-      r = Math.round(COLOR_LOW.r * lowRatio + COLOR_MID.r * midRatio + COLOR_HIGH.r * highRatio)
-      g = Math.round(COLOR_LOW.g * lowRatio + COLOR_MID.g * midRatio + COLOR_HIGH.g * highRatio)
-      b = Math.round(COLOR_LOW.b * lowRatio + COLOR_MID.b * midRatio + COLOR_HIGH.b * highRatio)
-    }
-    else {
-      // Fallback for silent parts
-      r = props.deck === 'A' ? 6 : 249
-      g = props.deck === 'A' ? 182 : 115
-      b = props.deck === 'A' ? 212 : 22
-    }
-
     // Dimmer for unplayed, brighter for played
-    const alpha = x < progressX ? 1 : 0.6
-    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`
+    const alpha = x < progressX ? 1 : 0.5
+    ctx.fillStyle = `rgba(${baseColor.r}, ${baseColor.g}, ${baseColor.b}, ${alpha})`
 
     ctx.fillRect(Math.round(x), Math.round(y), Math.max(1, barWidth - 0.5), Math.round(barHeight))
   }

@@ -1,6 +1,7 @@
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
   const analyzerUrl = config.analyzerUrl as string
+  const analyzerApiKey = config.analyzerApiKey as string
 
   if (!analyzerUrl) {
     throw createError({ statusCode: 503, message: 'Analyzer not configured' })
@@ -13,9 +14,14 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (analyzerApiKey) {
+      headers['X-API-Key'] = analyzerApiKey
+    }
+
     const response = await fetch(`${analyzerUrl}/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ soundcloud_id: body.soundcloud_id })
     })
 

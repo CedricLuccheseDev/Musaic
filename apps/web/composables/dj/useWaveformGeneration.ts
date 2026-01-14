@@ -1,6 +1,6 @@
 import type { WaveformSample } from './types'
 
-const WAVEFORM_SAMPLES_PER_SECOND = 100
+const WAVEFORM_SAMPLES_PER_SECOND = 50
 
 const waveformCache = new Map<number, WaveformSample[]>()
 
@@ -71,7 +71,9 @@ export function useWaveformGeneration() {
       const totalSamples = Math.ceil(duration * WAVEFORM_SAMPLES_PER_SECOND)
       const samplesPerChunk = Math.floor(channelData.length / totalSamples)
 
-      const waveform: WaveformSample[] = []
+      // First pass: collect raw RMS values
+      const rawData: { low: number; mid: number; high: number; total: number }[] = []
+      let maxLow = 0, maxMid = 0, maxHigh = 0, maxTotal = 0
 
       for (let i = 0; i < totalSamples; i++) {
         const start = i * samplesPerChunk
@@ -82,14 +84,25 @@ export function useWaveformGeneration() {
         const highRMS = computeRMS(highBand, start, end)
         const totalRMS = computeRMS(channelData, start, end)
 
-        const total = Math.min(1, totalRMS * 3)
-        const low = Math.min(1, lowRMS * 4)
-        const mid = Math.min(1, midRMS * 4)
-        const high = Math.min(1, highRMS * 6)
-
-        waveform.push({ low, mid, high, total })
+        rawData.push({ low: lowRMS, mid: midRMS, high: highRMS, total: totalRMS })
+        maxLow = Math.max(maxLow, lowRMS)
+        maxMid = Math.max(maxMid, midRMS)
+        maxHigh = Math.max(maxHigh, highRMS)
+        maxTotal = Math.max(maxTotal, totalRMS)
 
         if (i % 500 === 0) await yieldToMain()
+      }
+
+      // Second pass: normalize each band independently for better color contrast
+      const waveform: WaveformSample[] = []
+      for (let i = 0; i < rawData.length; i++) {
+        const d = rawData[i]
+        waveform.push({
+          low: maxLow > 0 ? d.low / maxLow : 0,
+          mid: maxMid > 0 ? d.mid / maxMid : 0,
+          high: maxHigh > 0 ? d.high / maxHigh : 0,
+          total: maxTotal > 0 ? Math.min(1, (d.total / maxTotal) * 1.2) : 0
+        })
       }
 
       await audioContext.close()

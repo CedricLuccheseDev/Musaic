@@ -1,8 +1,9 @@
 """Analyze audio from raw bytes (for tracks that can't be downloaded server-side)."""
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 
 from app.analyzer import AnalysisError, analyze_audio_from_bytes
+from app.security import verify_api_key
 from app.logger import log
 from app.models import AnalysisStatus, AnalyzingResponse, ErrorResponse
 from app.supabase_client import get_track_by_soundcloud_id, update_track_analysis, update_track_status
@@ -22,6 +23,7 @@ router = APIRouter(tags=["Analysis"])
 async def analyze_from_bytes(
     soundcloud_id: int = Form(...),
     audio: UploadFile = File(...),
+    _: str | None = Depends(verify_api_key),
 ) -> AnalyzingResponse:
     """
     Analyze audio from uploaded bytes.

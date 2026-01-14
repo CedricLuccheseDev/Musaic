@@ -222,18 +222,142 @@ def _find_highlight_and_extract(audio: np.ndarray, segment_duration: float) -> t
 
     best_idx = np.argmax(segment_scores)
     frame_time = hop_size / SAMPLE_RATE
-    start_time = best_idx * frame_time
-    center_time = start_time + segment_duration / 2
+    segment_start_time = best_idx * frame_time
 
-    # Clamp to valid range
+    # Refine to find the exact first kick of the drop
+    highlight_time = _refine_drop_start(audio, segment_start_time, segment_duration)
+
+    # Clamp segment extraction to valid range
     half_segment = segment_duration / 2
-    center_time = max(half_segment, min(duration - half_segment, center_time))
+    extract_center = max(half_segment, min(duration - half_segment, highlight_time))
 
-    # Extract segment
-    start_sample = int((center_time - half_segment) * SAMPLE_RATE)
-    end_sample = int((center_time + half_segment) * SAMPLE_RATE)
+    # Extract segment centered on the refined drop position
+    start_sample = int((extract_center - half_segment) * SAMPLE_RATE)
+    end_sample = int((extract_center + half_segment) * SAMPLE_RATE)
 
-    return audio[start_sample:end_sample], round(center_time, 2)
+    return audio[start_sample:end_sample], round(highlight_time, 2)
+
+
+def _refine_drop_start(
+    full_audio: np.ndarray,
+    segment_start_time: float,
+    segment_duration: float
+) -> float:
+    """
+    Find the exact first kick of the drop instead of the segment center.
+
+    Uses energy gradient analysis to find the "impact" moment,
+    then onset detection to pinpoint the first strong kick transient.
+
+    Args:
+        full_audio: Full track audio samples at SAMPLE_RATE
+        segment_start_time: Start time of the energetic segment in seconds
+        segment_duration: Duration of the segment (e.g., 30 seconds)
+
+    Returns:
+        Refined drop start time in seconds (first kick of the drop)
+    """
+    try:
+        duration = len(full_audio) / SAMPLE_RATE
+        fallback_time = segment_start_time + segment_duration / 2
+
+        # Search window: 5s before to 10s after segment start
+        search_start = max(0, segment_start_time - 5.0)
+        search_end = min(duration, segment_start_time + 10.0)
+
+        start_sample = int(search_start * SAMPLE_RATE)
+        end_sample = int(search_end * SAMPLE_RATE)
+        search_segment = full_audio[start_sample:end_sample]
+
+        if len(search_segment) < SAMPLE_RATE:
+            return fallback_time
+
+        # Compute bass energy in 100ms windows with 50ms hop
+        window_samples = int(0.1 * SAMPLE_RATE)
+        hop_samples = int(0.05 * SAMPLE_RATE)
+
+        lowpass = es.LowPass(cutoffFrequency=150)
+        energy_extractor = es.Energy()
+
+        energies = []
+        for i in range(0, len(search_segment) - window_samples, hop_samples):
+            window = search_segment[i:i + window_samples]
+            bass = lowpass(window)
+            energies.append(energy_extractor(bass))
+
+        energies = np.array(energies)
+        if len(energies) < 10:
+            return fallback_time
+
+        # Normalize energies
+        if energies.max() > 0:
+            energies = energies / energies.max()
+
+        # Compute energy gradient and smooth it
+        gradient = np.gradient(energies)
+        smoothed_gradient = np.convolve(gradient, np.ones(5) / 5, mode='same')
+
+        # Find maximum energy increase (the "impact" moment)
+        impact_idx = int(np.argmax(smoothed_gradient))
+        impact_time = search_start + (impact_idx * hop_samples / SAMPLE_RATE)
+
+        # Use onset detection to find the exact first kick
+        onset_search_start = max(0, impact_time - 1.0)
+        onset_search_end = min(duration, impact_time + 2.0)
+
+        onset_start_sample = int(onset_search_start * SAMPLE_RATE)
+        onset_end_sample = int(onset_search_end * SAMPLE_RATE)
+        onset_segment = full_audio[onset_start_sample:onset_end_sample]
+
+        if len(onset_segment) < SAMPLE_RATE // 2:
+            return round(impact_time, 3)
+
+        # HFC onset detection (best for percussive transients)
+        frame_size = 1024
+        hop = 512
+
+        windowing = es.Windowing(type='hann')
+        spectrum = es.Spectrum(size=frame_size)
+        onset_hfc = es.OnsetDetection(method='hfc')
+
+        hfc_values = []
+        for frame in es.FrameGenerator(onset_segment, frameSize=frame_size, hopSize=hop):
+            windowed = windowing(frame)
+            spec = spectrum(windowed)
+            hfc_values.append(onset_hfc(spec, spec))
+
+        hfc_array = np.array(hfc_values)
+        if len(hfc_array) == 0 or hfc_array.max() == 0:
+            return round(impact_time, 3)
+
+        hfc_array = hfc_array / hfc_array.max()
+
+        # Find onset peaks
+        onsets_algo = es.Onsets()
+        onset_matrix = np.vstack([hfc_array])
+        onset_times = onsets_algo(onset_matrix, [1])
+
+        if len(onset_times) == 0:
+            return round(impact_time, 3)
+
+        # Filter for strong onsets (> 70% of max HFC)
+        strong_onsets = []
+        for onset_time in onset_times:
+            onset_frame = int(onset_time * SAMPLE_RATE / hop)
+            if onset_frame < len(hfc_array) and hfc_array[onset_frame] > 0.7:
+                strong_onsets.append(float(onset_time))
+
+        if strong_onsets:
+            first_kick = onset_search_start + strong_onsets[0]
+            return round(first_kick, 3)
+        elif len(onset_times) > 0:
+            first_onset = onset_search_start + float(onset_times[0])
+            return round(first_onset, 3)
+        else:
+            return round(impact_time, 3)
+
+    except Exception:
+        return segment_start_time + segment_duration / 2
 
 
 def _extract_all_frame_features(audio: np.ndarray) -> dict:
