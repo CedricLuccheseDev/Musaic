@@ -8,8 +8,10 @@ from collections import deque
 from threading import Lock
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends
 from supabase import create_client
+
+from app.security import verify_api_key
 
 from app.analyzer import AnalysisError, analyze_audio, analyze_audio_from_bytes, reanalyze_beat_offset_from_bytes
 from app.config import get_settings
@@ -322,6 +324,7 @@ async def process_batch_analysis() -> None:
 async def analyze_all_tracks(
     background_tasks: BackgroundTasks,
     request: BatchAnalysisRequest | None = None,
+    _: str | None = Depends(verify_api_key),
 ) -> BatchAnalysisResponse:
     """
     Start batch analysis of all pending tracks.
@@ -548,6 +551,7 @@ async def process_beat_offset_reanalysis(soundcloud_id: int | None = None) -> No
 async def reanalyze_all_beat_offsets(
     background_tasks: BackgroundTasks,
     soundcloud_id: int | None = None,
+    _: str | None = Depends(verify_api_key),
 ) -> BatchAnalysisResponse:
     """
     Reanalyze beat_offset for all completed tracks (or a specific one).
@@ -707,6 +711,7 @@ async def process_full_reanalysis() -> None:
 )
 async def reanalyze_all_tracks_full(
     background_tasks: BackgroundTasks,
+    _: str | None = Depends(verify_api_key),
 ) -> BatchAnalysisResponse:
     """
     Force full reanalysis of ALL completed tracks (BPM + beat_offset).

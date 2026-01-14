@@ -103,12 +103,12 @@ function handleScrubEndB() {
         <div class="mb-3 space-y-1">
           <DjWaveform
             :track="deckA.track"
-            :current-time="deckA.currentTime"
             :duration="deckA.duration"
             :waveform-data="deckA.waveformData"
             :is-playing="deckA.isPlaying"
             :playback-rate="deckA.playbackRate"
             :time-advance-rate="deckA.timeAdvanceRate"
+            :initial-time="deckA.currentTime"
             deck="A"
             @scrub-start="handleScrubStartA"
             @scrub="handleScrubA"
@@ -116,13 +116,13 @@ function handleScrubEndB() {
           />
           <DjWaveform
             :track="deckB.track"
-            :current-time="deckB.currentTime"
             :duration="deckB.duration"
             :waveform-data="deckB.waveformData"
             :is-playing="deckB.isPlaying"
             :playback-rate="deckB.playbackRate"
             :time-advance-rate="deckB.timeAdvanceRate"
             :beat-offset-correction="deckB.beatOffsetCorrection"
+            :initial-time="deckB.currentTime"
             deck="B"
             @scrub-start="handleScrubStartB"
             @scrub="handleScrubB"

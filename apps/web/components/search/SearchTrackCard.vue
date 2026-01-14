@@ -22,6 +22,7 @@ const { loadToDeck, deckA, deckB, getTargetDeck, togglePlay, ejectDeck } = useDj
 const isVisible = ref(props.skipAnimation)
 const showDetails = ref(false)
 const showSimilar = ref(false)
+const isReanalyzing = ref(false)
 
 /* --- Computed --- */
 const hasAnalysis = computed(() => props.track.analysis_status === AnalysisStatus.Completed)
@@ -114,6 +115,23 @@ function handleDeckClick(deck: 'A' | 'B') {
   }
   else {
     loadToDeck(props.track, deck)
+  }
+}
+
+async function reanalyzeTrack() {
+  if (isReanalyzing.value) return
+  isReanalyzing.value = true
+  try {
+    await $fetch('/api/dashboard/analyze-single', {
+      method: 'POST',
+      body: { soundcloud_id: props.track.id }
+    })
+  }
+  catch (e) {
+    console.error('Reanalysis failed:', e)
+  }
+  finally {
+    isReanalyzing.value = false
   }
 }
 
@@ -283,6 +301,21 @@ onMounted(() => {
 
           <!-- Action buttons -->
           <div class="flex items-center gap-1.5" @click.stop>
+            <!-- Reanalyze (dev only) -->
+            <button
+              v-if="config.public.isDev && hasAnalysis"
+              type="button"
+              class="cursor-pointer rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-white/10 hover:text-yellow-400"
+              :disabled="isReanalyzing"
+              @click.stop="reanalyzeTrack"
+            >
+              <UIcon
+                name="i-heroicons-arrow-path"
+                class="h-4 w-4"
+                :class="{ 'animate-spin': isReanalyzing }"
+              />
+            </button>
+
             <!-- Details -->
             <button
               v-if="hasAnalysis"

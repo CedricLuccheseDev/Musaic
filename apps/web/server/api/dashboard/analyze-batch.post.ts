@@ -5,6 +5,7 @@ export default defineEventHandler(async () => {
   const supabaseUrl = config.supabaseUrl as string
   const supabaseKey = (config.supabaseServiceKey || config.supabaseKey) as string
   const analyzerUrl = config.analyzerUrl as string
+  const analyzerApiKey = config.analyzerApiKey as string
 
   if (!analyzerUrl) {
     throw createError({ statusCode: 503, message: 'Analyzer not configured' })
@@ -35,9 +36,14 @@ export default defineEventHandler(async () => {
 
   // Send to analyzer
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (analyzerApiKey) {
+      headers['X-API-Key'] = analyzerApiKey
+    }
+
     const response = await fetch(`${analyzerUrl}/analyze/batch`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ soundcloud_ids: soundcloudIds })
     })
 

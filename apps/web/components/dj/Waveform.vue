@@ -5,7 +5,7 @@ import type { WaveformSample } from '~/composables/useDjPlayer'
 /* --- Props --- */
 const props = defineProps<{
   track: TrackEntry | null
-  currentTime: number
+  initialTime?: number // Only used for initialization, not reactive updates
   duration: number
   deck: 'A' | 'B'
   waveformData: WaveformSample[] | null
@@ -33,24 +33,20 @@ const lastDragTimestamp = ref(0)
 const animationFrame = ref<number | null>(null)
 const canvasWidth = ref(0)
 const canvasHeight = ref(0)
+const displayTimeForUI = ref(0) // Separate ref for UI display, updated less frequently
 
 // Animation state - plain JS variables to avoid Vue reactivity overhead in hot path
 let displayTime = 0
-let lastFrameTimestamp = 0
+let playStartTime = 0 // performance.now() when playback started
+let playStartPosition = 0 // audio position when playback started
 
 // Cached gradients (recreated only on canvas resize)
 let gradientLeft: CanvasGradient | null = null
 let gradientRight: CanvasGradient | null = null
 
 /* --- Constants --- */
-const SAMPLES_PER_SECOND = 100
-const BAR_WIDTH = 1
-const BAR_GAP = 1
-
-// Rekordbox-style colors for frequency bands
-const COLOR_LOW = { r: 30, g: 100, b: 220 } // Blue for bass
-const COLOR_MID = { r: 50, g: 200, b: 100 } // Green for mids
-const COLOR_HIGH = { r: 230, g: 80, b: 60 } // Red/orange for highs
+const SAMPLES_PER_SECOND = 50
+const PIXELS_PER_SAMPLE = 3
 
 /* --- Computed --- */
 // Beat interval in audio time (based on original BPM)
@@ -70,7 +66,7 @@ const beatOffset = computed(() => {
 const highlightTime = computed(() => props.track?.highlight_time || 0)
 
 // Base pixels per second
-const basePixelsPerSecond = SAMPLES_PER_SECOND * (BAR_WIDTH + BAR_GAP)
+const basePixelsPerSecond = SAMPLES_PER_SECOND * PIXELS_PER_SAMPLE
 
 // Pixels per second - scaled INVERSELY by playbackRate to stretch the waveform
 // When playbackRate < 1 (track slowed down), we ZOOM IN (more px per audio second)
@@ -148,40 +144,48 @@ function drawWaveform() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, width, height)
 
-  const centerX = width / 2
-  const currentPos = displayTime * pxPerSec
+  const centerX = (width / 2) | 0
+  // Round currentPos to integer pixel for stable rendering (no anti-aliasing flicker)
+  const currentPos = (displayTime * pxPerSec) | 0
   const startX = currentPos - centerX
 
   if (waveformData && waveformData.length > 0) {
-    const barSpacing = BAR_WIDTH + BAR_GAP
-    const startSample = Math.floor(startX / barSpacing)
-    const visibleBars = Math.ceil(width / barSpacing) + 2
-    const endSample = Math.min(waveformData.length, startSample + visibleBars)
+    const sampleSpacing = PIXELS_PER_SAMPLE
+    const startSample = Math.floor(startX / sampleSpacing)
+    const visibleSamples = Math.ceil(width / sampleSpacing) + 4
+    const endSample = Math.min(waveformData.length, startSample + visibleSamples)
 
+    const centerY = height / 2
+    const maxAmplitude = (height / 2) - 2
+
+    // Single color waveform - simple and clean
+    const waveformColor = props.deck === 'A' ? 'rgb(6, 182, 212)' : 'rgb(251, 146, 60)' // Cyan / Orange
+
+    // Collect points
+    const points: { x: number; h: number }[] = []
     for (let i = Math.max(0, startSample); i < endSample; i++) {
       const sample = waveformData[i]
       if (!sample) continue
-
-      const x = Math.floor(i * barSpacing - startX)
-      const barHeight = Math.max(2, sample.total * (height - 4))
-      const y = Math.floor((height - barHeight) / 2)
-
-      // Use cached color or compute once
-      const total = sample.low + sample.mid + sample.high
-      if (total > 0.001) {
-        const lowRatio = sample.low / total
-        const midRatio = sample.mid / total
-        const highRatio = sample.high / total
-        const r = Math.round(COLOR_LOW.r * lowRatio + COLOR_MID.r * midRatio + COLOR_HIGH.r * highRatio)
-        const g = Math.round(COLOR_LOW.g * lowRatio + COLOR_MID.g * midRatio + COLOR_HIGH.g * highRatio)
-        const b = Math.round(COLOR_LOW.b * lowRatio + COLOR_MID.b * midRatio + COLOR_HIGH.b * highRatio)
-        ctx.fillStyle = `rgb(${r},${g},${b})`
-      }
-      else {
-        ctx.fillStyle = props.deck === 'A' ? 'rgb(6,182,212)' : 'rgb(249,115,22)'
-      }
-      ctx.fillRect(x, y, BAR_WIDTH, Math.floor(barHeight))
+      points.push({
+        x: i * sampleSpacing - startX,
+        h: sample.total * maxAmplitude * 1.5
+      })
     }
+
+    if (points.length < 2) return
+
+    // Draw single continuous shape
+    ctx.fillStyle = waveformColor
+    ctx.beginPath()
+    ctx.moveTo(points[0].x, centerY - points[0].h)
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, centerY - points[i].h)
+    }
+    for (let i = points.length - 1; i >= 0; i--) {
+      ctx.lineTo(points[i].x, centerY + points[i].h)
+    }
+    ctx.closePath()
+    ctx.fill()
   }
 
   // Draw beat grid lines
@@ -242,34 +246,34 @@ function drawWaveform() {
   }
 }
 
-function animate(timestamp: number) {
-  // Calculate delta time since last frame
-  const deltaTime = lastFrameTimestamp > 0 ? (timestamp - lastFrameTimestamp) / 1000 : 0
-  lastFrameTimestamp = timestamp
+// Cache values outside animation loop to avoid Vue reactivity in hot path
+let cachedIsPlaying = false
+let cachedTimeAdvanceRate = 1
+let cachedDuration = 0
+let lastUIUpdate = 0
 
-  // Cache props ONCE at start to avoid repeated Vue reactivity access
-  const isPlaying = props.isPlaying
-  const currentTime = props.currentTime
-  const duration = props.duration
-  const timeAdvanceRate = props.timeAdvanceRate
+function animate() {
+  const now = performance.now()
   const dragging = isDragging.value
 
   if (!dragging) {
-    if (isPlaying && deltaTime > 0) {
-      // Advance display time based on playback rate
-      displayTime += deltaTime * timeAdvanceRate
-
-      // Smooth drift correction towards actual audio position
-      const drift = currentTime - displayTime
-      const blendFactor = Math.min(1, deltaTime * 3)
-      displayTime += drift * blendFactor
+    if (cachedIsPlaying) {
+      // Calculate display time based on elapsed real time since play started
+      // Completely independent of Vue reactivity
+      const elapsed = (now - playStartTime) / 1000
+      displayTime = playStartPosition + elapsed * cachedTimeAdvanceRate
 
       // Clamp to valid range
-      displayTime = Math.max(0, Math.min(displayTime, duration || displayTime))
+      if (cachedDuration > 0) {
+        displayTime = Math.max(0, Math.min(displayTime, cachedDuration))
+      }
     }
-    else if (!isPlaying) {
-      displayTime = currentTime
-    }
+  }
+
+  // Update UI ref only every 100ms to avoid Vue re-renders affecting canvas
+  if (now - lastUIUpdate > 100) {
+    displayTimeForUI.value = displayTime
+    lastUIUpdate = now
   }
 
   drawWaveform()
@@ -360,8 +364,13 @@ function handleTouchEnd() {
 
 /* --- Lifecycle --- */
 onMounted(() => {
-  displayTime = props.currentTime
-  lastFrameTimestamp = 0
+  // Initialize cached values
+  cachedIsPlaying = props.isPlaying
+  cachedTimeAdvanceRate = props.timeAdvanceRate
+  cachedDuration = props.duration
+  displayTime = props.initialTime ?? 0
+  playStartTime = performance.now()
+  playStartPosition = props.initialTime ?? 0
 
   nextTick(() => {
     setupCanvas()
@@ -384,27 +393,40 @@ onUnmounted(() => {
   document.removeEventListener('mouseup', handleMouseUp)
 })
 
-// When currentTime prop updates, handle seeks (big jumps)
-watch(() => props.currentTime, (newTime) => {
-  // If not playing, sync immediately
-  // If big jump (>0.5s = seek), also snap
-  if (!props.isPlaying || Math.abs(newTime - displayTime) > 0.5) {
-    displayTime = newTime
-  }
-})
-
-// When play state changes, sync immediately
-watch(() => props.isPlaying, (isPlaying) => {
-  if (isPlaying) {
-    // Starting playback - sync to current time and reset frame counter
-    displayTime = props.currentTime
-    lastFrameTimestamp = 0
-  }
-})
-
+// When track changes, reset everything
 watch(() => props.track?.id, () => {
-  displayTime = props.currentTime
-  lastFrameTimestamp = 0
+  cachedIsPlaying = props.isPlaying
+  cachedTimeAdvanceRate = props.timeAdvanceRate
+  cachedDuration = props.duration
+  displayTime = props.initialTime ?? 0
+  playStartTime = performance.now()
+  playStartPosition = props.initialTime ?? 0
+})
+
+// When play state changes, sync position from parent without resetting displayTime
+watch(() => props.isPlaying, (newIsPlaying) => {
+  cachedIsPlaying = newIsPlaying
+  cachedTimeAdvanceRate = props.timeAdvanceRate
+  cachedDuration = props.duration
+
+  // Use current audio position from parent, preserving smooth animation continuity
+  const currentPosition = props.initialTime ?? displayTime
+  playStartTime = performance.now()
+  playStartPosition = currentPosition
+  displayTime = currentPosition
+})
+
+// Update cached values when they change
+watch(() => props.timeAdvanceRate, (val) => { cachedTimeAdvanceRate = val })
+watch(() => props.duration, (val) => { cachedDuration = val })
+
+// Detect seeks (large changes in initialTime)
+watch(() => props.initialTime, (newTime) => {
+  if (newTime !== undefined && Math.abs(newTime - displayTime) > 0.5) {
+    displayTime = newTime
+    playStartTime = performance.now()
+    playStartPosition = newTime
+  }
 })
 
 watch(() => props.waveformData, () => {
@@ -450,7 +472,7 @@ watch(() => props.waveformData, () => {
       v-if="track"
       class="absolute left-2 bottom-1 text-[10px] font-mono text-white/70 z-10"
     >
-      {{ formatTime(currentTime) }}
+      {{ formatTime(displayTimeForUI) }}
     </div>
 
     <!-- Empty state -->

@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # Proxy configuration (optional, for bypassing IP blocks)
     proxy_url: str | None = None  # Format: http://user:pass@host:port or http://host:port
 
+    # API security (shared secret with web service)
+    analyzer_api_key: str | None = None  # If set, all endpoints require this key
+
     # Temporary files directory (use project dir for better I/O on same disk)
     temp_dir: Path = Path(__file__).parent.parent / ".tmp"
 

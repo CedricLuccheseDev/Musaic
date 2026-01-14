@@ -28,6 +28,7 @@ interface AnalyzeFallbackRequest {
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
   const analyzerUrl = config.analyzerUrl as string
+  const analyzerApiKey = config.analyzerApiKey as string
 
   if (!analyzerUrl) {
     throw createError({
@@ -71,8 +72,14 @@ export default defineEventHandler(async (event) => {
     formData.append('soundcloud_id', soundcloudId.toString())
     formData.append('audio', new Blob([audioBytes], { type: 'audio/mpeg' }), 'audio.mp3')
 
+    const headers: Record<string, string> = {}
+    if (analyzerApiKey) {
+      headers['X-API-Key'] = analyzerApiKey
+    }
+
     const analyzerResponse = await fetch(`${analyzerUrl}/analyze-bytes`, {
       method: 'POST',
+      headers,
       body: formData
     })
 

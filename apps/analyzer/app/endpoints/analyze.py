@@ -2,9 +2,10 @@
 
 import asyncio
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 from app.analyzer import AnalysisError, analyze_audio
+from app.security import verify_api_key
 from app.config import get_settings
 from app.downloader import DownloadError, cleanup_audio_file, download_full_audio_async
 from app.logger import log
@@ -132,6 +133,7 @@ async def process_track_analysis(
 async def analyze_track(
     request: AnalyzeRequest,
     background_tasks: BackgroundTasks,
+    _: str | None = Depends(verify_api_key),
 ) -> AnalyzingResponse:
     """
     Manually trigger analysis for a track.
