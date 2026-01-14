@@ -298,6 +298,28 @@ export async function getTrackById(soundcloudId: number): Promise<TrackEntry | n
 export interface SearchFilters {
   genres?: string
   bpm?: { from: number; to: number }
+  created_at?: 'last_hour' | 'last_day' | 'last_week' | 'last_month' | 'last_year'
+  license?: 'to_modify_commercially' | 'to_share' | 'to_use_commercially'
+}
+
+// Known music genres to avoid false artist detection
+const KNOWN_GENRES = [
+  'dubstep', 'techno', 'house', 'trance', 'dnb', 'drum and bass', 'bass',
+  'trap', 'edm', 'electronic', 'ambient', 'chill', 'lofi', 'hip hop', 'rap',
+  'rock', 'metal', 'pop', 'jazz', 'classical', 'indie', 'folk', 'country',
+  'reggae', 'ska', 'funk', 'soul', 'rnb', 'disco', 'synthwave', 'vaporwave',
+  'future bass', 'melodic dubstep', 'riddim', 'brostep', 'glitch hop',
+  'downtempo', 'trip hop', 'breakbeat', 'hardstyle', 'hardcore', 'gabber'
+]
+
+// Check if query is primarily a genre search
+function isGenreQuery(query: string): boolean {
+  const queryLower = query.toLowerCase()
+  return KNOWN_GENRES.some(genre => {
+    const genreWords = genre.split(' ')
+    // Check if all words of the genre are in the query
+    return genreWords.every(word => queryLower.includes(word))
+  })
 }
 
 export async function searchWithArtistDetection(
@@ -315,12 +337,26 @@ export async function searchWithArtistDetection(
     'duration[from]': DURATION_MIN_MS,
     'duration[to]': DURATION_MAX_MS
   }
+
+  // Genre filter - prefer genre_or_tag for better coverage
   if (filters?.genres) {
-    extraParams.genres = filters.genres
+    extraParams['filter.genre_or_tag'] = filters.genres
   }
+
+  // BPM range filter
   if (filters?.bpm) {
     extraParams['bpm[from]'] = filters.bpm.from
     extraParams['bpm[to]'] = filters.bpm.to
+  }
+
+  // Recent tracks filter
+  if (filters?.created_at) {
+    extraParams['filter.created_at'] = filters.created_at
+  }
+
+  // License filter (for free downloads)
+  if (filters?.license) {
+    extraParams['filter.license'] = filters.license
   }
 
   // Search tracks and users in parallel with error handling
@@ -343,6 +379,11 @@ export async function searchWithArtistDetection(
 
   // Handle users search result - only attempt artist detection on first page
   if (offset !== 0) {
+    return { tracks, hasMore, nextOffset, artistSearchAttempted: false }
+  }
+
+  // Skip artist detection if query is primarily a genre search
+  if (isGenreQuery(query)) {
     return { tracks, hasMore, nextOffset, artistSearchAttempted: false }
   }
 

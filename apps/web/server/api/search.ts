@@ -1,6 +1,7 @@
 import { searchWithArtistDetection, getTrackById, resolveTrackUrl, searchExactTrack, type SearchResult } from '~/server/services/soundcloud'
 import { upsertTracks, enrichTracksWithAnalysis } from '~/server/services/trackStorage'
 import { generateSqlAndPhrase, type ClarificationOption } from '~/server/services/aiQuery'
+import { mergeAndRankTracks, groupTracksBySource, type MergedTrack } from '~/server/services/hybridSearch'
 import { createClient } from '@supabase/supabase-js'
 import { type DbTrackWithAnalysis, dbTrackToTrackEntry, type TrackEntry } from '~/types'
 import { logger } from '~/server/utils/logger'
@@ -65,6 +66,13 @@ interface CascadeSearchResult extends SearchResult {
   needsClarification?: boolean
   clarificationQuestion?: string
   clarificationOptions?: ClarificationOption[]
+  // Hybrid search metadata
+  hybridStats?: {
+    dbCount: number
+    scCount: number
+    analyzedCount: number
+    toAnalyzeCount: number
+  }
 }
 
 export default defineEventHandler(async (event): Promise<CascadeSearchResult> => {
@@ -207,7 +215,7 @@ async function handleTrackSearch(artistName: string, trackTitle: string): Promis
   }
 }
 
-// Handler: AI-powered search
+// Handler: AI-powered hybrid search (DB + SoundCloud)
 async function handleAiSearch(query: string, offset: number): Promise<CascadeSearchResult> {
   let aiResult
   try {
@@ -232,30 +240,72 @@ async function handleAiSearch(query: string, offset: number): Promise<CascadeSea
     }
   }
 
-  // Try database search first
-  const dbResults = await executeDbQuery(aiResult.sql)
+  // HYBRID SEARCH: Execute DB + SoundCloud in parallel
+  const [dbTracksResult, scResult] = await Promise.allSettled([
+    executeDbQuery(aiResult.sql),
+    searchWithArtistDetection(
+      aiResult.soundcloudQuery,
+      50, // Fetch MORE tracks to maximize quality options for merge
+      0,
+      aiResult.soundcloudFilters
+    )
+  ])
 
-  if (dbResults.length > 0) {
-    logger.ai.result(dbResults.length, aiResult.phrase)
-    return {
-      source: 'database',
-      tracks: dbResults,
-      response: aiResult.phrase,
-      hasMore: false,
-      wantsDownload: aiResult.wantsDownload,
-      queryType: 'genre'
-    }
+  // Extract results
+  const dbTracks = dbTracksResult.status === 'fulfilled' ? dbTracksResult.value : []
+  const scTracks = scResult.status === 'fulfilled' ? scResult.value.tracks : []
+
+  // Merge and rank (limit 20 for initial load)
+  const mergedTracks = mergeAndRankTracks(dbTracks, scTracks, {
+    wantsDownload: aiResult.wantsDownload,
+    limit: 20
+  })
+
+  // Analytics logging
+  const stats = groupTracksBySource(mergedTracks)
+  logger.ai.result(
+    mergedTracks.length,
+    `${aiResult.phrase} (DB: ${stats.counts.database}, SC: ${stats.counts.soundcloud}, analyzed: ${stats.counts.analyzed})`
+  )
+
+  // If no results from both sources, try SoundCloud with relaxed query
+  if (mergedTracks.length === 0) {
+    logger.ai.result(0, 'No hybrid results, trying relaxed SoundCloud search')
+    return await searchSoundCloud(
+      aiResult.soundcloudQuery,
+      offset,
+      undefined, // No filters to maximize results
+      aiResult.phrase,
+      aiResult.wantsDownload
+    )
   }
 
-  // Fallback to SoundCloud
-  logger.ai.result(0, 'No DB results, falling back to SoundCloud')
-  return await searchSoundCloud(
-    aiResult.soundcloudQuery,
-    offset,
-    aiResult.soundcloudFilters,
-    aiResult.phrase,
-    aiResult.wantsDownload
-  )
+  // Auto-analyze new tracks that meet quality criteria (non-blocking)
+  const tracksToAnalyze = mergedTracks
+    .filter(t => t.shouldAnalyze && t.source === 'soundcloud')
+    .map(t => ({ ...t } as TrackEntry)) // Remove extra fields for upsert
+
+  if (tracksToAnalyze.length > 0) {
+    upsertTracks(tracksToAnalyze).catch(err => {
+      logger.db.error(`Failed to store ${tracksToAnalyze.length} tracks: ${err instanceof Error ? err.message : 'Unknown'}`)
+    })
+  }
+
+  // Return unified results
+  return {
+    source: 'database', // Hybrid source
+    tracks: mergedTracks as TrackEntry[], // Cast back to TrackEntry for compatibility
+    response: aiResult.phrase,
+    hasMore: true, // Always enable pagination for more SoundCloud results
+    wantsDownload: aiResult.wantsDownload,
+    queryType: 'genre',
+    hybridStats: {
+      dbCount: stats.counts.database,
+      scCount: stats.counts.soundcloud,
+      analyzedCount: stats.counts.analyzed,
+      toAnalyzeCount: stats.counts.toAnalyze
+    }
+  }
 }
 
 // Helper: Fetch similar tracks from database

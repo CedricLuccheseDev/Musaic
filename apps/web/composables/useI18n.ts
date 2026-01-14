@@ -53,6 +53,9 @@ const translations = {
     download: 'Télécharger',
     freeLink: 'Lien gratuit',
     buy: 'Acheter',
+    close: 'Fermer',
+    openInNewTab: 'Problème avec l\'iframe ?',
+    openExternal: 'Ouvrir en externe',
 
     // Tooltips
     tooltipDirectDownload: 'Télécharger gratuitement en MP3',
@@ -268,6 +271,9 @@ const translations = {
     download: 'Download',
     freeLink: 'Free link',
     buy: 'Buy',
+    close: 'Close',
+    openInNewTab: 'Issue with iframe?',
+    openExternal: 'Open externally',
 
     // Tooltips
     tooltipDirectDownload: 'Download free MP3',
