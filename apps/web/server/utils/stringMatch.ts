@@ -100,6 +100,23 @@ export function calculateMatchScore(query: string, username: string): MatchResul
   return { type: 'none', score: 0 }
 }
 
+// Generic words that should not trigger artist detection
+const GENERIC_WORDS = [
+  'new', 'latest', 'recent', 'best', 'top', 'release', 'releases',
+  'music', 'track', 'tracks', 'song', 'songs', 'album', 'ep',
+  'mix', 'remix', 'set', 'dj', 'live', 'show', 'radio',
+  'free', 'download', 'downloads', 'télécharger', 'gratuit',
+  '2024', '2025', '2026', 'this', 'week', 'month', 'year'
+]
+
+/**
+ * Check if username is generic and should be ignored
+ */
+function isGenericUsername(username: string): boolean {
+  const normalized = normalizeForMatch(username)
+  return GENERIC_WORDS.some(word => normalized === normalizeForMatch(word))
+}
+
 /**
  * Find best matching user from a list
  */
@@ -111,6 +128,11 @@ export function findBestMatchingUser<T extends { username: string }>(
   let bestMatch: { user: T; match: MatchResult } | null = null
 
   for (const user of users) {
+    // Skip generic usernames
+    if (isGenericUsername(user.username)) {
+      continue
+    }
+
     const match = calculateMatchScore(query, user.username)
 
     if (match.score >= minScore) {

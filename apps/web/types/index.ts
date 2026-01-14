@@ -247,6 +247,11 @@ export interface TrackEntry {
   downloadable: boolean
   purchase_url: string | null
   purchase_title: string | null
+  // Hybrid search metadata (optional, added by mergeAndRankTracks)
+  source?: 'database' | 'soundcloud'
+  hasAnalysis?: boolean
+  score?: number
+  shouldAnalyze?: boolean
 }
 
 // =============================================================================

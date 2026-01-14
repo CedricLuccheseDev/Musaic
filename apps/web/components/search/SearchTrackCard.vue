@@ -23,6 +23,7 @@ const isVisible = ref(props.skipAnimation)
 const showDetails = ref(false)
 const showSimilar = ref(false)
 const isReanalyzing = ref(false)
+const showDownloadIframe = ref(false)
 
 /* --- Computed --- */
 const hasAnalysis = computed(() => props.track.analysis_status === AnalysisStatus.Completed)
@@ -99,6 +100,39 @@ function formatDuration(ms: number): string {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
 
+function formatTimeAgo(dateString: string): string {
+  const now = Date.now()
+  const date = new Date(dateString)
+  const diffMs = now - date.getTime()
+  const diffSeconds = Math.floor(diffMs / 1000)
+  const diffMinutes = Math.floor(diffSeconds / 60)
+  const diffHours = Math.floor(diffMinutes / 60)
+  const diffDays = Math.floor(diffHours / 24)
+  const diffWeeks = Math.floor(diffDays / 7)
+  const diffMonths = Math.floor(diffDays / 30)
+  const diffYears = Math.floor(diffDays / 365)
+
+  if (diffYears > 0) {
+    return `${diffYears}y`
+  }
+  if (diffMonths > 0) {
+    return `${diffMonths}mo`
+  }
+  if (diffWeeks > 0) {
+    return `${diffWeeks}w`
+  }
+  if (diffDays > 0) {
+    return `${diffDays}d`
+  }
+  if (diffHours > 0) {
+    return `${diffHours}h`
+  }
+  if (diffMinutes > 0) {
+    return `${diffMinutes}m`
+  }
+  return 'now'
+}
+
 function handleDeckClick(deck: 'A' | 'B') {
   if (!hasAnalysis.value) return
 
@@ -133,6 +167,16 @@ async function reanalyzeTrack() {
   finally {
     isReanalyzing.value = false
   }
+}
+
+function openDownloadIframe(event: Event) {
+  event.preventDefault()
+  event.stopPropagation()
+  showDownloadIframe.value = !showDownloadIframe.value
+}
+
+function closeDownloadIframe() {
+  showDownloadIframe.value = false
 }
 
 /* --- Lifecycle --- */
@@ -271,6 +315,14 @@ onMounted(() => {
             {{ track.genre }}
           </span>
 
+          <!-- Age tag -->
+          <span
+            v-if="track.created_at"
+            class="rounded-md bg-neutral-800/50 px-2 py-0.5 text-xs text-neutral-500"
+          >
+            {{ formatTimeAgo(track.created_at) }}
+          </span>
+
           <!-- Analysis tags -->
           <template v-if="hasAnalysis">
             <span
@@ -346,17 +398,15 @@ onMounted(() => {
               <UIcon name="i-heroicons-arrow-down-tray" class="h-4 w-4" />
               <span>{{ t.download }}</span>
             </a>
-            <a
+            <button
               v-else-if="isFreeDownload"
-              :href="getDownloadUrl() || track.permalink_url"
-              target="_blank"
-              rel="noopener"
+              type="button"
               class="flex h-7 items-center gap-1.5 rounded-md bg-emerald-600/80 px-2.5 text-xs font-medium text-white transition-colors hover:bg-emerald-500"
-              @click.stop
+              @click="openDownloadIframe"
             >
-              <UIcon name="i-heroicons-arrow-top-right-on-square" class="h-4 w-4" />
-              <span>{{ t.freeLink }}</span>
-            </a>
+              <UIcon :name="showDownloadIframe ? 'i-heroicons-x-mark' : 'i-heroicons-arrow-top-right-on-square'" class="h-4 w-4" />
+              <span>{{ showDownloadIframe ? t.close : t.freeLink }}</span>
+            </button>
             <a
               v-else-if="track.purchase_url"
               :href="track.purchase_url"
@@ -393,6 +443,57 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- Download iframe -->
+    <Transition
+      enter-active-class="transition-all duration-300 ease-out"
+      enter-from-class="max-h-0 opacity-0"
+      enter-to-class="max-h-[600px] opacity-100"
+      leave-active-class="transition-all duration-300 ease-in"
+      leave-from-class="max-h-[600px] opacity-100"
+      leave-to-class="max-h-0 opacity-0"
+    >
+      <div
+        v-if="showDownloadIframe && isFreeDownload && getDownloadUrl()"
+        class="overflow-hidden border-t border-neutral-800/50"
+      >
+        <div class="relative bg-neutral-950/80 p-3">
+          <!-- Close button -->
+          <button
+            type="button"
+            class="absolute right-3 top-3 z-10 rounded-md bg-neutral-900/80 p-2 text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white"
+            @click="closeDownloadIframe"
+          >
+            <UIcon name="i-heroicons-x-mark" class="h-4 w-4" />
+          </button>
+
+          <!-- Iframe -->
+          <div class="overflow-hidden rounded-lg border border-neutral-800/50 bg-white">
+            <iframe
+              :src="getDownloadUrl()!"
+              class="h-125 w-full"
+              frameborder="0"
+              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+            />
+          </div>
+
+          <!-- Direct link fallback -->
+          <div class="mt-3 flex items-center justify-center gap-2">
+            <span class="text-xs text-neutral-500">{{ t.openInNewTab }}</span>
+            <a
+              :href="getDownloadUrl()!"
+              target="_blank"
+              rel="noopener"
+              class="flex items-center gap-1.5 rounded-md bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:bg-neutral-700"
+              @click.stop
+            >
+              <UIcon name="i-heroicons-arrow-top-right-on-square" class="h-3.5 w-3.5" />
+              <span>{{ t.openExternal }}</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <!-- Details Modal -->
     <TrackDetailsModal

@@ -10,6 +10,24 @@ function validateSql(sql: string): boolean {
   return true
 }
 
+// Fix common SQL generation errors (auto-correct before validation)
+function fixSqlErrors(sql: string): string {
+  // Fix ILIKE patterns that use '0' instead of '%' at the start
+  // Pattern: ILIKE '0word%' -> ILIKE '%word%'
+  let fixed = sql.replace(/ILIKE\s+'0([^']+)'/gi, (_match, content) => {
+    const hasEndPercent = content.endsWith('%')
+    const cleanContent = hasEndPercent ? content.slice(0, -1) : content
+    return `ILIKE '%${cleanContent}%'`
+  })
+
+  // Also fix patterns like '%word0' (ending with 0 instead of %)
+  fixed = fixed.replace(/ILIKE\s+'%([^']+)0'/gi, (_match, content) => {
+    return `ILIKE '%${content}%'`
+  })
+
+  return fixed
+}
+
 // Escape user input for SQL fallback (prevent injection)
 function escapeSqlString(str: string): string {
   return str.replace(/'/g, "''").replace(/\\/g, '\\\\')
@@ -37,7 +55,12 @@ RESPONSE FORMAT:
   "sql": "SELECT * FROM tracks WHERE ...",
   "phrase": "Short response in user's language",
   "soundcloudQuery": "Keywords for SoundCloud search",
-  "soundcloudFilters": {"genres": "genre1,genre2", "bpm": {"from": 130, "to": 150}},
+  "soundcloudFilters": {
+    "genres": "genre1,genre2",
+    "bpm": {"from": 130, "to": 150},
+    "created_at": "last_week",
+    "license": "to_share"
+  },
   "needsClarification": false,
   "clarificationQuestion": "Question if ambiguous",
   "clarificationOptions": [{"label": "Option", "query": "refined query"}]
@@ -48,13 +71,24 @@ tracks(soundcloud_id, title, artist, genre, duration, download_status, playback_
   bpm_detected, key_detected, energy, valence, danceability, instrumentalness, spectral_centroid,
   analysis_status, embedding vector(1280))
 
+QUERY TYPE DETECTION:
+1. Genre/Tag: "dubstep", "techno récent", "chill house" → WHERE genre ILIKE '%genre%'
+2. Artist: Known artist names like "Skrillex", "Rezz" → WHERE artist ILIKE '%name%'
+3. Track: "Artist - Title" format → Exact match search
+4. Mood/Features: "energetic", "sad", "chill" → Use audio features (energy, valence)
+
 RULES:
-1. Use your music knowledge to understand ANY genre, style, mood, or artist
-2. Use ILIKE '%term%' for text matching, combine with OR for related terms
-3. For audio features (energy, valence, etc.), require analysis_status='completed'
-4. For similarity: find_similar_tracks(track_id, limit) RPC function
-5. Artist name alone → keep soundcloudQuery as just the name
-6. Default: ORDER BY playback_count DESC LIMIT 20
+- ALWAYS use ILIKE '%term%' for text (NEVER '0term%' or '%term0')
+- Genre queries → search genre field + use soundcloudFilters.genres
+- Audio features require analysis_status='completed'
+- Default ORDER BY playback_count DESC LIMIT 20
+
+SOUNDCLOUD FILTERS (always include in soundcloudFilters when detected):
+- created_at: Detect from "recent", "latest", "new", "2025", "2026", "this week/month/year"
+  → "last_week" (default for recent), "last_month", "last_year"
+- license: Detect from "free", "download", "télécharger", "gratuit", "free dl"
+  → "to_share" (for free downloads/sharing)
+- genres: Pass genre names directly (will use filter.genre_or_tag internally)
 
 AUDIO FEATURES (0-1 scale, require analysis_status='completed'):
 - energy: intensity (>0.7=high, <0.4=low)
@@ -64,22 +98,22 @@ AUDIO FEATURES (0-1 scale, require analysis_status='completed'):
 - danceability, acousticness, speechiness, liveness
 
 CLARIFICATION:
-If query is too broad or ambiguous (e.g. "electronic", "good vibes", "something to dance"),
-set needsClarification=true and provide relevant options based on your music knowledge.
-Keep option labels SHORT and SIMPLE (just the genre/style name, no modifiers like "aggressive", "melodic", etc.).
-The query field should also be simple (e.g. "dubstep" not "aggressive dubstep").
+If ambiguous (e.g. "electronic"), set needsClarification=true with simple options.
 
-EXAMPLES:
-- "chill dubstep" → {"sql":"SELECT * FROM tracks WHERE genre ILIKE '%dubstep%' AND energy < 0.5 AND analysis_status='completed' ORDER BY playback_count DESC LIMIT 20","phrase":"Voici du dubstep chill","soundcloudQuery":"melodic dubstep chill","needsClarification":false}
+EXAMPLES (CRITICAL: ILIKE '%word%' with percent %, never 0):
+- "dubstep récente" → {"sql":"SELECT * FROM tracks WHERE genre ILIKE '%dubstep%' ORDER BY playback_count DESC LIMIT 20","phrase":"Dernières sorties dubstep","soundcloudQuery":"dubstep","soundcloudFilters":{"genres":"Dubstep","created_at":"last_month"},"needsClarification":false}
 - "Skrillex" → {"sql":"SELECT * FROM tracks WHERE artist ILIKE '%skrillex%' ORDER BY playback_count DESC LIMIT 20","phrase":"Tracks by Skrillex","soundcloudQuery":"skrillex","needsClarification":false}
-- "electronic music" → {"needsClarification":true,"clarificationQuestion":"Quel style d'électro ?","clarificationOptions":[{"label":"House","query":"house music"},{"label":"Techno","query":"techno"},{"label":"Dubstep","query":"dubstep"},{"label":"Ambient","query":"ambient electronic"}],"sql":"","phrase":"","soundcloudQuery":""}
-- "free downloads dubstep" → {"sql":"SELECT * FROM tracks WHERE genre ILIKE '%dubstep%' AND download_status IN ('FreeDirectLink','FreeExternalLink') ORDER BY playback_count DESC LIMIT 20","phrase":"Dubstep gratuit pour toi","soundcloudQuery":"dubstep free download","needsClarification":false}
+- "chill dubstep" → {"sql":"SELECT * FROM tracks WHERE genre ILIKE '%dubstep%' AND energy < 0.5 AND analysis_status='completed' ORDER BY playback_count DESC LIMIT 20","phrase":"Voici du dubstep chill","soundcloudQuery":"melodic dubstep chill","soundcloudFilters":{"genres":"Dubstep"},"needsClarification":false}
+- "free dubstep" → {"sql":"SELECT * FROM tracks WHERE genre ILIKE '%dubstep%' AND download_status IN ('FreeDirectLink','FreeExternalLink') ORDER BY playback_count DESC LIMIT 20","phrase":"Dubstep gratuit","soundcloudQuery":"dubstep","soundcloudFilters":{"genres":"Dubstep","license":"to_share"},"needsClarification":false}
+- "electronic" → {"needsClarification":true,"clarificationQuestion":"Quel style ?","clarificationOptions":[{"label":"House","query":"house"},{"label":"Techno","query":"techno"},{"label":"Dubstep","query":"dubstep"}],"sql":"","phrase":"","soundcloudQuery":""}
 
 Respond in user's language. No emojis.`
 
 export interface SoundcloudFilters {
   genres?: string
   bpm?: { from: number; to: number }
+  created_at?: 'last_hour' | 'last_day' | 'last_week' | 'last_month' | 'last_year'
+  license?: 'to_modify_commercially' | 'to_share' | 'to_use_commercially'
 }
 
 export interface ClarificationOption {
@@ -150,14 +184,18 @@ async function callAiApi(question: string): Promise<AiQueryResult> {
       sql: '',
       phrase: '',
       soundcloudQuery: '',
+
       needsClarification: true,
       clarificationQuestion: result.clarificationQuestion || '',
       clarificationOptions: result.clarificationOptions || []
     }
   }
 
+  // Auto-fix common SQL errors (like '0word%' instead of '%word%')
+  const fixedSql = result.sql ? fixSqlErrors(result.sql) : ''
+
   return {
-    sql: result.sql || '',
+    sql: fixedSql,
     phrase: result.phrase || '',
     soundcloudQuery: result.soundcloudQuery || question,
     soundcloudFilters: result.soundcloudFilters || undefined,
