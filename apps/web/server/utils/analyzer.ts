@@ -45,6 +45,8 @@ export async function sendAnalysisRequest(
   options?: AnalyzeOptions
 ): Promise<AnalyzeResponse> {
   const analyzerUrl = validateAnalyzerConfig()
+  const config = useRuntimeConfig()
+  const analyzerApiKey = config.analyzerApiKey as string
 
   if (!soundcloudIds || soundcloudIds.length === 0) {
     throw createError({
@@ -63,9 +65,14 @@ export async function sendAnalysisRequest(
 
     const timeoutId = setTimeout(() => controller.abort(), timeout)
 
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (analyzerApiKey) {
+      headers['X-API-Key'] = analyzerApiKey
+    }
+
     const response = await fetch(`${analyzerUrl}/analyze/batch`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ soundcloud_ids: ids }),
       signal: controller.signal
     })
@@ -124,13 +131,20 @@ export async function analyzeSingleTrack(soundcloudId: number, options?: Analyze
 export async function triggerAnalysisBackground(soundcloudIds: number[]): Promise<void> {
   try {
     const analyzerUrl = validateAnalyzerConfig()
+    const config = useRuntimeConfig()
+    const analyzerApiKey = config.analyzerApiKey as string
 
     if (!soundcloudIds || soundcloudIds.length === 0) return
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (analyzerApiKey) {
+      headers['X-API-Key'] = analyzerApiKey
+    }
 
     // Fire and forget - don't await the result
     fetch(`${analyzerUrl}/analyze/batch`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ soundcloud_ids: soundcloudIds })
     }).catch((error) => {
       // Silent fail - analyzer might be down
