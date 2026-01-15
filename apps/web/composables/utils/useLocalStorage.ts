@@ -52,7 +52,7 @@ export function useLocalStorage<T>(
       }
 
       return parsed
-    } catch (error) {
+    } catch {
       // Invalid JSON or deserialization error
       return initialValue
     }
@@ -68,7 +68,7 @@ export function useLocalStorage<T>(
     try {
       const valueToSave = newValue !== undefined ? newValue : value.value
       localStorage.setItem(key, serializer(valueToSave))
-    } catch (error) {
+    } catch {
       // localStorage might be full or disabled - silently fail
     }
   }
@@ -83,7 +83,7 @@ export function useLocalStorage<T>(
     try {
       localStorage.removeItem(key)
       value.value = initialValue
-    } catch (error) {
+    } catch {
       // Silently fail
     }
   }

@@ -1,7 +1,7 @@
 import { searchWithArtistDetection, getTrackById, resolveTrackUrl, searchExactTrack, type SearchResult } from '~/server/services/soundcloud'
 import { upsertTracks, enrichTracksWithAnalysis } from '~/server/services/trackStorage'
 import { generateSqlAndPhrase, type ClarificationOption } from '~/server/services/aiQuery'
-import { mergeAndRankTracks, groupTracksBySource, type MergedTrack } from '~/server/services/hybridSearch'
+import { mergeAndRankTracks, groupTracksBySource } from '~/server/services/hybridSearch'
 import { createClient } from '@supabase/supabase-js'
 import { type DbTrackWithAnalysis, dbTrackToTrackEntry, type TrackEntry } from '~/types'
 import { logger } from '~/server/utils/logger'
