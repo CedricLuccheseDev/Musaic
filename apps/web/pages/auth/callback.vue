@@ -1,35 +1,35 @@
 <script setup lang="ts">
-import { createClient } from '@supabase/supabase-js'
-
 /* --- Meta --- */
 definePageMeta({
   layout: false
 })
 
 /* --- States --- */
-const config = useRuntimeConfig()
+const router = useRouter()
+const supabase = useSupabase()
 
 /* --- Lifecycle --- */
 onMounted(async () => {
-  const url = config.public.supabaseUrl
-  const key = config.public.supabaseAnonKey
-
-  if (!url || !key) {
-    window.close()
+  if (!supabase) {
+    router.push('/login')
     return
   }
 
-  const supabase = createClient(url, key)
+  try {
+    const { error } = await supabase.auth.exchangeCodeForSession(window.location.href)
 
-  const { error } = await supabase.auth.exchangeCodeForSession(window.location.href)
+    if (error) {
+      console.error('[auth/callback] Error:', error)
+      router.push('/login')
+      return
+    }
 
-  if (error) {
-    await supabase.auth.getSession()
+    // Redirect to home on success
+    router.push('/')
+  } catch (err) {
+    console.error('[auth/callback] Exception:', err)
+    router.push('/login')
   }
-
-  await new Promise(resolve => setTimeout(resolve, 100))
-
-  window.close()
 })
 </script>
 

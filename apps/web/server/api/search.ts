@@ -4,7 +4,7 @@ import { generateSqlAndPhrase, type ClarificationOption } from '~/server/service
 import { mergeAndRankTracks, groupTracksBySource } from '~/server/services/hybridSearch'
 import { createClient } from '@supabase/supabase-js'
 import { type DbTrackWithAnalysis, dbTrackToTrackEntry, type TrackEntry } from '~/types'
-import { logger } from '~/server/utils/logger'
+import { logger, genReqId } from '~/server/utils/logger'
 
 // Query type detection
 type QueryType = 'url' | 'track' | 'artist' | 'genre' | 'id'
@@ -73,10 +73,12 @@ interface CascadeSearchResult extends SearchResult {
     analyzedCount: number
     toAnalyzeCount: number
   }
+  // SoundCloud query for lazy loading more results
+  soundcloudQuery?: string
 }
 
 export default defineEventHandler(async (event): Promise<CascadeSearchResult> => {
-  const { q, offset } = getQuery(event)
+  const { q, offset, skipAi } = getQuery(event)
 
   if (!q || typeof q !== 'string') {
     throw createError({
@@ -86,6 +88,12 @@ export default defineEventHandler(async (event): Promise<CascadeSearchResult> =>
   }
 
   const offsetNum = typeof offset === 'string' ? parseInt(offset, 10) : 0
+  const shouldSkipAi = skipAi === 'true'
+
+  // Skip AI and go directly to SoundCloud (for "Search more" button)
+  if (shouldSkipAi) {
+    return await searchSoundCloud(q, offsetNum)
+  }
 
   // Analyze query type
   const analysis = analyzeQuery(q)
@@ -217,18 +225,24 @@ async function handleTrackSearch(artistName: string, trackTitle: string): Promis
 
 // Handler: AI-powered hybrid search (DB + SoundCloud)
 async function handleAiSearch(query: string, offset: number): Promise<CascadeSearchResult> {
+  const reqId = genReqId()
+
+  // Step 1: Log user prompt
+  logger.ai.prompt(reqId, query)
+
   let aiResult
   try {
     aiResult = await generateSqlAndPhrase(query)
-    logger.ai.query(query)
-    if (aiResult.sql) logger.ai.sql(aiResult.sql)
+    // Step 2: Log AI interpretation
+    logger.ai.interpret(reqId, aiResult.sql, aiResult.soundcloudQuery)
   } catch (err) {
-    logger.ai.error(err instanceof Error ? err.message : 'AI query generation failed')
+    logger.ai.fallback(reqId, query, err instanceof Error ? err.message : 'AI failed')
     return await searchSoundCloud(query, offset)
   }
 
   // Handle clarification needed
   if (aiResult.needsClarification) {
+    logger.ai.clarify(reqId, aiResult.clarificationQuestion || '')
     return {
       source: 'database',
       tracks: [],
@@ -261,16 +275,12 @@ async function handleAiSearch(query: string, offset: number): Promise<CascadeSea
     limit: 20
   })
 
-  // Analytics logging
+  // Step 3: Log final results
   const stats = groupTracksBySource(mergedTracks)
-  logger.ai.result(
-    mergedTracks.length,
-    `${aiResult.phrase} (DB: ${stats.counts.database}, SC: ${stats.counts.soundcloud}, analyzed: ${stats.counts.analyzed})`
-  )
+  logger.ai.result(reqId, mergedTracks.length, { db: stats.counts.database, sc: stats.counts.soundcloud })
 
   // If no results from both sources, try SoundCloud with relaxed query
   if (mergedTracks.length === 0) {
-    logger.ai.result(0, 'No hybrid results, trying relaxed SoundCloud search')
     return await searchSoundCloud(
       aiResult.soundcloudQuery,
       offset,
@@ -304,7 +314,8 @@ async function handleAiSearch(query: string, offset: number): Promise<CascadeSea
       scCount: stats.counts.soundcloud,
       analyzedCount: stats.counts.analyzed,
       toAnalyzeCount: stats.counts.toAnalyze
-    }
+    },
+    soundcloudQuery: aiResult.soundcloudQuery
   }
 }
 

@@ -177,7 +177,7 @@ async function main() {
     console.log(`[${searchCount}/${config.queries.length}] "${query}"...`)
 
     try {
-      const tracks = await searchTracks(query, 25)
+      const tracks = await searchTracks(query, 25, true) // Enable Odesli enrichment
       const filtered = tracks.filter(t => shouldIncludeTrack(t, config))
 
       for (const track of filtered) {

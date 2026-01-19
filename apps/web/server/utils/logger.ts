@@ -14,6 +14,13 @@ const c = {
   bgGray: '\x1b[48;5;236m'
 }
 
+// Generate short request ID (4 chars)
+let reqCounter = 0
+export function genReqId(): string {
+  reqCounter = (reqCounter + 1) % 10000
+  return reqCounter.toString().padStart(4, '0')
+}
+
 type LogLevel = 'info' | 'success' | 'warn' | 'error' | 'debug'
 
 const levelConfig: Record<LogLevel, { color: string; icon: string }> = {
@@ -92,36 +99,53 @@ export const logger = {
 
   // SoundCloud operations
   sc: {
-    search: (query: string, count: number) => {
-      log('info', 'SC', `"${c.cyan}${query}${c.reset}" → ${num(count)} tracks`)
+    // Search with optional artist match info
+    search: (query: string, count: number, artist?: { name: string; matchType?: string }) => {
+      log('success', 'SC', `"${c.cyan}${query}${c.reset}" → ${num(count)} tracks`)
+      if (artist) {
+        const matchInfo = artist.matchType ? ` ${c.dim}(${artist.matchType})${c.reset}` : ''
+        console.log(`${c.dim}                └─ Artist: ${c.reset}${artist.name}${matchInfo}`)
+      }
+    },
+    // Fallback search (no artist match)
+    fallback: (query: string, count: number) => {
+      log('warn', 'SC', `"${c.cyan}${query}${c.reset}" → ${num(count)} tracks ${c.dim}(no artist match)${c.reset}`)
     },
     error: (error: string) => log('error', 'SC', error)
   },
 
-  // AI operations
+  // AI operations (with request ID for tracking)
   ai: {
-    query: (question: string) => {
-      log('info', 'AI', `"${c.cyan}${question}${c.reset}"`)
+    // Step 1: Log the user prompt
+    prompt: (id: string, query: string) => {
+      log('info', 'AI', `${c.dim}[${id}]${c.reset} "${c.cyan}${query}${c.reset}"`)
     },
-    sql: (sql: string) => {
-      log('debug', 'AI', `${c.gray}${sql}${c.reset}`)
+    // Step 2: Log AI interpretation (SQL generated)
+    interpret: (id: string, sql: string, scQuery: string) => {
+      const shortSql = sql.length > 80 ? sql.substring(0, 80) + '...' : sql
+      console.log(`${c.dim}      [${id}] ├─ SQL: ${shortSql}${c.reset}`)
+      console.log(`${c.dim}      [${id}] └─ SC: "${scQuery}"${c.reset}`)
     },
+    // Step 3: Log final results
+    result: (id: string, count: number, stats: { db: number; sc: number }) => {
+      log('success', 'AI', `${c.dim}[${id}]${c.reset} → ${num(count)} tracks ${c.dim}(DB:${stats.db} SC:${stats.sc})${c.reset}`)
+    },
+    // Log when AI needs clarification
+    clarify: (id: string, question: string) => {
+      log('info', 'AI', `${c.dim}[${id}]${c.reset} → ${c.yellow}?${c.reset} ${question}`)
+    },
+    // Log fallback (AI failed)
+    fallback: (id: string, query: string, reason?: string) => {
+      const r = reason ? ` ${c.dim}(${reason})${c.reset}` : ''
+      log('warn', 'AI', `${c.dim}[${id}]${c.reset} "${c.cyan}${query}${c.reset}" → fallback${r}`)
+    },
+    // Token stats (silent)
     tokens: (input: number, output: number, cacheRead = 0, cacheCreation = 0) => {
       sessionStats.haiku.inputTokens += input
       sessionStats.haiku.outputTokens += output
       sessionStats.haiku.cacheRead += cacheRead
       sessionStats.haiku.cacheCreation += cacheCreation
       sessionStats.haiku.requests++
-
-      const h = sessionStats.haiku
-      const cache = cacheRead > 0 ? ` ${c.green}(${cacheRead} cached)${c.reset}` : ''
-      log('debug', 'AI', `${num(input)}in/${num(output)}out${cache} ${c.dim}│${c.reset} Session: ${num(h.requests, c.cyan)} req`)
-    },
-    result: (count: number, phrase?: string) => {
-      const msg = phrase
-        ? `${num(count)} results ${c.dim}│${c.reset} "${c.gray}${phrase}${c.reset}"`
-        : `${num(count)} results`
-      log('success', 'AI', msg)
     },
     error: (error: string) => log('error', 'AI', error)
   },

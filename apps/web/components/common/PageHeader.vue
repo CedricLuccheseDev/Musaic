@@ -29,9 +29,12 @@ withDefaults(defineProps<{
           mode="out-in"
         >
           <slot v-if="!hideLogo" name="left">
-            <NuxtLink to="/" class="group transition-transform hover:scale-105">
-              <AppLogo size="md" />
-            </NuxtLink>
+            <div class="flex items-center gap-3">
+              <NuxtLink to="/" class="group transition-transform hover:scale-105">
+                <AppLogo size="md" />
+              </NuxtLink>
+              <PremiumButton />
+            </div>
           </slot>
           <div v-else />
         </Transition>
@@ -65,8 +68,7 @@ withDefaults(defineProps<{
         >
           <slot name="right">
             <div class="flex items-center gap-3">
-              <PremiumButton />
-              <LangSwitch />
+              <SetBuilderButton />
               <ProfileButtons />
             </div>
           </slot>
@@ -91,9 +93,12 @@ withDefaults(defineProps<{
           >
             <slot v-if="!hideLogo" name="left-mobile">
               <slot name="left">
-                <NuxtLink to="/">
-                  <AppLogo size="sm" />
-                </NuxtLink>
+                <div class="flex items-center gap-2">
+                  <NuxtLink to="/">
+                    <AppLogo size="sm" />
+                  </NuxtLink>
+                  <PremiumButton size="sm" />
+                </div>
               </slot>
             </slot>
             <div v-else />
@@ -111,8 +116,7 @@ withDefaults(defineProps<{
           >
             <slot name="right-mobile">
               <div class="flex items-center gap-2">
-                <PremiumButton size="sm" />
-                <LangSwitch size="sm" />
+                <SetBuilderButton size="sm" />
                 <ProfileButtons size="sm" />
               </div>
             </slot>

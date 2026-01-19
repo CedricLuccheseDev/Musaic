@@ -1,7 +1,7 @@
 import { generateSqlAndPhrase } from '~/server/services/aiQuery'
 import { createClient } from '@supabase/supabase-js'
 import { type DbTrackWithAnalysis, dbTrackToTrackEntry } from '~/types'
-import { logger } from '~/server/utils/logger'
+import { logger, genReqId } from '~/server/utils/logger'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
@@ -14,14 +14,14 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const reqId = genReqId()
+
   try {
+    logger.ai.prompt(reqId, question)
     // Generate SQL and phrase from natural language (single AI call)
     const aiResult = await generateSqlAndPhrase(question)
     const sql = aiResult.sql.trim().replace(/;+$/, '')
     const phrase = aiResult.phrase
-
-    logger.ai.query(question)
-    logger.ai.sql(sql)
 
     // Validate SQL (security check)
     const sqlLower = sql.toLowerCase().trim()
@@ -57,7 +57,7 @@ export default defineEventHandler(async (event) => {
     // Transform DB results to TrackEntry format
     const results = (data || []).map((row: DbTrackWithAnalysis) => dbTrackToTrackEntry(row))
 
-    logger.ai.result(results.length, phrase)
+    logger.ai.result(reqId, results.length, { db: results.length, sc: 0 })
 
     return {
       sql: isDev ? sql : undefined,

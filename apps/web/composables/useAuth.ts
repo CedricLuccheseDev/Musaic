@@ -41,75 +41,35 @@ export const useAuth = () => {
   }
 
   async function signInWithGoogle() {
+    console.log('[useAuth] signInWithGoogle called')
+
     if (!supabase) {
+      console.error('[useAuth] Supabase not configured')
       return { error: { message: 'Supabase not configured' } }
     }
 
     const redirectUrl = `${window.location.origin}/auth/callback`
+    console.log('[useAuth] Redirect URL:', redirectUrl)
 
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectUrl,
-        skipBrowserRedirect: true
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl
+        }
+      })
+
+      console.log('[useAuth] OAuth response:', { data, error })
+
+      if (error) {
+        console.error('[useAuth] Google sign-in error:', error)
       }
-    })
 
-    if (error) {
       return { data, error }
+    } catch (err) {
+      console.error('[useAuth] Exception during OAuth:', err)
+      return { error: { message: String(err) } }
     }
-
-    // Open OAuth in popup instead of redirect
-    if (data?.url) {
-      const width = 500
-      const height = 600
-      const left = window.screenX + (window.outerWidth - width) / 2
-      const top = window.screenY + (window.outerHeight - height) / 2
-
-      window.open(
-        data.url,
-        'google-oauth',
-        `width=${width},height=${height},left=${left},top=${top},popup=true`
-      )
-    }
-
-    return { data, error }
-  }
-
-  async function signInWithApple() {
-    if (!supabase) {
-      return { error: { message: 'Supabase not configured' } }
-    }
-
-    const redirectUrl = `${window.location.origin}/auth/callback`
-
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'apple',
-      options: {
-        redirectTo: redirectUrl,
-        skipBrowserRedirect: true
-      }
-    })
-
-    if (error) {
-      return { data, error }
-    }
-
-    // Open OAuth in popup instead of redirect
-    if (data?.url) {
-      const width = 500
-      const height = 600
-      const left = window.screenX + (window.outerWidth - width) / 2
-      const top = window.screenY + (window.outerHeight - height) / 2
-
-      window.open(
-        data.url,
-        'apple-oauth',
-        `width=${width},height=${height},left=${left},top=${top},popup=true`
-      )
-    }
-
-    return { data, error }
   }
 
   async function signOut() {
@@ -134,7 +94,6 @@ export const useAuth = () => {
     loading: readonly(loading),
     init,
     signInWithGoogle,
-    signInWithApple,
     signOut
   }
 }

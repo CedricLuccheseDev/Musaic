@@ -6,23 +6,18 @@ definePageMeta({
 
 /* --- States --- */
 const { t } = useI18n()
-const { user, signInWithGoogle, signInWithApple } = useAuth()
+const { user, signInWithGoogle } = useAuth()
 const router = useRouter()
 const isLoadingGoogle = ref(false)
-const isLoadingApple = ref(false)
 const showTerms = ref(false)
 
 /* --- Methods --- */
 async function handleGoogle() {
+  console.log('[login] handleGoogle clicked')
   isLoadingGoogle.value = true
-  await signInWithGoogle()
+  const result = await signInWithGoogle()
+  console.log('[login] signInWithGoogle result:', result)
   isLoadingGoogle.value = false
-}
-
-async function handleApple() {
-  isLoadingApple.value = true
-  await signInWithApple()
-  isLoadingApple.value = false
 }
 
 /* --- Watchers --- */
@@ -91,25 +86,13 @@ watch(user, (u) => {
           <!-- Google -->
           <button
             type="button"
-            :disabled="isLoadingGoogle || isLoadingApple"
+            :disabled="isLoadingGoogle"
             class="group relative flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl bg-white px-4 py-3.5 font-medium text-neutral-900 transition-all duration-200 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
             @click="handleGoogle"
           >
             <UIcon v-if="isLoadingGoogle" name="i-heroicons-arrow-path" class="h-5 w-5 animate-spin" />
             <UIcon v-else name="i-simple-icons-google" class="h-5 w-5" />
             <span>{{ t.continueWithGoogle }}</span>
-          </button>
-
-          <!-- Apple -->
-          <button
-            type="button"
-            :disabled="isLoadingGoogle || isLoadingApple"
-            class="group relative flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl bg-neutral-800 px-4 py-3.5 font-medium text-white transition-all duration-200 hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
-            @click="handleApple"
-          >
-            <UIcon v-if="isLoadingApple" name="i-heroicons-arrow-path" class="h-5 w-5 animate-spin" />
-            <UIcon v-else name="i-simple-icons-apple" class="h-5 w-5" />
-            <span>{{ t.continueWithApple }}</span>
           </button>
         </div>
 

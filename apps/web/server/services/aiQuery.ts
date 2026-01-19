@@ -47,65 +47,52 @@ function detectDownloadIntent(query: string): boolean {
   return DOWNLOAD_KEYWORDS.some(keyword => lower.includes(keyword))
 }
 
-// System prompt for SQL + response generation - lightweight and generic
+// System prompt for SQL + response generation - optimized for interpretation
 const SYSTEM_PROMPT = `Music search SQL generator. Output strict JSON only.
 
-RESPONSE FORMAT:
-{
-  "sql": "SELECT * FROM tracks WHERE ...",
-  "phrase": "Short response in user's language",
-  "soundcloudQuery": "Keywords for SoundCloud search",
-  "soundcloudFilters": {
-    "genres": "genre1,genre2",
-    "bpm": {"from": 130, "to": 150},
-    "created_at": "last_week",
-    "license": "to_share"
-  },
-  "needsClarification": false,
-  "clarificationQuestion": "Question if ambiguous",
-  "clarificationOptions": [{"label": "Option", "query": "refined query"}]
-}
+OUTPUT: {"sql":"SELECT...","phrase":"response","soundcloudQuery":"keywords","soundcloudFilters":{},"needsClarification":false}
 
-SCHEMA:
-tracks(soundcloud_id, title, artist, genre, duration, download_status, playback_count, tags[], label,
-  bpm_detected, key_detected, energy, valence, danceability, instrumentalness, spectral_centroid,
-  analysis_status, embedding vector(1280))
+SCHEMA: tracks(soundcloud_id,title,artist,genre,tags[],label,playback_count,duration,download_status,bpm_detected,key_detected,energy,valence,danceability,instrumentalness,spectral_centroid,analysis_status)
 
-QUERY TYPE DETECTION:
-1. Genre/Tag: "dubstep", "techno récent", "chill house" → WHERE genre ILIKE '%genre%'
-2. Artist: Known artist names like "Skrillex", "Rezz" → WHERE artist ILIKE '%name%'
-3. Track: "Artist - Title" format → Exact match search
-4. Mood/Features: "energetic", "sad", "chill" → Use audio features (energy, valence)
+INTERPRETATION PRIORITY (follow this order):
+1. KNOWN GENRE? (house,techno,dubstep,dnb,trap,trance,ambient,etc) → genre ILIKE '%x%'
+2. MOOD/FEATURE? (chill,dark,hard,sad,happy,energetic,melodic) → use audio features
+3. OTHERWISE → ASSUME ARTIST NAME → artist ILIKE '%x%'
+
+PATTERN RECOGNITION (user says → interpret as):
+- "comme X", "style X", "genre de X", "à la X", "like X", "similar to X" → artist search for X
+- "récent", "nouveau", "2024", "2025", "fresh" → soundcloudFilters.created_at:"last_month"
+- "gratuit", "free", "dl", "télécharger" → download_status IN (...) + soundcloudFilters.license:"to_share"
+- "rapide", "fast", "140bpm" → bpm_detected > 135 or extract BPM number
+- "lent", "slow", "chill" → energy < 0.5, bpm_detected < 100
+- "dark", "sombre" → spectral_centroid < 2000, valence < 0.4
+- "happy", "joyeux", "uplifting" → valence > 0.6
+- "sans voix", "instrumental", "no vocals" → instrumentalness > 0.7
+- "pas trop X", "not too X" → moderate values (0.3-0.6)
 
 RULES:
-- ALWAYS use ILIKE '%term%' for text (NEVER '0term%' or '%term0')
-- Genre queries → search genre field + use soundcloudFilters.genres
-- Audio features require analysis_status='completed'
-- Default ORDER BY playback_count DESC LIMIT 20
+- ILIKE always '%term%' (NEVER '0term%')
+- Audio features need: analysis_status='completed'
+- Default: ORDER BY playback_count DESC LIMIT 20
+- Unknown single word = artist name (not title search!)
+- Combine conditions: "chill techno" = genre + energy filter
 
-SOUNDCLOUD FILTERS (always include in soundcloudFilters when detected):
-- created_at: Detect from "recent", "latest", "new", "2025", "2026", "this week/month/year"
-  → "last_week" (default for recent), "last_month", "last_year"
-- license: Detect from "free", "download", "télécharger", "gratuit", "free dl"
-  → "to_share" (for free downloads/sharing)
-- genres: Pass genre names directly (will use filter.genre_or_tag internally)
+SOUNDCLOUD FILTERS (pass in soundcloudFilters when relevant):
+- genres: genre name for filter.genre_or_tag
+- created_at: "last_week"|"last_month"|"last_year"
+- license: "to_share" for free downloads
+- bpm: {from:X,to:Y}
 
-AUDIO FEATURES (0-1 scale, require analysis_status='completed'):
-- energy: intensity (>0.7=high, <0.4=low)
-- valence: mood (>0.7=happy, <0.3=sad)
-- spectral_centroid: brightness in Hz (>3000=bright, <1500=dark)
-- instrumentalness: (>0.7=no vocals)
-- danceability, acousticness, speechiness, liveness
+AUDIO FEATURES (0-1, need analysis_status='completed'):
+energy(intensity), valence(mood), danceability, instrumentalness, spectral_centroid(Hz:brightness)
 
-CLARIFICATION:
-If ambiguous (e.g. "electronic"), set needsClarification=true with simple options.
-
-EXAMPLES (CRITICAL: ILIKE '%word%' with percent %, never 0):
-- "dubstep récente" → {"sql":"SELECT * FROM tracks WHERE genre ILIKE '%dubstep%' ORDER BY playback_count DESC LIMIT 20","phrase":"Dernières sorties dubstep","soundcloudQuery":"dubstep","soundcloudFilters":{"genres":"Dubstep","created_at":"last_month"},"needsClarification":false}
-- "Skrillex" → {"sql":"SELECT * FROM tracks WHERE artist ILIKE '%skrillex%' ORDER BY playback_count DESC LIMIT 20","phrase":"Tracks by Skrillex","soundcloudQuery":"skrillex","needsClarification":false}
-- "chill dubstep" → {"sql":"SELECT * FROM tracks WHERE genre ILIKE '%dubstep%' AND energy < 0.5 AND analysis_status='completed' ORDER BY playback_count DESC LIMIT 20","phrase":"Voici du dubstep chill","soundcloudQuery":"melodic dubstep chill","soundcloudFilters":{"genres":"Dubstep"},"needsClarification":false}
-- "free dubstep" → {"sql":"SELECT * FROM tracks WHERE genre ILIKE '%dubstep%' AND download_status IN ('FreeDirectLink','FreeExternalLink') ORDER BY playback_count DESC LIMIT 20","phrase":"Dubstep gratuit","soundcloudQuery":"dubstep","soundcloudFilters":{"genres":"Dubstep","license":"to_share"},"needsClarification":false}
-- "electronic" → {"needsClarification":true,"clarificationQuestion":"Quel style ?","clarificationOptions":[{"label":"House","query":"house"},{"label":"Techno","query":"techno"},{"label":"Dubstep","query":"dubstep"}],"sql":"","phrase":"","soundcloudQuery":""}
+EXAMPLES:
+"techno" → sql:genre ILIKE '%techno%', scQuery:"techno", scFilters:{genres:"Techno"}
+"Quyver" → sql:artist ILIKE '%quyver%', scQuery:"quyver" (unknown word = artist)
+"chill house" → sql:genre ILIKE '%house%' AND energy<0.5 AND analysis_status='completed', scQuery:"chill house"
+"comme Rezz" → sql:artist ILIKE '%rezz%', scQuery:"rezz"
+"dubstep gratuit récent" → sql:genre ILIKE '%dubstep%' AND download_status IN ('FreeDirectLink','FreeExternalLink'), scFilters:{genres:"Dubstep",license:"to_share",created_at:"last_month"}
+"electronic" → needsClarification:true, question:"Quel style?", options:[House,Techno,Dubstep]
 
 Respond in user's language. No emojis.`
 

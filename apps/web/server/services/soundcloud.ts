@@ -7,10 +7,10 @@ import type {
 } from '~/types/soundcloud'
 import {
   findBestMatchingUser,
-  calculateMatchScore,
   type MatchResult
 } from '~/server/utils/stringMatch'
 import { containsRejectKeyword } from '~/server/config/qualityRules'
+import { logger } from '~/server/utils/logger'
 
 // ============================================================================
 // Constants
@@ -61,6 +61,24 @@ const PURCHASE_DOMAINS = [
   'spotify.com',
   'deezer.com'
 ]
+
+// Odesli API for finding purchase links across platforms
+const ODESLI_API_URL = 'https://api.song.link/v1-alpha.1/links'
+
+// Priority order for purchase platforms (prefer dedicated music stores)
+const PURCHASE_PLATFORM_PRIORITY = [
+  'beatport',
+  'bandcamp',
+  'traxsource',
+  'itunes',
+  'appleMusic',
+  'amazon',
+  'deezer',
+  'spotify',
+  'tidal',
+  'youtube',
+  'youtubeMusic'
+] as const
 
 // ============================================================================
 // Client
@@ -177,6 +195,106 @@ function extractPurchaseUrl(track: SoundcloudTrack): string | null {
   return null
 }
 
+// Odesli API response types
+interface OdesliPlatformLink {
+  url: string
+  entityUniqueId: string
+}
+
+interface OdesliResponse {
+  entityUniqueId: string
+  pageUrl: string
+  linksByPlatform: Record<string, OdesliPlatformLink>
+}
+
+/**
+ * Fetch purchase links from Odesli API using SoundCloud URL
+ * Returns the best purchase link based on platform priority
+ */
+async function fetchOdesliPurchaseLink(soundcloudUrl: string): Promise<string | null> {
+  try {
+    const url = `${ODESLI_API_URL}?url=${encodeURIComponent(soundcloudUrl)}`
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(5000) // 5 second timeout
+    })
+
+    if (!response.ok) {
+      return null
+    }
+
+    const data = await response.json() as OdesliResponse
+
+    if (!data.linksByPlatform) {
+      return null
+    }
+
+    // Find best purchase link based on priority
+    for (const platform of PURCHASE_PLATFORM_PRIORITY) {
+      const link = data.linksByPlatform[platform]
+      if (link?.url) {
+        return link.url
+      }
+    }
+
+    // Fallback: return the Odesli page URL which aggregates all links
+    return data.pageUrl || null
+  } catch {
+    // Silently fail - Odesli is optional
+    return null
+  }
+}
+
+/**
+ * Enrich a single track with purchase link from Odesli if none exists
+ */
+export async function enrichTrackWithPurchaseLink(track: TrackEntry): Promise<TrackEntry> {
+  if (track.purchase_url) {
+    return track
+  }
+
+  const odesliLink = await fetchOdesliPurchaseLink(track.permalink_url)
+  if (odesliLink) {
+    return {
+      ...track,
+      purchase_url: odesliLink,
+      purchase_title: 'Buy / Stream'
+    }
+  }
+
+  return track
+}
+
+/**
+ * Enrich multiple tracks with purchase links from Odesli (parallel with rate limiting)
+ */
+export async function enrichTracksWithPurchaseLinks(
+  tracks: TrackEntry[],
+  concurrency = 5
+): Promise<TrackEntry[]> {
+  const tracksNeedingEnrichment = tracks.filter(t => !t.purchase_url)
+
+  if (tracksNeedingEnrichment.length === 0) {
+    return tracks
+  }
+
+  logger.info('SC', `Enriching ${tracksNeedingEnrichment.length} tracks with Odesli purchase links`)
+
+  // Process in batches to avoid rate limiting
+  const enrichedMap = new Map<number, TrackEntry>()
+
+  for (let i = 0; i < tracksNeedingEnrichment.length; i += concurrency) {
+    const batch = tracksNeedingEnrichment.slice(i, i + concurrency)
+    const enrichedBatch = await Promise.all(
+      batch.map(track => enrichTrackWithPurchaseLink(track))
+    )
+    enrichedBatch.forEach(t => enrichedMap.set(t.id, t))
+  }
+
+  // Merge enriched tracks back
+  return tracks.map(t => enrichedMap.get(t.id) || t)
+}
+
 function parseTags(tagList?: string): string[] {
   if (!tagList) return []
   return tagList.split(' ').filter(tag => tag.length > 0)
@@ -267,7 +385,7 @@ export interface SearchResult {
   artistSearchFailed?: boolean
 }
 
-export async function searchTracks(query: string, limit = SEARCH_LIMIT): Promise<TrackEntry[]> {
+export async function searchTracks(query: string, limit = SEARCH_LIMIT, enrichWithOdesli = true): Promise<TrackEntry[]> {
   const soundcloud = createSoundcloudClient()
   const response = await soundcloud.tracks.search({
     q: query,
@@ -278,10 +396,17 @@ export async function searchTracks(query: string, limit = SEARCH_LIMIT): Promise
   const tracks = response.collection || []
 
   // Filter out mixes/sets and tracks outside 2-7 min range, then map to TrackEntry
-  return tracks
+  let mappedTracks = tracks
     .filter(t => !containsRejectKeyword(t.title) && isValidDuration(t.duration))
     .slice(0, limit)
     .map(mapToTrackEntry)
+
+  // Enrich with Odesli purchase links if enabled
+  if (enrichWithOdesli) {
+    mappedTracks = await enrichTracksWithPurchaseLinks(mappedTracks)
+  }
+
+  return mappedTracks
 }
 
 export async function getTrackById(soundcloudId: number): Promise<TrackEntry | null> {
@@ -326,7 +451,8 @@ export async function searchWithArtistDetection(
   query: string,
   limit = SEARCH_LIMIT,
   offset = 0,
-  filters?: SearchFilters
+  filters?: SearchFilters,
+  enrichWithOdesli = false
 ): Promise<SearchResult> {
   const soundcloud = createSoundcloudClient()
 
@@ -367,15 +493,20 @@ export async function searchWithArtistDetection(
 
   // Handle tracks search result
   if (tracksResult.status === 'rejected') {
-    console.error('[SoundCloud] Track search failed:', tracksResult.reason)
+    logger.sc.error('Track search failed')
   }
   const tracksResponse = tracksResult.status === 'fulfilled' ? tracksResult.value : { collection: [], next_href: null }
   // Filter out mixes/sets and tracks outside 2-7 min range
-  const tracks = (tracksResponse.collection || [])
+  let tracks = (tracksResponse.collection || [])
     .filter(t => !containsRejectKeyword(t.title) && isValidDuration(t.duration))
     .map(mapToTrackEntry)
   const hasMore = !!tracksResponse.next_href
   const nextOffset = hasMore ? offset + limit : undefined
+
+  // Enrich with Odesli purchase links if enabled
+  if (enrichWithOdesli) {
+    tracks = await enrichTracksWithPurchaseLinks(tracks)
+  }
 
   // Handle users search result - only attempt artist detection on first page
   if (offset !== 0) {
@@ -404,31 +535,24 @@ export async function searchWithArtistDetection(
   const bestMatch = findBestMatchingUser(query, users, 50) // Minimum score of 50
 
   if (!bestMatch) {
-    // Log for debugging - no user met the threshold
-    console.log(
-      `[SoundCloud] No matching artist found for "${query}". Top candidates:`,
-      users
-        .slice(0, 3)
-        .map(u => ({ username: u.username, score: calculateMatchScore(query, u.username) }))
-    )
     return { tracks, hasMore, nextOffset, artistSearchAttempted: true }
   }
 
   const { user: matchingUser, match: matchInfo } = bestMatch
 
-  // Log the match for debugging
-  console.log(
-    `[SoundCloud] Artist match for "${query}": "${matchingUser.username}" (${matchInfo.type}, score: ${matchInfo.score})`
-  )
-
   try {
     // Found matching artist, get their tracks
     const artistTracks = await soundcloud.users.tracks(matchingUser.id)
     // Filter out mixes/sets and tracks outside 2-7 min range
-    const mappedArtistTracks = (artistTracks || [])
+    let mappedArtistTracks = (artistTracks || [])
       .filter(t => !containsRejectKeyword(t.title) && isValidDuration(t.duration))
       .slice(0, ARTIST_TRACKS_LIMIT)
       .map(mapToTrackEntry)
+
+    // Enrich artist tracks with Odesli purchase links if enabled
+    if (enrichWithOdesli && mappedArtistTracks.length > 0) {
+      mappedArtistTracks = await enrichTracksWithPurchaseLinks(mappedArtistTracks)
+    }
 
     if (mappedArtistTracks.length > 0) {
       return {
@@ -453,9 +577,9 @@ export async function searchWithArtistDetection(
         artistSearchAttempted: true
       }
     }
-  } catch (err) {
+  } catch {
     // Artist tracks fetch failed (404 is common)
-    console.error(`[SoundCloud] Failed to fetch tracks for artist "${matchingUser.username}":`, err)
+    logger.sc.error(`Artist "${matchingUser.username}" tracks failed`)
     return {
       tracks,
       hasMore,
@@ -503,8 +627,8 @@ export async function resolveTrackUrl(url: string): Promise<TrackEntry | null> {
     }
 
     return null
-  } catch (err) {
-    console.error('[SoundCloud] URL resolution failed:', err)
+  } catch {
+    logger.sc.error('URL resolution failed')
     return null
   }
 }
@@ -573,8 +697,8 @@ export async function searchExactTrack(artistName: string, trackTitle: string): 
     }
 
     return null
-  } catch (err) {
-    console.error('[SoundCloud] Exact track search failed:', err)
+  } catch {
+    logger.sc.error('Exact track search failed')
     return null
   }
 }

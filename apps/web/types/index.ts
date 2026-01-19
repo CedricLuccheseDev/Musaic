@@ -5,6 +5,9 @@
 // Re-export SoundCloud types
 export * from './soundcloud'
 
+// Re-export Set Builder types
+export * from './set-builder'
+
 // =============================================================================
 // Enums
 // =============================================================================

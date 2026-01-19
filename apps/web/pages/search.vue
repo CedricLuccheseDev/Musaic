@@ -20,6 +20,7 @@ interface CascadeSearchResult extends SearchResult {
   needsClarification?: boolean
   clarificationQuestion?: string
   clarificationOptions?: ClarificationOption[]
+  soundcloudQuery?: string
 }
 
 /* --- Constants --- */
@@ -114,6 +115,9 @@ const showSearchMoreButton = computed(() =>
   resultSource.value === 'database' && filteredTracks.value.length > 0 && searchMoreTracks.value.length === 0
 )
 
+// SoundCloud query from AI (for lazy loading)
+const soundcloudQuery = computed(() => searchResult.value?.soundcloudQuery)
+
 /* --- Methods --- */
 function applyFilter(tracks: TrackEntry[]): TrackEntry[] {
   if (activeFilter.value === 'all') return tracks
@@ -200,12 +204,14 @@ function handleClarificationSkip() {
 
 // Handle "Search More" from AI results - fetch SoundCloud results
 async function handleSearchMore() {
-  if (searchMoreLoading.value || !query.value) return
+  // Use AI-optimized soundcloudQuery if available, fallback to original query
+  const searchQuery = soundcloudQuery.value || query.value
+  if (searchMoreLoading.value || !searchQuery) return
 
   searchMoreLoading.value = true
   try {
     const response = await $fetch<CascadeSearchResult>('/api/search', {
-      query: { q: query.value, offset: searchMoreOffset.value, skipAi: 'true' }
+      query: { q: searchQuery, offset: searchMoreOffset.value, skipAi: 'true' }
     })
 
     if (searchMoreOffset.value === 0) {

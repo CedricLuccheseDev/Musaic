@@ -3,6 +3,27 @@
 -- Run this script in Supabase SQL Editor to initialize the database
 -- =====================================================
 
+-- =====================================================
+-- DROP EXISTING OBJECTS (order matters for foreign keys)
+-- =====================================================
+
+-- Drop trigger on auth.users (table always exists)
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
+-- Drop tables (CASCADE also drops triggers and indexes on these tables)
+DROP TABLE IF EXISTS set_tracks CASCADE;
+DROP TABLE IF EXISTS sets CASCADE;
+DROP TABLE IF EXISTS profiles CASCADE;
+DROP TABLE IF EXISTS tracks CASCADE;
+
+-- Drop functions
+DROP FUNCTION IF EXISTS find_similar_tracks(BIGINT, INT);
+DROP FUNCTION IF EXISTS exec(TEXT);
+DROP FUNCTION IF EXISTS update_updated_at_column();
+DROP FUNCTION IF EXISTS handle_new_user();
+
+-- =====================================================
+
 -- Enable vector extension for similarity search
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -163,6 +184,82 @@ GRANT EXECUTE ON FUNCTION exec(TEXT) TO anon;
 GRANT EXECUTE ON FUNCTION exec(TEXT) TO authenticated;
 
 -- Find similar tracks by embedding
+-- =====================================================
+-- DJ SETS TABLES
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS sets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  -- Metadata
+  name TEXT NOT NULL,
+  description TEXT,
+  genre TEXT,
+  target_duration INTEGER, -- in seconds
+  avg_track_playtime INTEGER DEFAULT 70, -- % of track duration played (60-80)
+  mood TEXT,
+
+  -- Status
+  status TEXT DEFAULT 'draft', -- 'draft', 'completed'
+  is_public BOOLEAN DEFAULT FALSE,
+
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS set_tracks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  set_id UUID NOT NULL REFERENCES sets(id) ON DELETE CASCADE,
+  soundcloud_id BIGINT NOT NULL REFERENCES tracks(soundcloud_id),
+  position INTEGER NOT NULL,
+
+  -- Optional notes
+  transition_note TEXT, -- "crossfade 16 bars", "drop mix", etc.
+
+  added_at TIMESTAMPTZ DEFAULT NOW(),
+
+  UNIQUE(set_id, position)
+);
+
+-- Indexes for sets
+CREATE INDEX IF NOT EXISTS idx_sets_user_id ON sets(user_id);
+CREATE INDEX IF NOT EXISTS idx_sets_status ON sets(status);
+CREATE INDEX IF NOT EXISTS idx_set_tracks_set_id ON set_tracks(set_id);
+CREATE INDEX IF NOT EXISTS idx_set_tracks_soundcloud_id ON set_tracks(soundcloud_id);
+
+-- Auto-update updated_at for sets
+DROP TRIGGER IF EXISTS update_sets_updated_at ON sets;
+CREATE TRIGGER update_sets_updated_at
+  BEFORE UPDATE ON sets
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- RLS for sets
+ALTER TABLE sets ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own sets" ON sets FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own sets" ON sets FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own sets" ON sets FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own sets" ON sets FOR DELETE USING (auth.uid() = user_id);
+
+-- RLS for set_tracks
+ALTER TABLE set_tracks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own set tracks" ON set_tracks FOR SELECT
+  USING (EXISTS (SELECT 1 FROM sets WHERE sets.id = set_tracks.set_id AND sets.user_id = auth.uid()));
+CREATE POLICY "Users can insert own set tracks" ON set_tracks FOR INSERT
+  WITH CHECK (EXISTS (SELECT 1 FROM sets WHERE sets.id = set_tracks.set_id AND sets.user_id = auth.uid()));
+CREATE POLICY "Users can update own set tracks" ON set_tracks FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM sets WHERE sets.id = set_tracks.set_id AND sets.user_id = auth.uid()));
+CREATE POLICY "Users can delete own set tracks" ON set_tracks FOR DELETE
+  USING (EXISTS (SELECT 1 FROM sets WHERE sets.id = set_tracks.set_id AND sets.user_id = auth.uid()));
+
+-- =====================================================
+-- RPC FUNCTIONS
+-- =====================================================
+
 DROP FUNCTION IF EXISTS find_similar_tracks(BIGINT, INT);
 CREATE OR REPLACE FUNCTION find_similar_tracks(
   source_track_id BIGINT,

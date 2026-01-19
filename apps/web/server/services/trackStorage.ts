@@ -73,6 +73,115 @@ export async function triggerAnalysis(soundcloudIds: number[]): Promise<void> {
   })
 }
 
+// ============================================================================
+// Odesli Purchase Link Enrichment (Background)
+// ============================================================================
+
+const ODESLI_API_URL = 'https://api.song.link/v1-alpha.1/links'
+
+const PURCHASE_PLATFORM_PRIORITY = [
+  'beatport', 'bandcamp', 'traxsource', 'itunes', 'appleMusic',
+  'amazon', 'deezer', 'spotify', 'tidal', 'youtube', 'youtubeMusic'
+] as const
+
+interface OdesliPlatformLink {
+  url: string
+  entityUniqueId: string
+}
+
+interface OdesliResponse {
+  pageUrl: string
+  linksByPlatform: Record<string, OdesliPlatformLink>
+}
+
+async function fetchOdesliLink(soundcloudUrl: string): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `${ODESLI_API_URL}?url=${encodeURIComponent(soundcloudUrl)}`,
+      {
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(8000)
+      }
+    )
+
+    if (!response.ok) return null
+
+    const data = await response.json() as OdesliResponse
+    if (!data.linksByPlatform) return null
+
+    for (const platform of PURCHASE_PLATFORM_PRIORITY) {
+      const link = data.linksByPlatform[platform]
+      if (link?.url) return link.url
+    }
+
+    return data.pageUrl || null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Enrich tracks with purchase links from Odesli (background, non-blocking)
+ * Called after upsertTracks to fill in missing purchase_url
+ */
+export function triggerPurchaseLinkEnrichment(tracks: TrackEntry[]): void {
+  // Filter tracks without purchase_url
+  const tracksToEnrich = tracks.filter(t => !t.purchase_url)
+  if (tracksToEnrich.length === 0) return
+
+  // Fire and forget - run in background
+  enrichPurchaseLinksBackground(tracksToEnrich).catch(() => {
+    // Silent fail
+  })
+}
+
+async function enrichPurchaseLinksBackground(tracks: TrackEntry[]): Promise<void> {
+  const supabase = getSupabaseClient()
+  if (!supabase) return
+
+  logger.info('DB', `Enriching ${tracks.length} tracks with Odesli links (background)`)
+
+  // Process in small batches to avoid rate limiting
+  const BATCH_SIZE = 3
+  const DELAY_MS = 1000
+  let enriched = 0
+
+  for (let i = 0; i < tracks.length; i += BATCH_SIZE) {
+    const batch = tracks.slice(i, i + BATCH_SIZE)
+
+    const results = await Promise.all(
+      batch.map(async (track) => {
+        const url = await fetchOdesliLink(track.permalink_url)
+        return { track, url }
+      })
+    )
+
+    // Update tracks that got a link
+    for (const { track, url } of results) {
+      if (url) {
+        const { error } = await supabase
+          .from('tracks')
+          .update({
+            purchase_url: url,
+            purchase_title: 'Buy / Stream'
+          })
+          .eq('soundcloud_id', track.id)
+
+        if (!error) enriched++
+      }
+    }
+
+    // Rate limit delay
+    if (i + BATCH_SIZE < tracks.length) {
+      await new Promise(resolve => setTimeout(resolve, DELAY_MS))
+    }
+  }
+
+  if (enriched > 0) {
+    logger.info('DB', `Enriched ${enriched}/${tracks.length} tracks with purchase links`)
+  }
+}
+
 function getSupabaseClient(): SupabaseClient | null {
   if (supabaseClient) return supabaseClient
 
@@ -117,6 +226,7 @@ export async function upsertTrack(track: TrackEntry): Promise<void> {
     const totalCount = await getTrackCount()
     logger.db.upsert(1, totalCount)
     triggerAnalysis([track.id])
+    triggerPurchaseLinkEnrichment([track])
   }
 }
 
@@ -180,7 +290,10 @@ export async function upsertTracks(tracks: TrackEntry[], options?: UpsertOptions
   if (rejectedCount > 0) {
     logger.db.quality(storedCount, rejectedCount)
   }
+
+  // Trigger background jobs (non-blocking)
   triggerAnalysis(uniqueTracks.map(t => t.id))
+  triggerPurchaseLinkEnrichment(uniqueTracks)
 
   return { stored: storedCount, rejected: rejectedCount }
 }

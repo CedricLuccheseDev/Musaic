@@ -7,7 +7,7 @@ definePageMeta({
 })
 
 /* --- States --- */
-const { t } = useI18n()
+const { t, lang, setLang } = useI18n()
 const { user, loading, signOut } = useAuth()
 const { isPremium, profile } = useProfile()
 const { notation, setNotation } = useKeyNotation()
@@ -261,6 +261,58 @@ watch(user, (u) => {
                     :class="notation === 'camelot' ? 'border-violet-500 bg-violet-500' : 'border-neutral-600'"
                   >
                     <UIcon v-if="notation === 'camelot'" name="i-heroicons-check" class="h-3 w-3 text-white" />
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <!-- Language -->
+            <div>
+              <h3 class="mb-3 text-sm font-medium text-neutral-400">{{ t.language }}</h3>
+              <div class="space-y-2">
+                <button
+                  type="button"
+                  class="flex w-full cursor-pointer items-center justify-between rounded-xl px-4 py-3 transition-all"
+                  :class="lang === 'fr' ? 'bg-violet-600/20 ring-1 ring-violet-500/50' : 'bg-neutral-800/30 hover:bg-neutral-800/50'"
+                  @click="setLang('fr')"
+                >
+                  <div class="flex items-center gap-3">
+                    <div
+                      class="flex h-10 w-10 items-center justify-center rounded-full text-xl"
+                      :class="lang === 'fr' ? 'bg-violet-500/30' : 'bg-neutral-700/50'"
+                    >
+                      🇫🇷
+                    </div>
+                    <p class="font-medium" :class="lang === 'fr' ? 'text-white' : 'text-neutral-300'">{{ t.languageFrench }}</p>
+                  </div>
+                  <div
+                    class="flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all"
+                    :class="lang === 'fr' ? 'border-violet-500 bg-violet-500' : 'border-neutral-600'"
+                  >
+                    <UIcon v-if="lang === 'fr'" name="i-heroicons-check" class="h-3 w-3 text-white" />
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  class="flex w-full cursor-pointer items-center justify-between rounded-xl px-4 py-3 transition-all"
+                  :class="lang === 'en' ? 'bg-violet-600/20 ring-1 ring-violet-500/50' : 'bg-neutral-800/30 hover:bg-neutral-800/50'"
+                  @click="setLang('en')"
+                >
+                  <div class="flex items-center gap-3">
+                    <div
+                      class="flex h-10 w-10 items-center justify-center rounded-full text-xl"
+                      :class="lang === 'en' ? 'bg-violet-500/30' : 'bg-neutral-700/50'"
+                    >
+                      🇬🇧
+                    </div>
+                    <p class="font-medium" :class="lang === 'en' ? 'text-white' : 'text-neutral-300'">{{ t.languageEnglish }}</p>
+                  </div>
+                  <div
+                    class="flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all"
+                    :class="lang === 'en' ? 'border-violet-500 bg-violet-500' : 'border-neutral-600'"
+                  >
+                    <UIcon v-if="lang === 'en'" name="i-heroicons-check" class="h-3 w-3 text-white" />
                   </div>
                 </button>
               </div>
