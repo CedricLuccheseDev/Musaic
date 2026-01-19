@@ -1,6 +1,6 @@
 {
   "name": "musaic",
-  "version": "1.0.1",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,10 +17,7 @@
     "test:all": "bun run test && bun run test:supabase && bun run test:analyzer",
     "seed": "bun --env-file=.env scripts/seed-database.ts",
     "sc:client-id": "bun scripts/get-soundcloud-client-id.ts",
-    "preversion": "bun run lint && bun run build && bun run test",
-    "release": "npm version patch && git push && git push --tags",
-    "release:minor": "npm version minor && git push && git push --tags",
-    "release:major": "npm version major && git push && git push --tags"
+    "typecheck": "nuxt typecheck"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

@@ -28,6 +28,23 @@ Simple conventional format, no signatures:
 git commit -m "feat(web): add feature"
 ```
 
+### Versioning (SemVer + release-please)
+
+Commits on `main` trigger automatic version bumps:
+
+| Commit prefix | Version bump | Example |
+|---------------|--------------|---------|
+| `fix:` | Patch (0.0.x) | `fix(web): resolve login bug` |
+| `feat:` | Minor (0.x.0) | `feat(analyzer): add BPM detection` |
+| `feat!:` or `BREAKING CHANGE:` | Major (x.0.0) | `feat!: redesign API` |
+
+Other prefixes (`chore:`, `docs:`, `refactor:`, `test:`, `style:`) don't trigger releases.
+
+**Workflow:**
+1. Push commits to `main`
+2. release-please creates a "Release PR" with changelog
+3. Merge the PR → tag + GitHub Release created automatically
+
 ## Database Population
 
 When asked to add/populate tracks:
