@@ -40,76 +40,10 @@ export const useAuth = () => {
     }
   }
 
-  async function signInWithGoogle() {
-    if (!supabase) {
-      return { error: { message: 'Supabase not configured' } }
-    }
-
-    const redirectUrl = `${window.location.origin}/auth/callback`
-
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectUrl,
-        skipBrowserRedirect: true
-      }
-    })
-
-    if (error) {
-      return { data, error }
-    }
-
-    // Open OAuth in popup instead of redirect
-    if (data?.url) {
-      const width = 500
-      const height = 600
-      const left = window.screenX + (window.outerWidth - width) / 2
-      const top = window.screenY + (window.outerHeight - height) / 2
-
-      window.open(
-        data.url,
-        'google-oauth',
-        `width=${width},height=${height},left=${left},top=${top},popup=true`
-      )
-    }
-
-    return { data, error }
-  }
-
-  async function signInWithApple() {
-    if (!supabase) {
-      return { error: { message: 'Supabase not configured' } }
-    }
-
-    const redirectUrl = `${window.location.origin}/auth/callback`
-
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'apple',
-      options: {
-        redirectTo: redirectUrl,
-        skipBrowserRedirect: true
-      }
-    })
-
-    if (error) {
-      return { data, error }
-    }
-
-    // Open OAuth in popup instead of redirect
-    if (data?.url) {
-      const width = 500
-      const height = 600
-      const left = window.screenX + (window.outerWidth - width) / 2
-      const top = window.screenY + (window.outerHeight - height) / 2
-
-      window.open(
-        data.url,
-        'apple-oauth',
-        `width=${width},height=${height},left=${left},top=${top},popup=true`
-      )
-    }
-
-    return { data, error }
+  async function signInWithSoundCloud() {
+    // TODO: Implement SoundCloud OAuth
+    // Will redirect to /api/auth/soundcloud which handles the OAuth flow
+    window.location.href = '/api/auth/soundcloud'
   }
 
   async function signOut() {
@@ -133,8 +67,7 @@ export const useAuth = () => {
     user: readonly(user),
     loading: readonly(loading),
     init,
-    signInWithGoogle,
-    signInWithApple,
+    signInWithSoundCloud,
     signOut
   }
 }

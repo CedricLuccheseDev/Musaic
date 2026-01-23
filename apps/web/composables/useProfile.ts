@@ -5,6 +5,8 @@ interface Profile {
   is_premium: boolean
   is_admin: boolean
   premium_until: string | null
+  daily_search_count: number
+  last_search_date: string | null
 }
 
 interface AiUsage {
@@ -87,7 +89,7 @@ export function useProfile() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, is_premium, is_admin, premium_until')
+        .select('id, is_premium, is_admin, premium_until, daily_search_count, last_search_date')
         .eq('id', userId)
         .single()
 
@@ -95,7 +97,7 @@ export function useProfile() {
         const { data: newProfile } = await supabase
           .from('profiles')
           .upsert({ id: userId })
-          .select('id, is_premium, is_admin, premium_until')
+          .select('id, is_premium, is_admin, premium_until, daily_search_count, last_search_date')
           .single()
 
         if (newProfile) {

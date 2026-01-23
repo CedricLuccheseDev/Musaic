@@ -175,6 +175,12 @@ function openDownloadIframe(event: Event) {
   showDownloadIframe.value = !showDownloadIframe.value
 }
 
+function searchSimilar() {
+  // Search for similar tracks by artist name (AI will expand to genre/style)
+  const prompt = props.track.artist
+  navigateTo(`/search?q=${encodeURIComponent(prompt)}`)
+}
+
 function closeDownloadIframe() {
   showDownloadIframe.value = false
 }
@@ -378,14 +384,26 @@ onMounted(() => {
               <UIcon name="i-heroicons-chart-bar" class="h-4 w-4" />
             </button>
 
-            <!-- Similar -->
+            <!-- Similar (modal) -->
             <button
               v-if="hasAnalysis"
               type="button"
               class="cursor-pointer rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-white/10 hover:text-cyan-400"
+              title="Voir similaires"
               @click.stop="showSimilar = true"
             >
               <UIcon name="i-heroicons-squares-2x2" class="h-4 w-4" />
+            </button>
+
+            <!-- Search Similar (new search) -->
+            <button
+              type="button"
+              class="flex h-7 cursor-pointer items-center gap-1 rounded-md bg-cyan-600/80 px-2 text-xs font-medium text-white transition-colors hover:bg-cyan-500"
+              :title="t.searchSimilar"
+              @click.stop="searchSimilar"
+            >
+              <UIcon name="i-heroicons-magnifying-glass" class="h-3.5 w-3.5" />
+              <span class="hidden sm:inline">{{ t.searchSimilar }}</span>
             </button>
 
             <!-- Download / Link -->

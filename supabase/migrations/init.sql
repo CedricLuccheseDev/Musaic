@@ -117,6 +117,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   is_premium BOOLEAN DEFAULT FALSE,
   is_admin BOOLEAN DEFAULT FALSE,
   premium_until TIMESTAMPTZ,
+  daily_search_count INTEGER DEFAULT 0,
+  last_search_date DATE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -207,3 +209,190 @@ BEGIN
   LIMIT limit_count;
 END;
 $$ LANGUAGE plpgsql;
+
+-- =====================================================
+-- SOUNDCLOUD CONNECTIONS TABLE
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS soundcloud_connections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  soundcloud_user_id BIGINT NOT NULL,
+  soundcloud_username TEXT,
+  soundcloud_avatar TEXT,
+  access_token TEXT NOT NULL,
+  refresh_token TEXT,
+  expires_at TIMESTAMPTZ,
+  last_sync_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
+ALTER TABLE soundcloud_connections ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own soundcloud connection"
+  ON soundcloud_connections FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own soundcloud connection"
+  ON soundcloud_connections FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own soundcloud connection"
+  ON soundcloud_connections FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own soundcloud connection"
+  ON soundcloud_connections FOR DELETE USING (auth.uid() = user_id);
+
+-- =====================================================
+-- USER LIKED TRACKS TABLE
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS user_liked_tracks (
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  soundcloud_id BIGINT NOT NULL,
+  liked_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (user_id, soundcloud_id)
+);
+
+ALTER TABLE user_liked_tracks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own liked tracks"
+  ON user_liked_tracks FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own liked tracks"
+  ON user_liked_tracks FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete own liked tracks"
+  ON user_liked_tracks FOR DELETE USING (auth.uid() = user_id);
+
+-- =====================================================
+-- PLAYLISTS TABLE
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS playlists (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT,
+  target_duration INTEGER,
+  style TEXT,
+  free_download_only BOOLEAN DEFAULT FALSE,
+  reference_track_id BIGINT REFERENCES tracks(soundcloud_id),
+  is_draft BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_draft_per_user
+  ON playlists(user_id) WHERE is_draft = TRUE;
+CREATE INDEX IF NOT EXISTS idx_playlists_user_id ON playlists(user_id);
+
+DROP TRIGGER IF EXISTS update_playlists_updated_at ON playlists;
+CREATE TRIGGER update_playlists_updated_at
+  BEFORE UPDATE ON playlists
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+ALTER TABLE playlists ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own playlists"
+  ON playlists FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own playlists"
+  ON playlists FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own playlists"
+  ON playlists FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own playlists"
+  ON playlists FOR DELETE USING (auth.uid() = user_id);
+
+-- =====================================================
+-- PLAYLIST TRACKS TABLE
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS playlist_tracks (
+  playlist_id UUID NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+  soundcloud_id BIGINT NOT NULL,
+  position INTEGER NOT NULL,
+  added_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (playlist_id, soundcloud_id)
+);
+
+ALTER TABLE playlist_tracks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own playlist tracks"
+  ON playlist_tracks FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM playlists WHERE playlists.id = playlist_tracks.playlist_id AND playlists.user_id = auth.uid()
+  ));
+CREATE POLICY "Users can insert own playlist tracks"
+  ON playlist_tracks FOR INSERT
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM playlists WHERE playlists.id = playlist_tracks.playlist_id AND playlists.user_id = auth.uid()
+  ));
+CREATE POLICY "Users can delete own playlist tracks"
+  ON playlist_tracks FOR DELETE
+  USING (EXISTS (
+    SELECT 1 FROM playlists WHERE playlists.id = playlist_tracks.playlist_id AND playlists.user_id = auth.uid()
+  ));
+
+-- =====================================================
+-- PLAYLIST FEEDBACK TABLE
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS playlist_feedback (
+  playlist_id UUID NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+  soundcloud_id BIGINT NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('like', 'skip')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (playlist_id, soundcloud_id)
+);
+
+ALTER TABLE playlist_feedback ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own playlist feedback"
+  ON playlist_feedback FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM playlists WHERE playlists.id = playlist_feedback.playlist_id AND playlists.user_id = auth.uid()
+  ));
+CREATE POLICY "Users can insert own playlist feedback"
+  ON playlist_feedback FOR INSERT
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM playlists WHERE playlists.id = playlist_feedback.playlist_id AND playlists.user_id = auth.uid()
+  ));
+
+-- =====================================================
+-- PLAYLIST HELPER FUNCTIONS
+-- =====================================================
+
+CREATE OR REPLACE FUNCTION get_or_create_draft(p_user_id UUID)
+RETURNS UUID
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  draft_id UUID;
+BEGIN
+  SELECT id INTO draft_id FROM playlists WHERE user_id = p_user_id AND is_draft = TRUE;
+  IF draft_id IS NULL THEN
+    INSERT INTO playlists (user_id, is_draft) VALUES (p_user_id, TRUE) RETURNING id INTO draft_id;
+  END IF;
+  RETURN draft_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION check_and_increment_quota(p_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  current_count INTEGER;
+  last_date DATE;
+  user_is_premium BOOLEAN;
+BEGIN
+  SELECT daily_search_count, last_search_date, is_premium
+  INTO current_count, last_date, user_is_premium
+  FROM profiles WHERE id = p_user_id;
+
+  IF user_is_premium THEN RETURN TRUE; END IF;
+
+  IF last_date IS NULL OR last_date < CURRENT_DATE THEN
+    UPDATE profiles SET daily_search_count = 1, last_search_date = CURRENT_DATE WHERE id = p_user_id;
+    RETURN TRUE;
+  END IF;
+
+  IF current_count < 5 THEN
+    UPDATE profiles SET daily_search_count = daily_search_count + 1 WHERE id = p_user_id;
+    RETURN TRUE;
+  END IF;
+
+  RETURN FALSE;
+END;
+$$;

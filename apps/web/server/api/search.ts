@@ -38,8 +38,10 @@ function analyzeQuery(query: string): QueryAnalysis {
   }
 
   // 3. Format "Artiste - Titre" (with various dash types)
+  // Exclude queries that start with search keywords (e.g., "tracks similar to Artist - Title")
+  const searchKeywords = /^(tracks?\s+)?(similar\s+to|like|find|search|cherche|trouve)/i
   const trackMatch = q.match(/^(.+?)\s*[-–—]\s*(.+)$/)
-  if (trackMatch && trackMatch[1].length > 1 && trackMatch[2].length > 1) {
+  if (trackMatch && trackMatch[1].length > 1 && trackMatch[2].length > 1 && !searchKeywords.test(q)) {
     return {
       type: 'track',
       artistName: trackMatch[1].trim(),
@@ -73,10 +75,13 @@ interface CascadeSearchResult extends SearchResult {
     analyzedCount: number
     toAnalyzeCount: number
   }
+  // Pagination context (for lazy load without re-calling AI)
+  scQuery?: string
+  scFilters?: { genres?: string; bpm?: { from: number; to: number }; created_at?: string; license?: string }
 }
 
 export default defineEventHandler(async (event): Promise<CascadeSearchResult> => {
-  const { q, offset } = getQuery(event)
+  const { q, offset, scQuery, scFilters: scFiltersParam } = getQuery(event)
 
   if (!q || typeof q !== 'string') {
     throw createError({
@@ -86,6 +91,16 @@ export default defineEventHandler(async (event): Promise<CascadeSearchResult> =>
   }
 
   const offsetNum = typeof offset === 'string' ? parseInt(offset, 10) : 0
+
+  // Parse SC filters from query params (for pagination)
+  let scFilters: { genres?: string; bpm?: { from: number; to: number } } | undefined
+  if (scFiltersParam && typeof scFiltersParam === 'string') {
+    try {
+      scFilters = JSON.parse(scFiltersParam)
+    } catch {
+      // Ignore parse errors
+    }
+  }
 
   // Analyze query type
   const analysis = analyzeQuery(q)
@@ -105,9 +120,10 @@ export default defineEventHandler(async (event): Promise<CascadeSearchResult> =>
     return await handleTrackSearch(analysis.artistName, analysis.trackTitle)
   }
 
-  // For pagination (offset > 0), skip AI query and go directly to SoundCloud
+  // For pagination (offset > 0), skip AI query and use passed SC context
   if (offsetNum > 0) {
-    return await searchSoundCloud(q, offsetNum)
+    const effectiveQuery = (typeof scQuery === 'string' && scQuery) || q
+    return await searchSoundCloud(effectiveQuery, offsetNum, scFilters)
   }
 
   // Default: AI-powered search (genre/mood/artist)
@@ -240,11 +256,16 @@ async function handleAiSearch(query: string, offset: number): Promise<CascadeSea
     }
   }
 
+  // Compute effective SoundCloud query - if empty, use genre from filters as fallback
+  const effectiveScQuery = aiResult.soundcloudQuery?.trim()
+    || aiResult.soundcloudFilters?.genres
+    || query
+
   // HYBRID SEARCH: Execute DB + SoundCloud in parallel
   const [dbTracksResult, scResult] = await Promise.allSettled([
     executeDbQuery(aiResult.sql),
     searchWithArtistDetection(
-      aiResult.soundcloudQuery,
+      effectiveScQuery,
       50, // Fetch MORE tracks to maximize quality options for merge
       0,
       aiResult.soundcloudFilters
@@ -271,13 +292,15 @@ async function handleAiSearch(query: string, offset: number): Promise<CascadeSea
   // If no results from both sources, try SoundCloud with relaxed query
   if (mergedTracks.length === 0) {
     logger.ai.result(0, 'No hybrid results, trying relaxed SoundCloud search')
-    return await searchSoundCloud(
-      aiResult.soundcloudQuery,
+    const result = await searchSoundCloud(
+      effectiveScQuery,
       offset,
       undefined, // No filters to maximize results
       aiResult.phrase,
       aiResult.wantsDownload
     )
+    // Include SC context for pagination
+    return { ...result, scQuery: effectiveScQuery }
   }
 
   // Auto-analyze new tracks that meet quality criteria (non-blocking)
@@ -291,7 +314,7 @@ async function handleAiSearch(query: string, offset: number): Promise<CascadeSea
     })
   }
 
-  // Return unified results
+  // Return unified results with SC context for pagination
   return {
     source: 'database', // Hybrid source
     tracks: mergedTracks as TrackEntry[], // Cast back to TrackEntry for compatibility
@@ -304,7 +327,10 @@ async function handleAiSearch(query: string, offset: number): Promise<CascadeSea
       scCount: stats.counts.soundcloud,
       analyzedCount: stats.counts.analyzed,
       toAnalyzeCount: stats.counts.toAnalyze
-    }
+    },
+    // SC context for lazy load (avoids re-calling AI)
+    scQuery: effectiveScQuery,
+    scFilters: aiResult.soundcloudFilters
   }
 }
 

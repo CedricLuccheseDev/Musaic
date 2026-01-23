@@ -10,8 +10,53 @@ const translations = {
     artist: 'Artiste',
     search: 'Rechercher',
 
-    // Home
+    // Home / Landing
     tagline: 'Cherche et Télécharge tes tracks facilement, rapidement.',
+    orChoosePath: 'ou choisis un parcours',
+    heroTitle: 'Trouve ta prochaine track en 30 secondes',
+    heroSubtitle: 'L\'IA te suggère des tracks, tu swipes pour construire ta playlist',
+    aiSearchPlaceholder: 'Techno dark 125bpm pour warm up...',
+    tryFreeNoAccount: 'Essaie gratuitement, sans compte',
+    howItWorks: 'Comment ça marche ?',
+    step1: 'Décris ce que tu cherches',
+    step2: 'Swipe les tracks proposées',
+    step3: 'Exporte ta playlist sur SoundCloud',
+    footerRights: 'Tous droits réservés.',
+
+    // Guided paths
+    guidedPrepareSet: 'Préparer un set',
+    guidedPrepareSetDesc: 'Genre → Vibe → Artiste',
+    guidedExploreGenre: 'Explorer un genre',
+    guidedExploreGenreDesc: 'Parcourir les styles',
+    guidedStartFromTrack: 'Partir d\'un track',
+    guidedStartFromTrackDesc: 'URL ou titre',
+
+    // PrepareSetFlow
+    flowWhatStyle: 'Quel style ?',
+    flowWhatVibe: 'Quel vibe ?',
+    flowVibeOptional: 'optionnel',
+    flowArtistInspiration: 'Un artiste qui t\'inspire ?',
+    flowArtistPlaceholder: 'Ex: Amelie Lens, Kerri Chandler...',
+    flowOtherGenre: 'Autre genre...',
+    flowSkip: 'Passer',
+    flowSearch: 'Rechercher',
+    flowStyleChosen: 'Style choisi',
+    flowVibeChill: 'Chill',
+    flowVibeEnergetic: 'Énergique',
+    flowVibeDark: 'Dark',
+    flowVibeMelodic: 'Mélodique',
+
+    // ExploreGenreFlow
+    flowExploreGenre: 'Explore un genre',
+
+    // StartFromTrackFlow
+    flowStartFromTrack: 'Partir d\'un track',
+    flowStartFromTrackDesc: 'Colle une URL SoundCloud ou tape "Artiste - Titre"',
+    flowStartFromTrackPlaceholder: 'Ex: soundcloud.com/... ou Amelie Lens - Exhale',
+    flowFindSimilar: 'Trouver des tracks similaires',
+
+    // SearchTrackCard
+    searchSimilar: 'Similaires',
 
     // Search results
     searching: 'Recherche en cours',
@@ -71,12 +116,14 @@ const translations = {
     signup: 'Inscription',
     loginTitle: 'Bienvenue',
     loginSubtitle: 'Connecte-toi pour accéder à toutes les fonctionnalités',
-    continueWithGoogle: 'Continuer avec Google',
-    continueWithApple: 'Continuer avec Apple',
-    orContinueWith: 'ou continuer avec',
+    continueWithSoundCloud: 'Continuer avec SoundCloud',
     termsNotice: 'En continuant, tu acceptes nos',
     termsLink: 'conditions d\'utilisation',
     tooltipLogin: 'Se connecter',
+    back: 'Retour',
+    benefit1: 'Sauvegarde tes playlists',
+    benefit2: 'Import de tes likes SoundCloud',
+    benefit3: 'Export direct sur SoundCloud',
 
     // Terms modal
     termsTitle: 'Conditions d\'utilisation',
@@ -217,7 +264,48 @@ const translations = {
     djLoadToB: 'Charger sur B',
     djEjectFromA: 'Éjecter de A',
     djEjectFromB: 'Éjecter de B',
-    djTrackNotAnalyzed: 'Track non analysée'
+    djTrackNotAnalyzed: 'Track non analysée',
+
+    // Set Creator
+    setCreatorCreate: 'Créer un set',
+    setCreatorMySets: 'Mes sets',
+    setCreatorTitle: 'Créateur de set',
+    setCreatorSubtitle: 'L\'IA t\'aide à construire ton set idéal',
+    setDuration: 'Durée du set',
+    setDuration30: '30 min',
+    setDuration60: '1 heure',
+    setDuration90: '1h30',
+    setDuration120: '2 heures',
+    setGenre: 'Genre principal',
+    setEnergy: 'Ambiance',
+    setEnergyChill: 'Chill',
+    setEnergyProgressive: 'Progressive',
+    setEnergyPeak: 'Peak Time',
+    setEnergyMixed: 'Mixée',
+    setStart: 'Commencer',
+    setAcceptTrack: 'Ajouter',
+    setRejectTrack: 'Passer',
+    setAiSuggesting: 'L\'IA cherche des tracks...',
+    setProgress: '{current} / {target} min',
+    setExportToPlayer: 'Charger dans le player',
+    setSavePlaylist: 'Sauvegarder',
+    setPlaylistSaved: 'Set sauvegardé !',
+    setTrackFits: 'Ce track s\'intègre bien',
+    setEmptyList: 'Aucune track dans ton set',
+    setEmptyListHint: 'Accepte des suggestions pour construire ton set',
+    setRefinementPlaceholder: 'Dis à l\'IA ce que tu veux...',
+    setNoMoreSuggestions: 'Plus de suggestions disponibles',
+    setTargetReached: 'Tu as atteint la durée cible !',
+    setExportTitle: 'Exporter le set',
+    setExportLoadPlayer: 'Charger dans le DJ Player',
+    setExportSave: 'Sauvegarder comme playlist',
+    setExportCopy: 'Copier la liste',
+    setPlaylistName: 'Nom du set',
+    setPlaylistNamePlaceholder: 'Mon set techno...',
+    setMySetsTitle: 'Mes sets',
+    setMySetsEmpty: 'Tu n\'as pas encore de sets sauvegardés',
+    setMySetsLoad: 'Charger',
+    setMySetsDelete: 'Supprimer'
   },
   en: {
     // SearchBar
@@ -228,8 +316,53 @@ const translations = {
     artist: 'Artist',
     search: 'Search',
 
-    // Home
+    // Home / Landing
     tagline: 'Search and Download your tracks easily, quickly.',
+    orChoosePath: 'or choose a path',
+    heroTitle: 'Find your next track in 30 seconds',
+    heroSubtitle: 'AI suggests tracks, you swipe to build your playlist',
+    aiSearchPlaceholder: 'Dark techno 125bpm for warm up...',
+    tryFreeNoAccount: 'Try for free, no account needed',
+    howItWorks: 'How it works?',
+    step1: 'Describe what you\'re looking for',
+    step2: 'Swipe through suggested tracks',
+    step3: 'Export your playlist to SoundCloud',
+    footerRights: 'All rights reserved.',
+
+    // Guided paths
+    guidedPrepareSet: 'Prepare a set',
+    guidedPrepareSetDesc: 'Genre → Vibe → Artist',
+    guidedExploreGenre: 'Explore a genre',
+    guidedExploreGenreDesc: 'Browse styles',
+    guidedStartFromTrack: 'Start from a track',
+    guidedStartFromTrackDesc: 'URL or title',
+
+    // PrepareSetFlow
+    flowWhatStyle: 'What style?',
+    flowWhatVibe: 'What vibe?',
+    flowVibeOptional: 'optional',
+    flowArtistInspiration: 'An artist that inspires you?',
+    flowArtistPlaceholder: 'Ex: Amelie Lens, Kerri Chandler...',
+    flowOtherGenre: 'Other genre...',
+    flowSkip: 'Skip',
+    flowSearch: 'Search',
+    flowStyleChosen: 'Style chosen',
+    flowVibeChill: 'Chill',
+    flowVibeEnergetic: 'Energetic',
+    flowVibeDark: 'Dark',
+    flowVibeMelodic: 'Melodic',
+
+    // ExploreGenreFlow
+    flowExploreGenre: 'Explore a genre',
+
+    // StartFromTrackFlow
+    flowStartFromTrack: 'Start from a track',
+    flowStartFromTrackDesc: 'Paste a SoundCloud URL or type "Artist - Title"',
+    flowStartFromTrackPlaceholder: 'Ex: soundcloud.com/... or Amelie Lens - Exhale',
+    flowFindSimilar: 'Find similar tracks',
+
+    // SearchTrackCard
+    searchSimilar: 'Similar',
 
     // Search results
     searching: 'Searching',
@@ -289,12 +422,14 @@ const translations = {
     signup: 'Sign up',
     loginTitle: 'Welcome',
     loginSubtitle: 'Sign in to access all features',
-    continueWithGoogle: 'Continue with Google',
-    continueWithApple: 'Continue with Apple',
-    orContinueWith: 'or continue with',
+    continueWithSoundCloud: 'Continue with SoundCloud',
     termsNotice: 'By continuing, you agree to our',
     termsLink: 'terms of service',
     tooltipLogin: 'Sign in',
+    back: 'Back',
+    benefit1: 'Save your playlists',
+    benefit2: 'Import your SoundCloud likes',
+    benefit3: 'Export directly to SoundCloud',
 
     // Terms modal
     termsTitle: 'Terms of Service',
@@ -435,7 +570,48 @@ const translations = {
     djLoadToB: 'Load to B',
     djEjectFromA: 'Eject from A',
     djEjectFromB: 'Eject from B',
-    djTrackNotAnalyzed: 'Track not analyzed'
+    djTrackNotAnalyzed: 'Track not analyzed',
+
+    // Set Creator
+    setCreatorCreate: 'Create a set',
+    setCreatorMySets: 'My sets',
+    setCreatorTitle: 'Set Creator',
+    setCreatorSubtitle: 'AI helps you build your ideal set',
+    setDuration: 'Set duration',
+    setDuration30: '30 min',
+    setDuration60: '1 hour',
+    setDuration90: '1h30',
+    setDuration120: '2 hours',
+    setGenre: 'Main genre',
+    setEnergy: 'Vibe',
+    setEnergyChill: 'Chill',
+    setEnergyProgressive: 'Progressive',
+    setEnergyPeak: 'Peak Time',
+    setEnergyMixed: 'Mixed',
+    setStart: 'Start',
+    setAcceptTrack: 'Add',
+    setRejectTrack: 'Skip',
+    setAiSuggesting: 'AI is searching for tracks...',
+    setProgress: '{current} / {target} min',
+    setExportToPlayer: 'Load to player',
+    setSavePlaylist: 'Save',
+    setPlaylistSaved: 'Set saved!',
+    setTrackFits: 'This track fits well',
+    setEmptyList: 'No tracks in your set',
+    setEmptyListHint: 'Accept suggestions to build your set',
+    setRefinementPlaceholder: 'Tell the AI what you want...',
+    setNoMoreSuggestions: 'No more suggestions available',
+    setTargetReached: 'You reached the target duration!',
+    setExportTitle: 'Export set',
+    setExportLoadPlayer: 'Load to DJ Player',
+    setExportSave: 'Save as playlist',
+    setExportCopy: 'Copy list',
+    setPlaylistName: 'Set name',
+    setPlaylistNamePlaceholder: 'My techno set...',
+    setMySetsTitle: 'My sets',
+    setMySetsEmpty: 'You don\'t have any saved sets yet',
+    setMySetsLoad: 'Load',
+    setMySetsDelete: 'Delete'
   }
 } as const
 

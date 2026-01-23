@@ -1,16 +1,13 @@
 <script setup lang="ts">
-/* --- Meta --- */
 definePageMeta({
   layoutConfig: {
     hideLogo: true
   }
 })
 
-/* --- States --- */
 const { t } = useI18n()
 const query = ref('')
 
-/* --- Methods --- */
 function search() {
   if (!query.value.trim()) return
   navigateTo({ path: '/search', query: { q: query.value } })

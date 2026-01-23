@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const { t } = useI18n();
+
 /* --- Props --- */
 withDefaults(defineProps<{
   sticky?: boolean
@@ -29,9 +31,12 @@ withDefaults(defineProps<{
           mode="out-in"
         >
           <slot v-if="!hideLogo" name="left">
-            <NuxtLink to="/" class="group transition-transform hover:scale-105">
-              <AppLogo size="md" />
-            </NuxtLink>
+            <div class="flex items-center gap-3">
+              <NuxtLink to="/" class="group transition-transform hover:scale-105">
+                <AppLogo size="md" />
+              </NuxtLink>
+              <PremiumButton />
+            </div>
           </slot>
           <div v-else />
         </Transition>
@@ -64,11 +69,7 @@ withDefaults(defineProps<{
           mode="out-in"
         >
           <slot name="right">
-            <div class="flex items-center gap-3">
-              <PremiumButton />
-              <LangSwitch />
-              <ProfileButtons />
-            </div>
+            <ProfileButtons />
           </slot>
         </Transition>
       </div>
@@ -91,9 +92,12 @@ withDefaults(defineProps<{
           >
             <slot v-if="!hideLogo" name="left-mobile">
               <slot name="left">
-                <NuxtLink to="/">
-                  <AppLogo size="sm" />
-                </NuxtLink>
+                <div class="flex items-center gap-2">
+                  <NuxtLink to="/">
+                    <AppLogo size="sm" />
+                  </NuxtLink>
+                  <PremiumButton size="sm" />
+                </div>
               </slot>
             </slot>
             <div v-else />
@@ -110,11 +114,7 @@ withDefaults(defineProps<{
             mode="out-in"
           >
             <slot name="right-mobile">
-              <div class="flex items-center gap-2">
-                <PremiumButton size="sm" />
-                <LangSwitch size="sm" />
-                <ProfileButtons size="sm" />
-              </div>
+              <ProfileButtons size="sm" />
             </slot>
           </Transition>
         </div>
