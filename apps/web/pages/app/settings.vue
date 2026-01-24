@@ -5,19 +5,33 @@ definePageMeta({
 
 const { t } = useI18n()
 const router = useRouter()
-const { user, signOut } = useAuth()
-const { profile } = useProfile()
+const { signOut } = useAuth()
+const { profile, aiGenerationsLeft } = useProfile()
 
 /* --- State --- */
 const isSyncing = ref(false)
 const keyNotation = ref<'standard' | 'camelot'>('camelot')
+const scConnection = ref<{
+  connected: boolean
+  username?: string
+  avatar?: string
+  lastSyncAt?: string
+  likedTracksCount?: number
+} | null>(null)
+const syncResult = ref<{ imported: number; total: number } | null>(null)
 
 /* --- Computed --- */
-const searchesUsed = computed(() => profile.value?.daily_search_count ?? 0)
-const searchesRemaining = computed(() => Math.max(0, 5 - searchesUsed.value))
 const isPremium = computed(() => profile.value?.is_premium ?? false)
 
 /* --- Methods --- */
+async function loadSoundCloudConnection() {
+  try {
+    scConnection.value = await $fetch('/api/soundcloud/connection')
+  } catch {
+    scConnection.value = { connected: false }
+  }
+}
+
 async function handleSignOut() {
   await signOut()
   router.push('/')
@@ -25,10 +39,24 @@ async function handleSignOut() {
 
 async function syncSoundCloud() {
   isSyncing.value = true
-  // TODO: Call sync API
-  await new Promise(resolve => setTimeout(resolve, 2000))
-  isSyncing.value = false
+  syncResult.value = null
+  try {
+    const result = await $fetch<{ imported: number; total: number }>('/api/soundcloud/sync-likes', {
+      method: 'POST'
+    })
+    syncResult.value = result
+    await loadSoundCloudConnection()
+  } catch (error) {
+    console.error('Failed to sync:', error)
+  } finally {
+    isSyncing.value = false
+  }
 }
+
+/* --- Lifecycle --- */
+onMounted(() => {
+  loadSoundCloudConnection()
+})
 </script>
 
 <template>
@@ -79,17 +107,28 @@ async function syncSoundCloud() {
           <h2 class="font-medium text-white">SoundCloud</h2>
         </div>
         <div class="p-4 space-y-4">
-          <div class="flex items-center justify-between">
+          <div v-if="scConnection?.connected" class="flex items-center justify-between">
             <div>
               <p class="text-sm text-neutral-400">Connecté</p>
-              <p class="font-medium text-white">@username</p>
+              <p class="font-medium text-white">@{{ scConnection.username }}</p>
+              <p v-if="scConnection.likedTracksCount" class="text-xs text-neutral-500">
+                {{ scConnection.likedTracksCount }} likes importés
+              </p>
             </div>
             <div class="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500">
               <UIcon name="i-simple-icons-soundcloud" class="h-5 w-5 text-white" />
             </div>
           </div>
+          <div v-else class="text-center py-2">
+            <p class="text-sm text-neutral-400">Non connecté</p>
+          </div>
+
+          <div v-if="syncResult" class="rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-400">
+            {{ syncResult.imported }} tracks importées sur {{ syncResult.total }}
+          </div>
 
           <button
+            v-if="scConnection?.connected"
             :disabled="isSyncing"
             class="flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-700 py-3 text-sm text-white transition-colors hover:bg-neutral-800 disabled:opacity-50"
             @click="syncSoundCloud"
@@ -119,7 +158,7 @@ async function syncSoundCloud() {
               v-if="!isPremium"
               class="rounded-full bg-neutral-800 px-3 py-1 text-sm text-neutral-400"
             >
-              {{ searchesRemaining }}/5 {{ t.aiGenerationsLeft }}
+              {{ aiGenerationsLeft }}/5 {{ t.aiGenerationsLeft }}
             </div>
           </div>
 

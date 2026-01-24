@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { TrackEntry, DownloadStatus } from '~/types'
+
 definePageMeta({
   middleware: 'auth'
 })
@@ -6,6 +8,7 @@ definePageMeta({
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
+const { play: playTrack, isTrackPlaying } = useSoundCloudEmbed()
 
 /* --- State --- */
 const playlistId = computed(() => route.params.id as string)
@@ -20,7 +23,7 @@ const playlist = ref<{
   is_draft: boolean
 } | null>(null)
 
-const tracks = ref<Array<{
+interface PlaylistTrack {
   soundcloud_id: number
   title: string
   artist: string
@@ -29,19 +32,13 @@ const tracks = ref<Array<{
   bpm_detected: number | null
   key_detected: string | null
   genre: string | null
-}>>([])
+  permalink_url?: string | null
+}
 
-const currentSuggestion = ref<{
-  soundcloud_id: number
-  title: string
-  artist: string
-  artwork: string | null
-  duration: number
-  bpm_detected: number | null
-  key_detected: string | null
-  genre: string | null
-} | null>(null)
+const tracks = ref<PlaylistTrack[]>([])
+const currentSuggestion = ref<PlaylistTrack | null>(null)
 
+const suggestions = ref<PlaylistTrack[]>([])
 const isLoading = ref(true)
 const isSearching = ref(false)
 const aiQuery = ref('')
@@ -63,67 +60,129 @@ const targetReached = computed(() =>
 
 /* --- Methods --- */
 async function loadPlaylist() {
-  if (isNewPlaylist.value) {
-    // Create new draft
-    playlist.value = {
-      id: 'new',
-      name: null,
-      target_duration: 60,
-      style: null,
-      is_draft: true
-    }
+  try {
+    if (isNewPlaylist.value) {
+      // Create new draft via API
+      const newPlaylist = await $fetch<typeof playlist.value>('/api/playlists', {
+        method: 'POST',
+        body: { target_duration: 60 }
+      })
+      playlist.value = newPlaylist
 
-    if (initialQuery.value) {
-      aiQuery.value = initialQuery.value
-      await searchTracks()
+      if (initialQuery.value) {
+        aiQuery.value = initialQuery.value
+        await searchTracks()
+      }
+    } else {
+      // Load existing playlist
+      const data = await $fetch<{
+        id: string
+        name: string | null
+        target_duration: number | null
+        style: string | null
+        is_draft: boolean
+        tracks: PlaylistTrack[]
+      }>(`/api/playlists/${playlistId.value}`)
+
+      playlist.value = {
+        id: data.id,
+        name: data.name,
+        target_duration: data.target_duration,
+        style: data.style,
+        is_draft: data.is_draft
+      }
+      tracks.value = data.tracks || []
     }
-  } else {
-    // TODO: Load existing playlist from Supabase
+  } catch (error) {
+    console.error('Failed to load playlist:', error)
+  } finally {
+    isLoading.value = false
   }
-
-  isLoading.value = false
 }
 
 async function searchTracks() {
-  if (!aiQuery.value.trim()) return
+  if (!aiQuery.value.trim() || !playlist.value?.id) return
 
   isSearching.value = true
-  // TODO: Call AI search API and get suggestions
-  // Mock suggestion for now
-  await new Promise(resolve => setTimeout(resolve, 1500))
+  try {
+    const result = await $fetch<{
+      tracks: PlaylistTrack[]
+      sql: string
+      reasoning: string
+    }>(`/api/playlists/${playlist.value.id}/suggest`, {
+      method: 'POST',
+      body: { query: aiQuery.value }
+    })
 
-  currentSuggestion.value = {
-    soundcloud_id: 123456,
-    title: 'Example Track',
-    artist: 'Example Artist',
-    artwork: null,
-    duration: 360000,
-    bpm_detected: 128,
-    key_detected: 'Am',
-    genre: 'Techno'
+    if (result.tracks && result.tracks.length > 0) {
+      currentSuggestion.value = result.tracks[0]
+      suggestions.value = result.tracks.slice(1)
+    } else {
+      currentSuggestion.value = null
+      suggestions.value = []
+    }
+  } catch (error: unknown) {
+    console.error('Failed to search tracks:', error)
+    const err = error as { statusCode?: number }
+    if (err.statusCode === 429) {
+      alert('Tu as atteint ta limite de 5 recherches IA par jour')
+    }
+    currentSuggestion.value = null
+  } finally {
+    isSearching.value = false
   }
-
-  isSearching.value = false
 }
 
 async function addTrack() {
-  if (!currentSuggestion.value) return
+  if (!currentSuggestion.value || !playlist.value?.id) return
 
-  tracks.value.push(currentSuggestion.value)
-  // TODO: Save to playlist_tracks table
-  // TODO: Save feedback (like)
+  const track = currentSuggestion.value
+  tracks.value.push(track)
 
-  // Get next suggestion
-  currentSuggestion.value = null
-  await searchTracks()
+  try {
+    // Save to playlist
+    await $fetch(`/api/playlists/${playlist.value.id}/tracks`, {
+      method: 'POST',
+      body: { soundcloud_id: track.soundcloud_id }
+    })
+  } catch (error) {
+    console.error('Failed to add track:', error)
+    // Remove from local list if API failed
+    tracks.value = tracks.value.filter(t => t.soundcloud_id !== track.soundcloud_id)
+    return
+  }
+
+  // Get next suggestion from queue or search again
+  if (suggestions.value.length > 0) {
+    currentSuggestion.value = suggestions.value.shift() || null
+  } else {
+    currentSuggestion.value = null
+    await searchTracks()
+  }
 }
 
 async function skipTrack() {
-  if (!currentSuggestion.value) return
+  if (!currentSuggestion.value || !playlist.value?.id) return
 
-  // TODO: Save feedback (skip)
-  currentSuggestion.value = null
-  await searchTracks()
+  const track = currentSuggestion.value
+
+  try {
+    // Record skip feedback
+    await $fetch(`/api/playlists/${playlist.value.id}/feedback`, {
+      method: 'POST',
+      body: { soundcloud_id: track.soundcloud_id, action: 'skip' }
+    })
+  } catch (error) {
+    console.error('Failed to save feedback:', error)
+  }
+
+  // Get next suggestion
+  if (suggestions.value.length > 0) {
+    currentSuggestion.value = suggestions.value.shift() || null
+  } else {
+    currentSuggestion.value = null
+    await searchTracks()
+  }
 }
 
 function formatDuration(ms: number): string {
@@ -137,6 +196,56 @@ function formatMinutes(minutes: number): string {
   const hours = Math.floor(minutes / 60)
   const mins = Math.round(minutes % 60)
   return mins > 0 ? `${hours}h${mins}` : `${hours}h`
+}
+
+function toTrackEntry(track: PlaylistTrack): TrackEntry {
+  return {
+    id: track.soundcloud_id,
+    urn: `soundcloud:tracks:${track.soundcloud_id}`,
+    permalink_url: track.permalink_url || `https://soundcloud.com/track/${track.soundcloud_id}`,
+    title: track.title,
+    artist: track.artist,
+    artwork: track.artwork,
+    duration: track.duration,
+    genre: track.genre,
+    description: null,
+    created_at: null,
+    label: null,
+    tags: [],
+    bpm_detected: track.bpm_detected,
+    bpm_confidence: null,
+    key_detected: track.key_detected,
+    key_confidence: null,
+    energy: null,
+    loudness: null,
+    dynamic_complexity: null,
+    spectral_centroid: null,
+    dissonance: null,
+    danceability: null,
+    speechiness: null,
+    instrumentalness: null,
+    acousticness: null,
+    valence: null,
+    liveness: null,
+    beat_offset: null,
+    highlight_time: null,
+    analysis_status: null,
+    analysis_error: null,
+    analyzed_at: null,
+    playback_count: 0,
+    likes_count: 0,
+    reposts_count: 0,
+    comment_count: 0,
+    downloadStatus: 'No' as DownloadStatus,
+    downloadable: false,
+    purchase_url: null,
+    purchase_title: null
+  }
+}
+
+function handlePreview(track: PlaylistTrack) {
+  if (!track.permalink_url) return
+  playTrack(toTrackEntry(track))
 }
 
 /* --- Lifecycle --- */
@@ -239,10 +348,20 @@ onMounted(() => {
               <span v-if="currentSuggestion.genre">{{ currentSuggestion.genre }}</span>
             </div>
 
-            <!-- Play button placeholder -->
-            <button class="mt-4 w-full rounded-lg bg-neutral-800 py-2 text-sm text-white transition-colors hover:bg-neutral-700">
-              <UIcon name="i-heroicons-play" class="mr-1 inline h-4 w-4" />
-              Preview
+            <!-- Preview button -->
+            <button
+              class="mt-4 w-full rounded-lg py-2 text-sm text-white transition-colors"
+              :class="isTrackPlaying(currentSuggestion.soundcloud_id)
+                ? 'bg-orange-500 hover:bg-orange-600'
+                : 'bg-neutral-800 hover:bg-neutral-700'"
+              :disabled="!currentSuggestion.permalink_url"
+              @click="handlePreview(currentSuggestion)"
+            >
+              <UIcon
+                :name="isTrackPlaying(currentSuggestion.soundcloud_id) ? 'i-heroicons-pause' : 'i-heroicons-play'"
+                class="mr-1 inline h-4 w-4"
+              />
+              {{ isTrackPlaying(currentSuggestion.soundcloud_id) ? 'Playing' : 'Preview' }}
             </button>
           </div>
 
@@ -334,6 +453,9 @@ onMounted(() => {
         </div>
       </div>
     </main>
+
+    <!-- SoundCloud Player -->
+    <SoundCloudPlayer />
 
     <!-- Target Reached Modal -->
     <Teleport to="body">

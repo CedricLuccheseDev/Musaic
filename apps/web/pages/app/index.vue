@@ -43,19 +43,33 @@ const savedPlaylists = computed(() =>
 /* --- Methods --- */
 async function loadPlaylists() {
   isLoading.value = true
-  // TODO: Fetch playlists from Supabase
-  // For now, mock data
-  playlists.value = []
-  isLoading.value = false
+  try {
+    const data = await $fetch<typeof playlists.value>('/api/playlists')
+    playlists.value = data
+  } catch (error) {
+    console.error('Failed to load playlists:', error)
+    playlists.value = []
+  } finally {
+    isLoading.value = false
+  }
 }
 
 async function handleAiSearch() {
   if (!aiSearchQuery.value.trim()) return
 
   isAiSearching.value = true
-  // TODO: Create draft playlist and redirect
-  // For now, just redirect to a placeholder
-  router.push('/app/playlist/new?q=' + encodeURIComponent(aiSearchQuery.value))
+  try {
+    // Create or get draft playlist
+    const playlist = await $fetch<{ id: string }>('/api/playlists', {
+      method: 'POST',
+      body: { target_duration: 60 }
+    })
+    // Redirect to playlist with query
+    router.push(`/app/playlist/${playlist.id}?q=${encodeURIComponent(aiSearchQuery.value)}`)
+  } catch (error) {
+    console.error('Failed to create playlist:', error)
+    isAiSearching.value = false
+  }
 }
 
 function handleCreate() {
