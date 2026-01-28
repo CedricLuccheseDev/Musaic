@@ -22,6 +22,8 @@ python3 -m py_compile apps/analyzer/app/*.py
 
 ## Git Commits
 
+**IMPORTANT:** Never commit automatically. Always wait for user to test changes first.
+
 Simple conventional format, no signatures:
 
 ```bash
