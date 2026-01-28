@@ -144,7 +144,6 @@ cd apps/web && npx tsx scripts/cleanupLowQualityTracks.ts -y
 | `acousticness` | REAL | Acoustic vs electronic (0-1) |
 | `valence` | REAL | Musical positivity (0-1) |
 | `liveness` | REAL | Live performance indicator (0-1) |
-| `beat_offset` | REAL | First beat position in seconds |
 | `highlight_time` | INTEGER | Best moment for preview (seconds) |
 | `embedding` | VECTOR(1280) | Audio feature vector |
 | `analysis_status` | TEXT | pending/processing/completed/failed |
@@ -182,7 +181,7 @@ cd apps/web && npx tsx scripts/cleanupLowQualityTracks.ts -y
 
 ### Database
 - **Platform**: Supabase (PostgreSQL + pgvector)
-- **Auth**: Supabase Auth (Google/Apple OAuth)
+- **Auth**: Supabase Auth (SoundCloud OAuth)
 
 ### Infrastructure
 - **CI/CD**: GitHub Actions

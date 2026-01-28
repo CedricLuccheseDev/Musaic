@@ -51,8 +51,8 @@ check_and_install_packages()
 from supabase import create_client
 
 from .config import get_settings
-from .analyzer import analyze_audio, analyze_audio_from_bytes, AnalysisError
-from .downloader import download_full_audio_async, stream_audio_to_memory, cleanup_audio_file, DownloadError
+from .analyzer import analyze_audio, AnalysisError
+from .downloader import download_full_audio_async, stream_audio_to_file, cleanup_audio_file, DownloadError, create_http_client
 from .supabase_client import update_track_analysis, update_track_status
 from .models import AnalysisStatus
 from .logger import log, Colors
@@ -384,12 +384,13 @@ async def analyze_track_streaming(
     analyze_semaphore: asyncio.Semaphore,
     settings,
     task_id: int,
+    http_client=None,
 ) -> bool:
     """
-    Analyze a track using streaming (no file download).
+    Analyze a track using optimized file streaming.
 
-    Streams audio directly to memory and analyzes without saving to disk.
-    Useful for VPS where SoundCloud blocks downloads but allows streaming.
+    Streams audio directly to a temp file (avoids RAM buffer overhead).
+    Falls back to yt-dlp/YouTube if SoundCloud streaming fails.
 
     Returns True if successful, False otherwise.
     """
@@ -402,6 +403,7 @@ async def analyze_track_streaming(
     title = track.get("title", "Unknown")
 
     start_time = time.time()
+    audio_file = None
 
     # Register task for progress display
     register_task(task_id, title)
@@ -421,8 +423,8 @@ async def analyze_track_streaming(
                 return False
 
             update_task(task_id, "Streaming", 10, "📡")
-            audio_bytes = await asyncio.wait_for(
-                stream_audio_to_memory(url),
+            audio_file = await asyncio.wait_for(
+                stream_audio_to_file(url, client=http_client),
                 timeout=settings.analysis_timeout_seconds,
             )
 
@@ -438,7 +440,7 @@ async def analyze_track_streaming(
                 display_percent = 25 + int(percent * 0.65)
                 update_task(task_id, step, display_percent, "🔍")
 
-            result = await asyncio.to_thread(analyze_audio_from_bytes, audio_bytes, on_analysis_progress)
+            result = await asyncio.to_thread(analyze_audio, audio_file, on_analysis_progress)
 
         # === SAVE PHASE (no semaphore - fast I/O) ===
         update_task(task_id, "Saving", 95, "💾")

@@ -14,7 +14,7 @@ Music search platform for DJs and producers.
 - AI-powered natural language search (Claude)
 - Audio analysis (BPM, key, energy, danceability...)
 - Similar tracks via vector embeddings
-- Google/Apple authentication
+- SoundCloud authentication
 
 ## Quick Start
 

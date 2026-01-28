@@ -300,34 +300,16 @@ Get current batch status.
 }
 ```
 
-#### `POST /analyze/batch/beat-offset`
-
-Reanalyze beat_offset for completed tracks (lightweight, uses existing BPM).
-
-**Query params:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `soundcloud_id` | number | Optional - reanalyze only this track |
-
-**Response:**
-```json
-{
-  "status": "started",
-  "total_tracks": 150,
-  "message": "Started beat_offset reanalysis for 150 track(s)"
-}
-```
-
 #### `POST /analyze/batch/full-reanalysis`
 
-Force full reanalysis of all completed tracks (BPM + beat_offset).
+Force full reanalysis of all completed tracks.
 
 **Response:**
 ```json
 {
   "status": "started",
   "total_tracks": 150,
-  "message": "Started full reanalysis (BPM + beat_offset) for 150 tracks"
+  "message": "Started full reanalysis for 150 tracks"
 }
 ```
 

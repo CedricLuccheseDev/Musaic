@@ -9,14 +9,19 @@ import tempfile
 import aiofiles
 import httpx
 import io
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, AsyncIterator
 
 from app.config import get_settings
 from app.logger import log
 
 if TYPE_CHECKING:
     from app.config import Settings
+
+
+# Optimized chunk size (256KB instead of 64KB for better throughput)
+STREAM_CHUNK_SIZE = 262144  # 256KB
 
 
 class DownloadError(Exception):
@@ -28,6 +33,30 @@ class DownloadError(Exception):
 class StreamUnavailableError(Exception):
     """Raised when stream is not available (geo-blocked, label restriction, etc.)."""
     pass
+
+
+# =============================================================================
+# Shared HTTP Client Pool
+# =============================================================================
+
+@asynccontextmanager
+async def create_http_client() -> AsyncIterator[httpx.AsyncClient]:
+    """
+    Create an optimized HTTP client for SoundCloud API requests.
+
+    Use as a shared client across multiple downloads for connection reuse.
+    """
+    settings = get_settings()
+    client = httpx.AsyncClient(
+        proxy=settings.proxy_url,
+        timeout=httpx.Timeout(30.0, read=300.0),
+        http2=True,
+        limits=httpx.Limits(max_keepalive_connections=20, max_connections=50),
+    )
+    try:
+        yield client
+    finally:
+        await client.aclose()
 
 
 # =============================================================================
@@ -235,6 +264,96 @@ async def _get_stream_url(
     return final_url
 
 
+async def stream_audio_to_file(
+    url: str,
+    client: httpx.AsyncClient | None = None,
+) -> Path:
+    """
+    Stream audio from SoundCloud directly to a temp file (optimized path).
+
+    This avoids the double I/O of streaming to RAM then writing to disk.
+    Essentia requires a file path, so streaming directly to file is more efficient.
+
+    Args:
+        url: SoundCloud track URL
+        client: Optional shared httpx.AsyncClient for connection reuse
+
+    Returns:
+        Path to the downloaded audio file
+
+    Raises:
+        DownloadError: If streaming fails
+    """
+    settings = get_settings()
+
+    if not settings.soundcloud_client_id:
+        raise DownloadError("soundcloud_client_id required for streaming")
+
+    should_close_client = False
+    settings.temp_dir.mkdir(parents=True, exist_ok=True)
+    temp_dir = Path(tempfile.mkdtemp(dir=settings.temp_dir))
+    output_path = temp_dir / "audio.mp3"
+
+    try:
+        if client is None:
+            client = httpx.AsyncClient(
+                proxy=settings.proxy_url,
+                timeout=httpx.Timeout(30.0, read=300.0),
+                http2=True,
+                limits=httpx.Limits(max_keepalive_connections=20, max_connections=50),
+            )
+            should_close_client = True
+
+        # Get the stream URL
+        try:
+            stream_url = await _get_stream_url(url, settings.soundcloud_client_id, client)
+        except StreamUnavailableError as e:
+            raise DownloadError(str(e)) from e
+
+        # Stream audio directly to file (no RAM buffer)
+        bytes_downloaded = 0
+        MIN_AUDIO_SIZE = 100 * 1024  # 100KB minimum
+
+        async with client.stream("GET", stream_url) as response:
+            if response.status_code != 200:
+                raise DownloadError(f"Stream failed with status {response.status_code}")
+
+            async with aiofiles.open(output_path, "wb") as f:
+                async for chunk in response.aiter_bytes(chunk_size=STREAM_CHUNK_SIZE):
+                    await f.write(chunk)
+                    bytes_downloaded += len(chunk)
+
+        # Validate file size
+        if bytes_downloaded < MIN_AUDIO_SIZE:
+            raise DownloadError(f"Audio too small ({bytes_downloaded} bytes) - likely geo-blocked")
+
+        return output_path
+
+    except DownloadError:
+        # Clean up on failure
+        if output_path.exists():
+            output_path.unlink()
+        if temp_dir.exists():
+            try:
+                temp_dir.rmdir()
+            except OSError:
+                pass
+        raise
+    except Exception as e:
+        # Clean up on failure
+        if output_path.exists():
+            output_path.unlink()
+        if temp_dir.exists():
+            try:
+                temp_dir.rmdir()
+            except OSError:
+                pass
+        raise DownloadError(f"Streaming failed: {e}") from e
+    finally:
+        if should_close_client and client:
+            await client.aclose()
+
+
 async def stream_audio_to_memory(
     url: str,
     client: httpx.AsyncClient | None = None,
@@ -243,7 +362,8 @@ async def stream_audio_to_memory(
     """
     Stream audio from SoundCloud directly to memory (no file).
 
-    This is useful for VPS where SoundCloud blocks downloads but allows streaming.
+    Note: For full analysis, prefer stream_audio_to_file() which avoids
+    the double I/O of RAM buffer -> temp file -> Essentia read.
 
     Args:
         url: SoundCloud track URL
@@ -269,7 +389,7 @@ async def stream_audio_to_memory(
                 proxy=settings.proxy_url,
                 timeout=httpx.Timeout(30.0, read=300.0),
                 http2=True,
-                limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
+                limits=httpx.Limits(max_keepalive_connections=20, max_connections=50),
             )
             should_close_client = True
 
@@ -287,7 +407,7 @@ async def stream_audio_to_memory(
             if response.status_code != 200:
                 raise DownloadError(f"Stream failed with status {response.status_code}")
 
-            async for chunk in response.aiter_bytes(chunk_size=65536):
+            async for chunk in response.aiter_bytes(chunk_size=STREAM_CHUNK_SIZE):
                 buffer.write(chunk)
                 bytes_downloaded += len(chunk)
 
@@ -384,7 +504,7 @@ async def _try_direct_download_async(
                 return None
 
             async with aiofiles.open(mp3_path, "wb") as f:
-                async for chunk in audio_response.aiter_bytes(chunk_size=65536):  # 64KB chunks
+                async for chunk in audio_response.aiter_bytes(chunk_size=STREAM_CHUNK_SIZE):
                     await f.write(chunk)
 
         # Validate file size
