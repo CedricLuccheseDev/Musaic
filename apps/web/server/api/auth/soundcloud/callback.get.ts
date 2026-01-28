@@ -22,6 +22,8 @@ interface SoundCloudUser {
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
   const query = getQuery(event)
+  const isDev = config.public.isDev as boolean
+  const baseUrl = isDev ? 'http://localhost:3000' : 'https://musaic.fr'
 
   const code = query.code as string
   const state = query.state as string
@@ -30,12 +32,12 @@ export default defineEventHandler(async (event) => {
   // Handle OAuth errors
   if (error) {
     const errorDescription = query.error_description as string || 'Authorization denied'
-    return sendRedirect(event, `/login?error=${encodeURIComponent(errorDescription)}`)
+    return sendRedirect(event, `${baseUrl}/login?error=${encodeURIComponent(errorDescription)}`)
   }
 
   // Validate required params
   if (!code || !state) {
-    return sendRedirect(event, '/login?error=Missing%20authorization%20parameters')
+    return sendRedirect(event, `${baseUrl}/login?error=Missing%20authorization%20parameters`)
   }
 
   // Parse state
@@ -44,30 +46,31 @@ export default defineEventHandler(async (event) => {
     return sendRedirect(event, '/login?error=Invalid%20state%20parameter')
   }
 
+  // If dev environment and we're on production, redirect to localhost
+  // This must happen BEFORE cookie check since cookie is on localhost domain
+  if (stateData.env === 'dev' && !isDev) {
+    const localUrl = new URL('http://localhost:3000/api/auth/soundcloud/callback')
+    localUrl.searchParams.set('code', code)
+    localUrl.searchParams.set('state', state)
+    return sendRedirect(event, localUrl.toString())
+  }
+
   // Get stored nonce from cookie
   const cookieData = getCookie(event, 'sc_oauth')
   if (!cookieData) {
-    return sendRedirect(event, '/login?error=Session%20expired')
+    return sendRedirect(event, `${baseUrl}/login?error=Session%20expired`)
   }
 
   let storedData: { nonce: string }
   try {
     storedData = JSON.parse(cookieData)
   } catch {
-    return sendRedirect(event, '/login?error=Invalid%20session%20data')
+    return sendRedirect(event, `${baseUrl}/login?error=Invalid%20session%20data`)
   }
 
   // Verify nonce to prevent CSRF
   if (stateData.nonce !== storedData.nonce) {
-    return sendRedirect(event, '/login?error=Invalid%20state')
-  }
-
-  // If dev environment and we're on production, redirect to localhost
-  if (stateData.env === 'dev') {
-    const localUrl = new URL('http://localhost:3000/api/auth/soundcloud/callback')
-    localUrl.searchParams.set('code', code)
-    localUrl.searchParams.set('state', state)
-    return sendRedirect(event, localUrl.toString())
+    return sendRedirect(event, `${baseUrl}/login?error=Invalid%20state`)
   }
 
   // Clear the OAuth cookie
@@ -163,19 +166,24 @@ export default defineEventHandler(async (event) => {
         .eq('id', userId)
     }
 
-    // Generate magic link to log user in
+    // Generate magic link to get the OTP token
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
       type: 'magiclink',
       email: userEmail
     })
 
-    if (linkError || !linkData.properties?.action_link) {
+    if (linkError || !linkData.properties?.hashed_token) {
       console.error('[SC Callback] Failed to generate link:', linkError)
-      return sendRedirect(event, '/login?error=Failed%20to%20create%20session')
+      return sendRedirect(event, `${baseUrl}/auth/callback?error=${encodeURIComponent('Failed to create session')}`)
     }
 
-    // Redirect to the magic link which will set up the Supabase session
-    return sendRedirect(event, linkData.properties.action_link)
+    // Redirect to the client callback page with the token
+    // The client will verify the token and establish the session
+    const callbackUrl = new URL(`${baseUrl}/auth/callback`)
+    callbackUrl.searchParams.set('token', linkData.properties.hashed_token)
+    callbackUrl.searchParams.set('email', userEmail)
+
+    return sendRedirect(event, callbackUrl.toString())
   } catch (err) {
     console.error('[SC Callback] Error:', err)
     return sendRedirect(event, '/login?error=Authentication%20failed')
