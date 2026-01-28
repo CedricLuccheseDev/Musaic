@@ -1,4 +1,4 @@
-import { generateCodeVerifier, generateCodeChallenge, generateNonce, createState } from '~/server/utils/pkce'
+import { generateNonce, createState } from '~/server/utils/pkce'
 
 const SOUNDCLOUD_AUTHORIZE_URL = 'https://secure.soundcloud.com/authorize'
 const REDIRECT_URI = 'https://musaic.fr/api/auth/soundcloud/callback'
@@ -14,9 +14,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Generate PKCE parameters
-  const codeVerifier = generateCodeVerifier()
-  const codeChallenge = generateCodeChallenge(codeVerifier)
+  // Generate nonce for CSRF protection
   const nonce = generateNonce()
 
   // Determine environment
@@ -24,8 +22,8 @@ export default defineEventHandler(async (event) => {
   const env = isDev ? 'dev' : 'prod'
   const state = createState(env, nonce)
 
-  // Store verifier and nonce in HTTP-only cookie (expires in 10 minutes)
-  const cookieData = JSON.stringify({ verifier: codeVerifier, nonce })
+  // Store nonce in HTTP-only cookie (expires in 10 minutes)
+  const cookieData = JSON.stringify({ nonce })
   setCookie(event, 'sc_oauth', cookieData, {
     httpOnly: true,
     secure: !isDev,

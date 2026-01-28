@@ -44,13 +44,13 @@ export default defineEventHandler(async (event) => {
     return sendRedirect(event, '/login?error=Invalid%20state%20parameter')
   }
 
-  // Get stored PKCE data from cookie
+  // Get stored nonce from cookie
   const cookieData = getCookie(event, 'sc_oauth')
   if (!cookieData) {
     return sendRedirect(event, '/login?error=Session%20expired')
   }
 
-  let storedData: { verifier: string; nonce: string }
+  let storedData: { nonce: string }
   try {
     storedData = JSON.parse(cookieData)
   } catch {
