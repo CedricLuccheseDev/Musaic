@@ -52,30 +52,25 @@ const SYSTEM_PROMPT = `Music search SQL generator. Output strict JSON only.
 
 OUTPUT: {"sql":"SELECT...","phrase":"response","soundcloudQuery":"keywords","soundcloudFilters":{},"needsClarification":false}
 
-SCHEMA: tracks(soundcloud_id,title,artist,genre,tags[],label,playback_count,duration,download_status,bpm_detected,key_detected,energy,valence,danceability,instrumentalness,spectral_centroid,analysis_status)
+SCHEMA: tracks(soundcloud_id,title,artist,genre,tags[],label,playback_count,duration,download_status,bpm_detected,key_detected,analysis_status)
 
 INTERPRETATION PRIORITY (follow this order):
 1. KNOWN GENRE? (house,techno,dubstep,dnb,trap,trance,ambient,etc) → genre ILIKE '%x%'
-2. MOOD/FEATURE? (chill,dark,hard,sad,happy,energetic,melodic) → use audio features
-3. OTHERWISE → ASSUME ARTIST NAME → artist ILIKE '%x%'
+2. BPM REQUEST? (fast,slow,140bpm) → use bpm_detected filter
+3. KEY REQUEST? (C major, Am) → use key_detected filter
+4. OTHERWISE → ASSUME ARTIST NAME → artist ILIKE '%x%'
 
 PATTERN RECOGNITION (user says → interpret as):
 - "comme X", "style X", "genre de X", "à la X", "like X", "similar to X" → artist search for X
 - "récent", "nouveau", "2024", "2025", "fresh" → soundcloudFilters.created_at:"last_month"
 - "gratuit", "free", "dl", "télécharger" → download_status IN (...) + soundcloudFilters.license:"to_share"
 - "rapide", "fast", "140bpm" → bpm_detected > 135 or extract BPM number
-- "lent", "slow", "chill" → energy < 0.5, bpm_detected < 100
-- "dark", "sombre" → spectral_centroid < 2000, valence < 0.4
-- "happy", "joyeux", "uplifting" → valence > 0.6
-- "sans voix", "instrumental", "no vocals" → instrumentalness > 0.7
-- "pas trop X", "not too X" → moderate values (0.3-0.6)
+- "lent", "slow" → bpm_detected < 100
 
 RULES:
 - ILIKE always '%term%' (NEVER '0term%')
-- Audio features need: analysis_status='completed'
 - Default: ORDER BY playback_count DESC LIMIT 20
 - Unknown single word = artist name (not title search!)
-- Combine conditions: "chill techno" = genre + energy filter
 
 SOUNDCLOUD FILTERS (pass in soundcloudFilters when relevant):
 - genres: genre name for filter.genre_or_tag
@@ -83,13 +78,9 @@ SOUNDCLOUD FILTERS (pass in soundcloudFilters when relevant):
 - license: "to_share" for free downloads
 - bpm: {from:X,to:Y}
 
-AUDIO FEATURES (0-1, need analysis_status='completed'):
-energy(intensity), valence(mood), danceability, instrumentalness, spectral_centroid(Hz:brightness)
-
 EXAMPLES:
 "techno" → sql:genre ILIKE '%techno%', scQuery:"techno", scFilters:{genres:"Techno"}
 "Quyver" → sql:artist ILIKE '%quyver%', scQuery:"quyver" (unknown word = artist)
-"chill house" → sql:genre ILIKE '%house%' AND energy<0.5 AND analysis_status='completed', scQuery:"chill house"
 "comme Rezz" → sql:artist ILIKE '%rezz%', scQuery:"rezz"
 "dubstep gratuit récent" → sql:genre ILIKE '%dubstep%' AND download_status IN ('FreeDirectLink','FreeExternalLink'), scFilters:{genres:"Dubstep",license:"to_share",created_at:"last_month"}
 "electronic" → needsClarification:true, question:"Quel style?", options:[House,Techno,Dubstep]

@@ -12,6 +12,7 @@ import {
   isIdealDuration,
   isRecent
 } from '~/server/config/qualityRules'
+import { fetchOdesliPurchaseLink } from '~/server/services/odesli'
 
 let supabaseClient: SupabaseClient | null = null
 
@@ -77,49 +78,6 @@ export async function triggerAnalysis(soundcloudIds: number[]): Promise<void> {
 // Odesli Purchase Link Enrichment (Background)
 // ============================================================================
 
-const ODESLI_API_URL = 'https://api.song.link/v1-alpha.1/links'
-
-const PURCHASE_PLATFORM_PRIORITY = [
-  'beatport', 'bandcamp', 'traxsource', 'itunes', 'appleMusic',
-  'amazon', 'deezer', 'spotify', 'tidal', 'youtube', 'youtubeMusic'
-] as const
-
-interface OdesliPlatformLink {
-  url: string
-  entityUniqueId: string
-}
-
-interface OdesliResponse {
-  pageUrl: string
-  linksByPlatform: Record<string, OdesliPlatformLink>
-}
-
-async function fetchOdesliLink(soundcloudUrl: string): Promise<string | null> {
-  try {
-    const response = await fetch(
-      `${ODESLI_API_URL}?url=${encodeURIComponent(soundcloudUrl)}`,
-      {
-        headers: { 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(8000)
-      }
-    )
-
-    if (!response.ok) return null
-
-    const data = await response.json() as OdesliResponse
-    if (!data.linksByPlatform) return null
-
-    for (const platform of PURCHASE_PLATFORM_PRIORITY) {
-      const link = data.linksByPlatform[platform]
-      if (link?.url) return link.url
-    }
-
-    return data.pageUrl || null
-  } catch {
-    return null
-  }
-}
-
 /**
  * Enrich tracks with purchase links from Odesli (background, non-blocking)
  * Called after upsertTracks to fill in missing purchase_url
@@ -151,8 +109,8 @@ async function enrichPurchaseLinksBackground(tracks: TrackEntry[]): Promise<void
 
     const results = await Promise.all(
       batch.map(async (track) => {
-        const url = await fetchOdesliLink(track.permalink_url)
-        return { track, url }
+        const result = await fetchOdesliPurchaseLink(track.permalink_url)
+        return { track, url: result.url }
       })
     )
 
@@ -371,7 +329,7 @@ export async function getAnalysisData(soundcloudIds: number[]): Promise<Map<numb
 
   const { data, error } = await supabase
     .from('tracks')
-    .select('soundcloud_id, bpm_detected, bpm_confidence, key_detected, key_confidence, energy, loudness, dynamic_complexity, danceability, speechiness, instrumentalness, acousticness, valence, liveness, spectral_centroid, dissonance, analysis_status')
+    .select('soundcloud_id, bpm_detected, bpm_confidence, key_detected, key_confidence, analysis_status')
     .in('soundcloud_id', soundcloudIds)
 
   if (error) {
@@ -405,17 +363,6 @@ export async function enrichTracksWithAnalysis(tracks: TrackEntry[]): Promise<Tr
       bpm_confidence: analysis.bpm_confidence,
       key_detected: analysis.key_detected,
       key_confidence: analysis.key_confidence,
-      energy: analysis.energy,
-      loudness: analysis.loudness,
-      dynamic_complexity: analysis.dynamic_complexity,
-      danceability: analysis.danceability,
-      speechiness: analysis.speechiness,
-      instrumentalness: analysis.instrumentalness,
-      acousticness: analysis.acousticness,
-      valence: analysis.valence,
-      liveness: analysis.liveness,
-      spectral_centroid: analysis.spectral_centroid,
-      dissonance: analysis.dissonance,
       analysis_status: analysis.analysis_status as TrackEntry['analysis_status']
     }
   })

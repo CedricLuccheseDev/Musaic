@@ -54,32 +54,12 @@ async def update_track_analysis(
     client = get_supabase_client()
 
     update_data = TrackUpdate(
-        # Rhythm
         bpm_detected=analysis_result["bpm_detected"],
         bpm_confidence=analysis_result["bpm_confidence"],
-        beat_offset=analysis_result.get("beat_offset"),
-        # Tonal
         key_detected=analysis_result["key_detected"],
         key_confidence=analysis_result["key_confidence"],
-        # Dynamics
-        energy=analysis_result["energy"],
-        loudness=analysis_result["loudness"],
-        dynamic_complexity=analysis_result["dynamic_complexity"],
-        # Timbre
-        spectral_centroid=analysis_result["spectral_centroid"],
-        dissonance=analysis_result["dissonance"],
-        # High-level
-        danceability=analysis_result["danceability"],
-        speechiness=analysis_result["speechiness"],
-        instrumentalness=analysis_result["instrumentalness"],
-        acousticness=analysis_result["acousticness"],
-        valence=analysis_result["valence"],
-        liveness=analysis_result["liveness"],
-        # Highlight
         highlight_time=analysis_result.get("highlight_time"),
-        # Embedding
         embedding=analysis_result.get("embedding"),
-        # Status
         analysis_status=AnalysisStatus.COMPLETED,
         analysis_error=None,
         analyzed_at=datetime.now(timezone.utc),
@@ -113,18 +93,3 @@ async def get_track_by_soundcloud_id(soundcloud_id: int) -> dict | None:
         return None
 
 
-async def update_track_beat_offset(
-    soundcloud_id: int,
-    beat_offset: float,
-) -> None:
-    """Update only the beat_offset for a track in Supabase."""
-    client = get_supabase_client()
-
-    try:
-        client.table("tracks").update(
-            {"beat_offset": beat_offset}
-        ).eq("soundcloud_id", soundcloud_id).execute()
-        logger.info(f"Updated track {soundcloud_id} beat_offset to {beat_offset}")
-    except Exception as e:
-        logger.error(f"Failed to update track {soundcloud_id} beat_offset: {e}")
-        raise

@@ -6,18 +6,21 @@ definePageMeta({
 
 /* --- States --- */
 const { t } = useI18n()
-const { user, signInWithGoogle } = useAuth()
+const { user, signInWithSoundCloud } = useAuth()
 const router = useRouter()
-const isLoadingGoogle = ref(false)
+const isLoading = ref(false)
 const showTerms = ref(false)
 
 /* --- Methods --- */
-async function handleGoogle() {
-  console.log('[login] handleGoogle clicked')
-  isLoadingGoogle.value = true
-  const result = await signInWithGoogle()
-  console.log('[login] signInWithGoogle result:', result)
-  isLoadingGoogle.value = false
+async function handleSoundCloud() {
+  console.log('[login] handleSoundCloud clicked')
+  isLoading.value = true
+  const result = await signInWithSoundCloud()
+  console.log('[login] signInWithSoundCloud result:', result)
+  if (result.error) {
+    isLoading.value = false
+  }
+  // Note: if successful, we redirect so no need to reset loading
 }
 
 /* --- Watchers --- */
@@ -83,16 +86,16 @@ watch(user, (u) => {
 
         <!-- Auth buttons -->
         <div class="space-y-3">
-          <!-- Google -->
+          <!-- SoundCloud -->
           <button
             type="button"
-            :disabled="isLoadingGoogle"
-            class="group relative flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl bg-white px-4 py-3.5 font-medium text-neutral-900 transition-all duration-200 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
-            @click="handleGoogle"
+            :disabled="isLoading"
+            class="group relative flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl bg-[#ff5500] px-4 py-3.5 font-medium text-white transition-all duration-200 hover:bg-[#ff6a1a] disabled:cursor-not-allowed disabled:opacity-50"
+            @click="handleSoundCloud"
           >
-            <UIcon v-if="isLoadingGoogle" name="i-heroicons-arrow-path" class="h-5 w-5 animate-spin" />
-            <UIcon v-else name="i-simple-icons-google" class="h-5 w-5" />
-            <span>{{ t.continueWithGoogle }}</span>
+            <UIcon v-if="isLoading" name="i-heroicons-arrow-path" class="h-5 w-5 animate-spin" />
+            <UIcon v-else name="i-simple-icons-soundcloud" class="h-5 w-5" />
+            <span>{{ t.continueWithSoundCloud }}</span>
           </button>
         </div>
 

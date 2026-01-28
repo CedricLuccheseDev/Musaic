@@ -13,7 +13,7 @@ from supabase import create_client
 
 from app.security import verify_api_key
 
-from app.analyzer import AnalysisError, analyze_audio, analyze_audio_from_bytes, reanalyze_beat_offset_from_bytes
+from app.analyzer import AnalysisError, analyze_audio, analyze_audio_from_bytes
 from app.config import get_settings
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ from app.models import (
     BatchAnalysisResponse,
     BatchStatusResponse,
 )
-from app.supabase_client import update_track_analysis, update_track_status, update_track_beat_offset
+from app.supabase_client import update_track_analysis, update_track_status
 
 router = APIRouter(tags=["Analysis"])
 
@@ -402,221 +402,7 @@ async def get_batch_status() -> BatchStatusResponse:
 
 
 # =============================================================================
-# BEAT OFFSET REANALYSIS
-# =============================================================================
-
-beat_offset_state = {
-    "is_running": False,
-    "total_tracks": 0,
-    "processed": 0,
-    "successful": 0,
-    "failed": 0,
-}
-
-
-async def reanalyze_beat_offset_single_track(
-    track: dict,
-    download_semaphore: asyncio.Semaphore,
-    analyze_semaphore: asyncio.Semaphore,
-    settings: Settings,
-) -> bool:
-    """Reanalyze beat_offset for a single track."""
-    global beat_offset_state
-    soundcloud_id = track["soundcloud_id"]
-    url = track["permalink_url"]
-    title = track.get("title", "Unknown")[:30]
-    artist = track.get("artist", "Unknown")[:20]
-    bpm = track.get("bpm_detected")
-    highlight_time = track.get("highlight_time")
-
-    if not bpm or bpm <= 0:
-        log.warn(f"Skipping {artist} - {title}: no BPM")
-        return False
-
-    try:
-        # Stream audio
-        async with download_semaphore:
-            try:
-                audio_bytes = await asyncio.wait_for(
-                    stream_audio_to_memory(url),
-                    timeout=settings.analysis_timeout_seconds,
-                )
-                if len(audio_bytes) < 100 * 1024:
-                    raise DownloadError("Audio too small")
-            except (DownloadError, asyncio.TimeoutError) as e:
-                log.error(f"Download failed for {artist} - {title}: {e}")
-                return False
-
-        # Reanalyze beat_offset only
-        async with analyze_semaphore:
-            new_offset = await asyncio.to_thread(
-                reanalyze_beat_offset_from_bytes,
-                audio_bytes,
-                bpm,
-                highlight_time
-            )
-
-        if new_offset is None:
-            log.warn(f"No beat_offset for {artist} - {title}")
-            return False
-
-        # Update in DB
-        await update_track_beat_offset(soundcloud_id, new_offset)
-
-        beat_offset_state["successful"] += 1
-        beat_offset_state["processed"] += 1
-        old_offset = track.get("beat_offset")
-        log.success(
-            f"[{beat_offset_state['processed']}/{beat_offset_state['total_tracks']}] "
-            f"{artist} - {title} | offset: {old_offset} -> {new_offset}"
-        )
-        return True
-
-    except Exception as e:
-        beat_offset_state["failed"] += 1
-        beat_offset_state["processed"] += 1
-        log.error(f"Failed {artist} - {title}: {e}")
-        return False
-
-
-async def process_beat_offset_reanalysis(soundcloud_id: int | None = None) -> None:
-    """Background task to reanalyze beat_offset for all completed tracks."""
-    global beat_offset_state
-    settings = get_settings()
-    client = create_client(settings.supabase_url, settings.supabase_service_key)
-
-    max_downloads = settings.max_concurrent_analyses * 3
-    max_analyses = settings.max_concurrent_analyses
-    download_semaphore = asyncio.Semaphore(max_downloads)
-    analyze_semaphore = asyncio.Semaphore(max_analyses)
-
-    try:
-        # Get tracks to reanalyze
-        query = (
-            client.table("tracks")
-            .select("soundcloud_id, permalink_url, title, artist, bpm_detected, beat_offset, highlight_time")
-            .eq("analysis_status", "completed")
-            .not_.is_("bpm_detected", "null")
-        )
-
-        if soundcloud_id:
-            query = query.eq("soundcloud_id", soundcloud_id)
-
-        response = query.execute()
-        tracks = response.data
-
-        if not tracks:
-            log.info("No tracks to reanalyze")
-            beat_offset_state["is_running"] = False
-            return
-
-        beat_offset_state["total_tracks"] = len(tracks)
-        beat_offset_state["processed"] = 0
-        beat_offset_state["successful"] = 0
-        beat_offset_state["failed"] = 0
-
-        log.info("=" * 50)
-        log.info("Beat Offset Reanalysis Started")
-        log.info("=" * 50)
-        log.info(f"Tracks: {len(tracks)}")
-        log.info("-" * 50)
-
-        start_time = time.time()
-
-        # Process all tracks
-        tasks = [
-            reanalyze_beat_offset_single_track(track, download_semaphore, analyze_semaphore, settings)
-            for track in tracks
-        ]
-        await asyncio.gather(*tasks, return_exceptions=True)
-
-        elapsed = time.time() - start_time
-        log.info("=" * 50)
-        log.success(
-            f"BEAT OFFSET REANALYSIS COMPLETE | "
-            f"OK: {beat_offset_state['successful']} | "
-            f"FAIL: {beat_offset_state['failed']} | "
-            f"Time: {_format_duration(elapsed)}"
-        )
-        log.info("=" * 50)
-
-    finally:
-        beat_offset_state["is_running"] = False
-
-
-@router.post(
-    "/analyze/batch/beat-offset",
-    response_model=BatchAnalysisResponse,
-)
-async def reanalyze_all_beat_offsets(
-    background_tasks: BackgroundTasks,
-    soundcloud_id: int | None = None,
-    _: str | None = Depends(verify_api_key),
-) -> BatchAnalysisResponse:
-    """
-    Reanalyze beat_offset for all completed tracks (or a specific one).
-
-    This is a lightweight reanalysis that only recalculates beat_offset
-    using existing BPM values. Useful after algorithm improvements.
-
-    Args:
-        soundcloud_id: Optional - reanalyze only this track
-    """
-    global beat_offset_state
-
-    if soundcloud_id:
-        log.api.request("POST", f"/analyze/batch/beat-offset?soundcloud_id={soundcloud_id}")
-    else:
-        log.api.request("POST", "/analyze/batch/beat-offset")
-
-    if beat_offset_state["is_running"]:
-        return BatchAnalysisResponse(
-            status="already_running",
-            total_tracks=beat_offset_state["total_tracks"],
-            message="Beat offset reanalysis is already in progress",
-        )
-
-    # Count tracks
-    settings = get_settings()
-    client = create_client(settings.supabase_url, settings.supabase_service_key)
-
-    query = (
-        client.table("tracks")
-        .select("soundcloud_id", count="exact")
-        .eq("analysis_status", "completed")
-        .not_.is_("bpm_detected", "null")
-    )
-
-    if soundcloud_id:
-        query = query.eq("soundcloud_id", soundcloud_id)
-
-    response = query.execute()
-    total = response.count or 0
-
-    if total == 0:
-        return BatchAnalysisResponse(
-            status="no_tracks",
-            total_tracks=0,
-            message="No tracks to reanalyze",
-        )
-
-    beat_offset_state["is_running"] = True
-    beat_offset_state["total_tracks"] = total
-
-    background_tasks.add_task(process_beat_offset_reanalysis, soundcloud_id)
-
-    msg = f"Started beat_offset reanalysis for {total} track(s)"
-    log.success(msg)
-
-    return BatchAnalysisResponse(
-        status="started",
-        total_tracks=total,
-        message=msg,
-    )
-
-
-# =============================================================================
-# FULL REANALYSIS (BPM + beat_offset)
+# FULL REANALYSIS
 # =============================================================================
 
 full_reanalysis_state = {
@@ -629,7 +415,7 @@ full_reanalysis_state = {
 
 
 async def process_full_reanalysis() -> None:
-    """Background task to fully reanalyze all completed tracks (BPM + beat_offset)."""
+    """Background task to fully reanalyze all completed tracks."""
     global full_reanalysis_state
 
     settings = get_settings()
@@ -714,7 +500,7 @@ async def reanalyze_all_tracks_full(
     _: str | None = Depends(verify_api_key),
 ) -> BatchAnalysisResponse:
     """
-    Force full reanalysis of ALL completed tracks (BPM + beat_offset).
+    Force full reanalysis of ALL completed tracks.
 
     Use this after algorithm improvements to recalculate all values.
     """
@@ -758,7 +544,7 @@ async def reanalyze_all_tracks_full(
 
     background_tasks.add_task(process_full_reanalysis)
 
-    msg = f"Started full reanalysis (BPM + beat_offset) for {total} tracks"
+    msg = f"Started full reanalysis for {total} tracks"
     log.success(msg)
 
     return BatchAnalysisResponse(

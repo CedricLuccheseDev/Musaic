@@ -61,18 +61,6 @@ CREATE TABLE IF NOT EXISTS tracks (
   bpm_confidence REAL,
   key_detected TEXT,
   key_confidence REAL,
-  energy REAL,
-  loudness REAL,
-  dynamic_complexity REAL,
-  spectral_centroid REAL,
-  dissonance REAL,
-  danceability REAL,
-  speechiness REAL,
-  instrumentalness REAL,
-  acousticness REAL,
-  valence REAL,
-  liveness REAL,
-  beat_offset REAL,
   highlight_time REAL,
   analysis_status TEXT DEFAULT 'pending',
   analysis_error TEXT,
@@ -100,8 +88,6 @@ CREATE INDEX IF NOT EXISTS idx_tracks_title ON tracks(title);
 CREATE INDEX IF NOT EXISTS idx_tracks_analysis_status ON tracks(analysis_status);
 CREATE INDEX IF NOT EXISTS idx_tracks_bpm_detected ON tracks(bpm_detected);
 CREATE INDEX IF NOT EXISTS idx_tracks_key_detected ON tracks(key_detected);
-CREATE INDEX IF NOT EXISTS idx_tracks_energy ON tracks(energy);
-CREATE INDEX IF NOT EXISTS idx_tracks_danceability ON tracks(danceability);
 CREATE INDEX IF NOT EXISTS idx_tracks_download_status ON tracks(download_status);
 CREATE INDEX IF NOT EXISTS idx_tracks_duration ON tracks(duration);
 CREATE INDEX IF NOT EXISTS idx_tracks_tags ON tracks USING GIN(tags);
@@ -138,8 +124,19 @@ CREATE TABLE IF NOT EXISTS profiles (
   is_premium BOOLEAN DEFAULT FALSE,
   is_admin BOOLEAN DEFAULT FALSE,
   premium_until TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+
+  -- SoundCloud OAuth
+  soundcloud_id BIGINT UNIQUE,
+  soundcloud_username TEXT,
+  soundcloud_avatar_url TEXT,
+  soundcloud_access_token TEXT,
+  soundcloud_refresh_token TEXT,
+  soundcloud_token_expires_at TIMESTAMPTZ
 );
+
+-- Index for SoundCloud lookups
+CREATE INDEX IF NOT EXISTS idx_profiles_soundcloud_id ON profiles(soundcloud_id);
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
@@ -274,8 +271,6 @@ RETURNS TABLE (
   genre TEXT,
   bpm_detected REAL,
   key_detected TEXT,
-  energy REAL,
-  danceability REAL,
   download_status TEXT,
   distance FLOAT
 ) AS $$
@@ -293,8 +288,6 @@ BEGIN
     t.genre,
     t.bpm_detected,
     t.key_detected,
-    t.energy,
-    t.danceability,
     t.download_status,
     (t.embedding <=> source.embedding)::FLOAT AS distance
   FROM tracks t, source

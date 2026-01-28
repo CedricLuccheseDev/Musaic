@@ -40,34 +40,21 @@ export const useAuth = () => {
     }
   }
 
-  async function signInWithGoogle() {
-    console.log('[useAuth] signInWithGoogle called')
-
-    if (!supabase) {
-      console.error('[useAuth] Supabase not configured')
-      return { error: { message: 'Supabase not configured' } }
-    }
-
-    const redirectUrl = `${window.location.origin}/auth/callback`
-    console.log('[useAuth] Redirect URL:', redirectUrl)
+  async function signInWithSoundCloud() {
+    console.log('[useAuth] signInWithSoundCloud called')
 
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl
-        }
-      })
+      // Call the init endpoint to get the authorization URL
+      const { authUrl } = await $fetch<{ authUrl: string }>('/api/auth/soundcloud/init')
 
-      console.log('[useAuth] OAuth response:', { data, error })
+      console.log('[useAuth] Redirecting to SoundCloud:', authUrl)
 
-      if (error) {
-        console.error('[useAuth] Google sign-in error:', error)
-      }
+      // Redirect to SoundCloud authorization
+      window.location.href = authUrl
 
-      return { data, error }
+      return { error: null }
     } catch (err) {
-      console.error('[useAuth] Exception during OAuth:', err)
+      console.error('[useAuth] Exception during SoundCloud auth:', err)
       return { error: { message: String(err) } }
     }
   }
@@ -93,7 +80,7 @@ export const useAuth = () => {
     user: readonly(user),
     loading: readonly(loading),
     init,
-    signInWithGoogle,
+    signInWithSoundCloud,
     signOut
   }
 }

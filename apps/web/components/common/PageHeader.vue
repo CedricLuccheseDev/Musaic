@@ -67,10 +67,7 @@ withDefaults(defineProps<{
           mode="out-in"
         >
           <slot name="right">
-            <div class="flex items-center gap-3">
-              <SetBuilderButton />
-              <ProfileButtons />
-            </div>
+            <ProfileButtons />
           </slot>
         </Transition>
       </div>
@@ -115,10 +112,7 @@ withDefaults(defineProps<{
             mode="out-in"
           >
             <slot name="right-mobile">
-              <div class="flex items-center gap-2">
-                <SetBuilderButton size="sm" />
-                <ProfileButtons size="sm" />
-              </div>
+              <ProfileButtons size="sm" />
             </slot>
           </Transition>
         </div>

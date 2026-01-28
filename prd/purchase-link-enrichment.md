@@ -52,19 +52,33 @@ User Search
 
 **Solution:** Enrichment happens in background after tracks are stored.
 
-## Known Issues / Tech Debt
+## Tech Debt (Resolved)
 
-| Issue | Impact | Suggested Fix |
-|-------|--------|---------------|
-| **Odesli code duplicated** | 3 files with same logic | Create `server/services/odesli.ts` |
-| **No Odesli response cache** | Redundant API calls | Add in-memory or Redis cache |
-| **No retry on Odesli failure** | Some tracks never enriched | Add retry queue or periodic job |
+All previously identified tech debt has been addressed:
 
-### Files with Odesli Code
+| Issue | Status | Solution |
+|-------|--------|----------|
+| **Odesli code duplicated** | ✅ Resolved | Created `server/services/odesli.ts` |
+| **No Odesli response cache** | ✅ Resolved | In-memory cache with 24h TTL (5000 entries max) |
+| **No retry on Odesli failure** | ✅ Resolved | Built-in retry mechanism (2 retries, 1s delay) |
 
-1. `server/services/soundcloud.ts` - `fetchOdesliPurchaseLink()`, `enrichTracksWithPurchaseLinks()`
-2. `server/services/trackStorage.ts` - `fetchOdesliLink()`, `triggerPurchaseLinkEnrichment()`
-3. `scripts/enrichPurchaseLinks.ts` - `fetchOdesliPurchaseLink()`, standalone version
+### Centralized Odesli Service
+
+**File:** `server/services/odesli.ts`
+
+Features:
+- `fetchOdesliPurchaseLink()` - Single API call with caching and retry
+- `enrichTracksWithPurchaseLinks()` - Batch processing with rate limiting
+- In-memory cache (24h TTL, 5000 max entries)
+- Automatic retry on transient failures (2 retries, 1s delay)
+- Exported constants: `FREE_KEYWORDS`, `FREE_DOWNLOAD_DOMAINS`, `PURCHASE_DOMAINS`, etc.
+- Helper functions: `extractUrlsFromText()`, `findFreeDownloadLink()`, `findPurchaseLink()`
+
+### Files Using the Service
+
+1. `server/services/soundcloud.ts` - Imports `fetchOdesliPurchaseLink` for track enrichment
+2. `server/services/trackStorage.ts` - Imports `fetchOdesliPurchaseLink` for background enrichment
+3. `scripts/enrichPurchaseLinks.ts` - Imports service for manual enrichment script
 
 ## Architecture
 
@@ -236,17 +250,19 @@ GET /v1-alpha.1/links?url={soundcloud_url}
 Logs are prefixed with:
 - `DB` - Database operations
 - `SC` - SoundCloud operations
+- `ODESLI` - Odesli API operations
 
 Example output:
 ```
 14:32:15 ● DB Enriching 12 tracks with Odesli links (background)
-14:32:25 ● DB Enriched 8/12 tracks with purchase links
+14:32:15 ● ODESLI Enriching 12 tracks with purchase links
+14:32:25 ● ODESLI Enriched 8/12 tracks with purchase links
 ```
 
 ## Future Improvements
 
-- [ ] **Centralize Odesli code** - Create `server/services/odesli.ts`
-- [ ] **Cache Odesli responses** - In-memory or Redis (TTL 24h)
-- [ ] **Retry failed enrichments** - Periodic job for tracks without `purchase_url`
+- [x] **Centralize Odesli code** - Created `server/services/odesli.ts`
+- [x] **Cache Odesli responses** - In-memory cache with 24h TTL
+- [x] **Retry failed enrichments** - Built-in retry mechanism (2 retries)
 - [ ] **User-triggered enrichment** - "Find purchase link" button per track
 - [ ] **Webhook on analysis complete** - Trigger enrichment after audio analysis done

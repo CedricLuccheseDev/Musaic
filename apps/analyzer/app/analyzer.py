@@ -1,6 +1,5 @@
 """Audio analysis using Essentia library - Optimized version."""
 
-import math
 import os
 import warnings
 from pathlib import Path
@@ -360,102 +359,16 @@ def _refine_drop_start(
         return segment_start_time + segment_duration / 2
 
 
-def _extract_all_frame_features(audio: np.ndarray) -> dict:
-    """
-    Extract frame-based features in a single pass.
-
-    This is the main optimization - instead of multiple separate loops,
-    we do everything in ONE pass through the audio.
-    """
-    # Pre-create all extractors (reuse across frames)
-    spectrum_analyzer = es.Spectrum(size=FRAME_SIZE)
-    spectral_peaks = es.SpectralPeaks(sampleRate=SAMPLE_RATE)
-    flatness_extractor = es.Flatness()
-    rolloff_extractor = es.RollOff()
-    hfc_extractor = es.HFC()
-    dissonance_extractor = es.Dissonance()
-    energy_extractor = es.Energy()
-
-    # Accumulators
-    flatnesses = []
-    rolloffs = []
-    hfcs = []
-    dissonances = []
-    energies = []
-    vocal_ratios = []
-
-    # Single pass through all frames
-    for frame in es.FrameGenerator(audio, frameSize=FRAME_SIZE, hopSize=HOP_SIZE):
-        spectrum = spectrum_analyzer(frame)
-
-        # Energy
-        energies.append(energy_extractor(frame))
-
-        # Spectral features
-        flatnesses.append(flatness_extractor(spectrum))
-        rolloffs.append(rolloff_extractor(spectrum))
-        hfcs.append(hfc_extractor(spectrum))
-
-        # Spectral peaks for dissonance
-        freqs, mags = spectral_peaks(spectrum)
-        if len(freqs) > 1:
-            dissonances.append(dissonance_extractor(freqs, mags))
-
-        # Vocal energy ratio for instrumentalness
-        total_energy = np.sum(spectrum ** 2)
-        if total_energy > 0:
-            # Vocal formant region (adjusted for 22050 Hz sample rate)
-            vocal_bins = spectrum[22:90]  # ~1-4kHz region
-            vocal_energy = np.sum(vocal_bins ** 2)
-            vocal_ratios.append(vocal_energy / total_energy)
-
-    # Calculate derived metrics
-    energies = np.array(energies) if energies else np.array([0])
-    flatnesses = np.array(flatnesses) if flatnesses else np.array([0])
-    rolloffs = np.array(rolloffs) if rolloffs else np.array([0])
-    hfcs = np.array(hfcs) if hfcs else np.array([0])
-
-    # Acousticness
-    acoustic_scores = (1.0 - np.minimum(1.0, flatnesses * 2)) * (1.0 - np.minimum(1.0, hfcs / 1000))
-    acousticness = np.mean(acoustic_scores) if len(acoustic_scores) > 0 else 0.5
-
-    # Instrumentalness & Speechiness (vocal presence)
-    # Both are derived from vocal energy ratio in the 1-4kHz range
-    if vocal_ratios:
-        avg_vocal_ratio = np.mean(vocal_ratios)
-        # Speechiness = how much vocal content (singing or speech)
-        # Scale: avg_vocal_ratio ~0.2-0.4 for vocals, ~0.1 for instrumental
-        speechiness = min(1.0, max(0.0, (avg_vocal_ratio - 0.1) * 4))
-        # Instrumentalness = inverse (low vocal = instrumental)
-        instrumentalness = 1.0 - speechiness
-    else:
-        speechiness = 0.0
-        instrumentalness = 0.5
-
-    # Liveness (energy variance)
-    if len(energies) > 1:
-        energy_variance = np.var(energies) / (np.mean(energies) + 1e-10)
-        variance_score = min(1.0, energy_variance * 10)
-    else:
-        variance_score = 0
-
-    return {
-        "dissonance": min(1.0, float(np.mean(dissonances))) if dissonances else 0,
-        "speechiness": round(speechiness, 3),
-        "instrumentalness": round(max(0.0, min(1.0, instrumentalness)), 3),
-        "acousticness": max(0.0, min(1.0, float(acousticness))),
-        "liveness_variance": variance_score,
-    }
-
 
 def analyze_audio(file_path: str | Path, progress_callback=None) -> AnalysisResult:
     """
     Analyze audio file and extract features using Essentia.
 
-    Optimized version that:
-    - Loads audio only once
-    - Uses lower sample rate (22050 Hz)
-    - Extracts all frame-based features in a single pass
+    Optimized version that extracts only essential features:
+    - BPM + confidence
+    - Key + confidence
+    - Highlight time (drop position)
+    - Embedding (for similarity search)
 
     Args:
         file_path: Path to the audio file
@@ -500,64 +413,24 @@ def analyze_audio(file_path: str | Path, progress_callback=None) -> AnalysisResu
 
         # === RHYTHM ANALYSIS ===
         _progress("Rhythm", 20)
-        bpm, bpm_confidence, _, beat_offset = _extract_rhythm(
-            audio,
-            full_audio=full_audio,
-            highlight_time=highlight_time
-        )
+        bpm, bpm_confidence = _extract_rhythm(audio)
 
         # === TONAL ANALYSIS ===
-        _progress("Key detection", 40)
+        _progress("Key detection", 50)
         key_detected, key_confidence = _extract_key(audio)
 
-        # === ALL FRAME-BASED FEATURES IN ONE PASS ===
-        _progress("Spectral analysis", 50)
-        frame_features = _extract_all_frame_features(audio)
-
-        # === SIMPLE EXTRACTORS (no frame loop needed) ===
-        _progress("Dynamics", 80)
-        energy = _extract_energy(audio)
-        loudness = _extract_loudness(audio)
-        dynamic_complexity = _extract_dynamic_complexity(audio)
-        spectral_centroid = _extract_spectral_centroid(audio)
-        danceability = _extract_danceability(audio)
-
-        # === DERIVED METRICS ===
-        _progress("Finalizing", 90)
-        valence = _extract_valence(key_detected, bpm, spectral_centroid)
-        liveness = _extract_liveness(dynamic_complexity, frame_features["liveness_variance"])
-
         # === EMBEDDING EXTRACTION (on full audio for better representation) ===
-        _progress("Embedding", 95)
+        _progress("Embedding", 80)
         embedding = _extract_embedding(full_audio)
 
         _progress("Done", 100)
 
         return AnalysisResult(
-            # Rhythm
             bpm_detected=bpm,
             bpm_confidence=bpm_confidence,
-            beat_offset=beat_offset,
-            # Tonal
             key_detected=key_detected,
             key_confidence=key_confidence,
-            # Dynamics
-            energy=energy,
-            loudness=loudness,
-            dynamic_complexity=dynamic_complexity,
-            # Timbre
-            spectral_centroid=spectral_centroid,
-            dissonance=round(frame_features["dissonance"], 3),
-            # High-level
-            danceability=danceability,
-            speechiness=round(frame_features["speechiness"], 3),
-            instrumentalness=round(frame_features["instrumentalness"], 3),
-            acousticness=round(frame_features["acousticness"], 3),
-            valence=valence,
-            liveness=liveness,
-            # Highlight
             highlight_time=highlight_time,
-            # Embedding
             embedding=embedding,
         )
 
@@ -576,7 +449,7 @@ def analyze_audio_from_bytes(audio_bytes: bytes, progress_callback=None) -> Anal
         progress_callback: Optional callback function(step: str, percent: int)
 
     Returns:
-        AnalysisResult with all extracted features
+        AnalysisResult with essential features (BPM, key, highlight, embedding)
     """
     def _progress(step: str, percent: int):
         if progress_callback:
@@ -612,64 +485,24 @@ def analyze_audio_from_bytes(audio_bytes: bytes, progress_callback=None) -> Anal
 
         # === RHYTHM ANALYSIS ===
         _progress("Rhythm", 20)
-        bpm, bpm_confidence, _, beat_offset = _extract_rhythm(
-            audio,
-            full_audio=full_audio,
-            highlight_time=highlight_time
-        )
+        bpm, bpm_confidence = _extract_rhythm(audio)
 
         # === TONAL ANALYSIS ===
-        _progress("Key detection", 40)
+        _progress("Key detection", 50)
         key_detected, key_confidence = _extract_key(audio)
 
-        # === ALL FRAME-BASED FEATURES IN ONE PASS ===
-        _progress("Spectral analysis", 50)
-        frame_features = _extract_all_frame_features(audio)
-
-        # === SIMPLE EXTRACTORS (no frame loop needed) ===
-        _progress("Dynamics", 80)
-        energy = _extract_energy(audio)
-        loudness = _extract_loudness(audio)
-        dynamic_complexity = _extract_dynamic_complexity(audio)
-        spectral_centroid = _extract_spectral_centroid(audio)
-        danceability = _extract_danceability(audio)
-
-        # === DERIVED METRICS ===
-        _progress("Finalizing", 90)
-        valence = _extract_valence(key_detected, bpm, spectral_centroid)
-        liveness = _extract_liveness(dynamic_complexity, frame_features["liveness_variance"])
-
         # === EMBEDDING EXTRACTION (on full audio for better representation) ===
-        _progress("Embedding", 95)
+        _progress("Embedding", 80)
         embedding = _extract_embedding(full_audio)
 
         _progress("Done", 100)
 
         return AnalysisResult(
-            # Rhythm
             bpm_detected=bpm,
             bpm_confidence=bpm_confidence,
-            beat_offset=beat_offset,
-            # Tonal
             key_detected=key_detected,
             key_confidence=key_confidence,
-            # Dynamics
-            energy=energy,
-            loudness=loudness,
-            dynamic_complexity=dynamic_complexity,
-            # Timbre
-            spectral_centroid=spectral_centroid,
-            dissonance=round(frame_features["dissonance"], 3),
-            # High-level
-            danceability=danceability,
-            speechiness=round(frame_features["speechiness"], 3),
-            instrumentalness=round(frame_features["instrumentalness"], 3),
-            acousticness=round(frame_features["acousticness"], 3),
-            valence=valence,
-            liveness=liveness,
-            # Highlight
             highlight_time=highlight_time,
-            # Embedding
             embedding=embedding,
         )
 
@@ -706,196 +539,22 @@ def _extract_bpm_tempocnn(audio: np.ndarray) -> tuple[float, float]:
         return 0.0, 0.0
 
 
-def _compute_bass_energy(segment: np.ndarray) -> float:
+
+def _extract_rhythm(audio: np.ndarray) -> tuple[float, float]:
     """
-    Compute energy in bass frequencies (< 150 Hz).
-
-    Used to identify downbeats which typically have more kick/bass energy.
-    """
-    try:
-        if len(segment) < 100:
-            return 0.0
-        lowpass = es.LowPass(cutoffFrequency=150)
-        bass = lowpass(segment)
-        return float(es.Energy()(bass))
-    except Exception:
-        return 0.0
-
-
-def _extract_beat_offset_from_drop(full_audio: np.ndarray, highlight_time: float, bpm: float) -> float | None:
-    """
-    Extract beat offset using onset detection for precise transient alignment.
-
-    Combines beat tracking with onset detection to find the exact position
-    of kick drum transients, which gives more accurate beat grid alignment.
-
-    Args:
-        full_audio: Full track audio samples
-        highlight_time: Time of the drop/highlight in seconds
-        bpm: Already detected BPM for validation
-
-    Returns:
-        Beat offset in seconds (phase relative to track start), or None if detection failed
-    """
-    try:
-        # Extract segment: 0.5s before drop to 15s after
-        drop_start = max(0, highlight_time - 0.5)
-        drop_end = min(len(full_audio) / SAMPLE_RATE, highlight_time + 15.0)
-
-        start_sample = int(drop_start * SAMPLE_RATE)
-        end_sample = int(drop_end * SAMPLE_RATE)
-        drop_segment = full_audio[start_sample:end_sample]
-
-        if len(drop_segment) < SAMPLE_RATE * 2:
-            return None
-
-        beat_interval = 60.0 / bpm
-
-        # Method 1: Onset detection for precise transient timing
-        # Use 'hfc' (High Frequency Content) which is good for percussive onsets
-        frame_size = 1024
-        hop_size = 512
-
-        windowing = es.Windowing(type='hann')
-        spectrum = es.Spectrum(size=frame_size)
-        onset_hfc = es.OnsetDetection(method='hfc')
-        onset_complex = es.OnsetDetection(method='complex')
-
-        hfc_values = []
-        complex_values = []
-
-        for frame in es.FrameGenerator(drop_segment, frameSize=frame_size, hopSize=hop_size):
-            windowed = windowing(frame)
-            spec = spectrum(windowed)
-            hfc_values.append(onset_hfc(spec, spec))
-            complex_values.append(onset_complex(spec, spec))
-
-        # Combine onset detection functions
-        hfc_array = np.array(hfc_values)
-        complex_array = np.array(complex_values)
-
-        # Normalize and combine
-        if hfc_array.max() > 0:
-            hfc_array = hfc_array / hfc_array.max()
-        if complex_array.max() > 0:
-            complex_array = complex_array / complex_array.max()
-
-        combined = (hfc_array + complex_array) / 2
-
-        # Find onset peaks using Essentia's Onsets algorithm
-        onsets_algo = es.Onsets()
-        # Convert to 2D array as required by Onsets
-        onset_matrix = np.vstack([hfc_array, complex_array])
-        onset_times = onsets_algo(onset_matrix, [1, 1])
-
-        # Method 2: Beat tracking as reference
-        beat_tracker = es.BeatTrackerMultiFeature()
-        beats, _ = beat_tracker(drop_segment)
-
-        if len(beats) < 4:
-            # Fallback: if beat tracking fails, use first strong onset
-            if len(onset_times) > 0:
-                first_onset = float(onset_times[0]) + drop_start
-                return round(first_onset % beat_interval, 3)
-            return None
-
-        # Find the best onset near each beat (within 50ms tolerance)
-        tolerance = 0.050  # 50ms
-        refined_beats = []
-
-        for beat_time in beats[:16]:  # Check first 16 beats
-            # Find onsets near this beat
-            nearby_onsets = [
-                ot for ot in onset_times
-                if abs(ot - beat_time) < tolerance
-            ]
-
-            if nearby_onsets:
-                # Use the onset closest to the beat
-                best_onset = min(nearby_onsets, key=lambda x: abs(x - beat_time))
-                refined_beats.append(best_onset)
-            else:
-                refined_beats.append(beat_time)
-
-        if not refined_beats:
-            return round((float(beats[0]) + drop_start) % beat_interval, 3)
-
-        # Analyze bass energy to find downbeat position
-        bass_energies = []
-        window_samples = int(0.025 * SAMPLE_RATE)  # 25ms window
-
-        for beat_time in refined_beats:
-            start = int(beat_time * SAMPLE_RATE) - window_samples // 2
-            end = start + window_samples
-            if 0 <= start and end < len(drop_segment):
-                segment = drop_segment[start:end]
-                bass_energy = _compute_bass_energy(segment)
-                bass_energies.append((beat_time, bass_energy))
-
-        if len(bass_energies) < 4:
-            first_beat = refined_beats[0] + drop_start
-            return round(first_beat % beat_interval, 3)
-
-        # Group by position in bar (0, 1, 2, 3)
-        first_beat_time = bass_energies[0][0]
-        position_energies: list[list[tuple[float, float]]] = [[] for _ in range(4)]
-
-        for beat_time, energy in bass_energies:
-            beats_from_first = (beat_time - first_beat_time) / beat_interval
-            position = round(beats_from_first) % 4
-            position_energies[position].append((beat_time, energy))
-
-        # Find position with highest average bass energy (likely downbeat)
-        avg_energies = [
-            np.mean([e for _, e in pos_beats]) if pos_beats else 0.0
-            for pos_beats in position_energies
-        ]
-
-        max_energy = max(avg_energies)
-        min_energy = min(avg_energies)
-
-        if max_energy > 0 and (max_energy - min_energy) / max_energy > 0.15:
-            downbeat_position = int(np.argmax(avg_energies))
-        else:
-            downbeat_position = 0
-
-        # Get the first beat at the downbeat position
-        if position_energies[downbeat_position]:
-            first_downbeat_time = position_energies[downbeat_position][0][0]
-            first_downbeat = first_downbeat_time + drop_start
-            return round(first_downbeat % beat_interval, 3)
-
-        # Fallback
-        first_beat = refined_beats[0] + drop_start
-        return round(first_beat % beat_interval, 3)
-
-    except Exception:
-        return None
-
-
-def _extract_rhythm(
-    audio: np.ndarray,
-    full_audio: np.ndarray | None = None,
-    highlight_time: float | None = None
-) -> tuple[float, float, int, float | None]:
-    """
-    Extract BPM, confidence, beat count, and beat offset using multiple methods.
+    Extract BPM and confidence using multiple methods.
 
     Combines several approaches to improve accuracy:
     1. TempoCNN neural network (most accurate for BPM)
     2. RhythmExtractor2013 with multifeature (good general purpose)
     3. RhythmExtractor2013 with degara (good for electronic music)
     4. LoopBpmEstimator (good for loops/electronic)
-    5. BeatTrackerMultiFeature for precise beat positions at the drop
 
     Args:
         audio: Audio segment for BPM analysis
-        full_audio: Full track audio for beat offset detection at the drop
-        highlight_time: Time of the drop/highlight for beat offset detection
 
     Returns:
-        tuple: (bpm, confidence, beat_count, beat_offset)
-               beat_offset is the phase offset of the first beat in seconds
+        tuple: (bpm, confidence)
     """
     # Method 1: TempoCNN (neural network - most accurate for BPM)
     bpm_cnn, conf_cnn = _extract_bpm_tempocnn(audio)
@@ -952,7 +611,7 @@ def _extract_rhythm(
         candidates.append((bpm_from_beats, 0.6, "beats"))  # Lower weight
 
     if not candidates:
-        return 120.0, 0.0, 0, None  # Default fallback
+        return 120.0, 0.0  # Default fallback
 
     # Normalize all candidates to 100-200 range (better for electronic/DnB)
     def normalize_bpm(bpm: float) -> float:
@@ -987,10 +646,8 @@ def _extract_rhythm(
     best_bpm, best_score, _ = scored[0]
 
     # Refine BPM using beat intervals for higher precision
-    # The consensus gives us the approximate BPM, but beat intervals give exact timing
     if len(beats) > 10:
         intervals = np.diff(beats)
-        # Filter intervals that match the consensus BPM (within 5%)
         expected_interval = 60.0 / best_bpm
         tolerance = expected_interval * 0.05
         matching_intervals = intervals[
@@ -998,90 +655,16 @@ def _extract_rhythm(
             (intervals < expected_interval + tolerance)
         ]
         if len(matching_intervals) > 5:
-            # Use mean of matching intervals for precise BPM
             precise_interval = float(np.mean(matching_intervals))
             refined_bpm = 60.0 / precise_interval
-            # Only use refined BPM if it's close to consensus (sanity check)
             if abs(refined_bpm - best_bpm) < 1.0:
                 best_bpm = refined_bpm
 
-    # Keep 2 decimal precision for BPM to minimize beat grid drift
-    # (~3ms per minute with 0.01 BPM precision vs ~30ms with 0.1)
-    # Frontend displays as integer, but calculations use full precision
+    # Keep 2 decimal precision for BPM
     best_bpm = round(best_bpm, 2)
-
     final_confidence = min(1.0, best_score / 3.0)
 
-    # Use BeatTrackerMultiFeature for more accurate beat offset detection at the drop
-    beat_offset = None
-    if full_audio is not None and highlight_time is not None and highlight_time > 0:
-        beat_offset = _extract_beat_offset_from_drop(full_audio, highlight_time, best_bpm)
-
-    # Fallback: try on the analysis segment if drop detection failed
-    if beat_offset is None:
-        beat_offset = _extract_beat_offset_from_drop(audio, 0.0, best_bpm)
-
-    # Last fallback to RhythmExtractor2013 beats
-    if beat_offset is None and len(beats) > 0:
-        first_beat = float(beats[0])
-        beat_interval = 60.0 / best_bpm
-        beat_offset = round(first_beat % beat_interval, 3)
-
-    return float(best_bpm), round(final_confidence, 3), len(beats), beat_offset
-
-
-# =============================================================================
-# BEAT OFFSET REANALYSIS (lightweight)
-# =============================================================================
-
-def reanalyze_beat_offset_from_bytes(
-    audio_bytes: bytes,
-    bpm: float,
-    highlight_time: float | None = None
-) -> float | None:
-    """
-    Reanalyze only the beat offset from audio bytes.
-
-    This is a lightweight function that only recalculates the beat_offset
-    using the existing BPM value. Useful for batch reanalysis after
-    algorithm improvements.
-
-    Args:
-        audio_bytes: Raw audio data (MP3, WAV, etc.)
-        bpm: Existing BPM value from the database
-        highlight_time: Existing highlight_time, or None to recalculate
-
-    Returns:
-        New beat_offset value, or None if detection failed
-    """
-    try:
-        full_audio = _load_audio_from_bytes(audio_bytes)
-
-        if len(full_audio) == 0:
-            return None
-
-        # Keep 1 decimal precision for BPM
-        bpm = round(bpm, 1)
-
-        # Use existing highlight_time or find it
-        if highlight_time is None or highlight_time <= 0:
-            settings = get_settings()
-            _, highlight_time = _find_highlight_and_extract(
-                full_audio,
-                settings.audio_duration_seconds
-            )
-
-        # Calculate beat_offset using the improved algorithm
-        beat_offset = _extract_beat_offset_from_drop(full_audio, highlight_time, bpm)
-
-        # Fallback: try from the beginning if drop detection failed
-        if beat_offset is None:
-            beat_offset = _extract_beat_offset_from_drop(full_audio, 0.0, bpm)
-
-        return beat_offset
-
-    except Exception:
-        return None
+    return float(best_bpm), round(final_confidence, 3)
 
 
 # =============================================================================
@@ -1097,115 +680,3 @@ def _extract_key(audio: np.ndarray) -> tuple[str, float]:
     confidence = min(1.0, max(0.0, float(confidence)))
 
     return key_detected, round(confidence, 3)
-
-
-# =============================================================================
-# DYNAMICS EXTRACTORS (simple, no frame loop)
-# =============================================================================
-
-def _extract_energy(audio: np.ndarray) -> float:
-    """Extract normalized energy level."""
-    energy = es.Energy()(audio)
-
-    if energy > 0:
-        log_energy = math.log10(energy + 1)
-        normalized = min(1.0, max(0.0, log_energy / 6.0))
-    else:
-        normalized = 0.0
-
-    return round(normalized, 3)
-
-
-def _extract_loudness(audio: np.ndarray) -> float:
-    """Extract loudness in dB (LUFS-like).
-
-    Returns a value typically between -60 and 0 dB.
-    -60 = very quiet
-    -20 = moderate
-    -6 = loud (typical mastered track)
-    0 = maximum
-    """
-    # Use RMS energy converted to dB for a more meaningful loudness value
-    rms = np.sqrt(np.mean(audio ** 2))
-    if rms > 0:
-        loudness_db = 20 * np.log10(rms)
-    else:
-        loudness_db = -60.0
-
-    # Clamp to reasonable range
-    loudness_db = max(-60.0, min(0.0, float(loudness_db)))
-    return round(loudness_db, 2)
-
-
-def _extract_dynamic_complexity(audio: np.ndarray) -> float:
-    """Extract dynamic complexity."""
-    complexity, _ = es.DynamicComplexity()(audio)
-    normalized = min(1.0, max(0.0, float(complexity) / 10.0))
-    return round(normalized, 3)
-
-
-def _extract_spectral_centroid(audio: np.ndarray) -> float:
-    """Extract spectral centroid (brightness) normalized to 0-1.
-
-    0 = dark/warm sound (sub-bass dominant)
-    1 = bright/harsh sound (high frequencies dominant)
-
-    Typical values for music: 0.1-0.4
-    """
-    # Calculate centroid frame by frame for better accuracy
-    centroids = []
-    spectrum_analyzer = es.Spectrum(size=FRAME_SIZE)
-    nyquist = SAMPLE_RATE / 2  # 22050 Hz
-    centroid_extractor = es.Centroid(range=nyquist)
-
-    for frame in es.FrameGenerator(audio, frameSize=FRAME_SIZE, hopSize=HOP_SIZE):
-        spectrum = spectrum_analyzer(frame)
-        # Centroid returns value in Hz (0 to nyquist range)
-        centroid_hz = centroid_extractor(spectrum)
-        # Normalize to 0-1 by dividing by nyquist frequency
-        centroids.append(centroid_hz / nyquist)
-
-    if not centroids:
-        return 0.0
-
-    avg_centroid = float(np.mean(centroids))
-
-    # Clamp to 0-1 range
-    return round(max(0.0, min(1.0, avg_centroid)), 3)
-
-
-def _extract_danceability(audio: np.ndarray) -> float:
-    """Extract danceability score."""
-    danceability, _ = es.Danceability()(audio)
-    normalized = min(1.0, max(0.0, float(danceability) / 3.0))
-    return round(normalized, 3)
-
-
-# =============================================================================
-# DERIVED METRICS
-# =============================================================================
-
-def _extract_valence(key: str, bpm: float, spectral_centroid: float) -> float:
-    """Extract valence (musical positivity).
-
-    Args:
-        key: Musical key (e.g., "C major", "A minor")
-        bpm: Beats per minute
-        spectral_centroid: Brightness normalized 0-1
-    """
-    is_major = "major" in key.lower()
-    key_valence = 0.7 if is_major else 0.3
-
-    tempo_valence = min(1.0, max(0.0, (bpm - 60) / 140))
-
-    # spectral_centroid is now 0-1, use directly as brightness
-    brightness_valence = spectral_centroid
-
-    valence = (key_valence * 0.4) + (tempo_valence * 0.35) + (brightness_valence * 0.25)
-    return round(valence, 3)
-
-
-def _extract_liveness(dynamic_complexity: float, variance_score: float) -> float:
-    """Extract liveness from pre-computed values."""
-    liveness = (dynamic_complexity * 0.5) + (variance_score * 0.5)
-    return round(max(0.0, min(1.0, liveness)), 3)

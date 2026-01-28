@@ -11,6 +11,13 @@ import {
 } from '~/server/utils/stringMatch'
 import { containsRejectKeyword } from '~/server/config/qualityRules'
 import { logger } from '~/server/utils/logger'
+import {
+  fetchOdesliPurchaseLink,
+  FREE_KEYWORDS,
+  FREE_DOWNLOAD_DOMAINS,
+  extractUrlsFromText,
+  findPurchaseLink as odesli_findPurchaseLink
+} from '~/server/services/odesli'
 
 // ============================================================================
 // Constants
@@ -28,57 +35,7 @@ function isValidDuration(durationMs: number | undefined): boolean {
   if (!durationMs) return false
   return durationMs >= DURATION_MIN_MS && durationMs <= DURATION_MAX_MS
 }
-const FREE_KEYWORDS = ['free download', 'free dl', 'freedl', 'free']
-
-const FREE_DOWNLOAD_DOMAINS = [
-  'hypeddit.com',
-  'toneden.io',
-  'fanlink.to',
-  'gate.fm',
-  'bfrnd.link',
-  'edmdisc.com'
-]
-
-const SMART_LINK_DOMAINS = [
-  'smarturl.it',
-  'ffm.to',
-  'linktr.ee',
-  'distrokid.com',
-  'lnk.to',
-  'found.ee',
-  'song.link',
-  'odesli.co'
-]
-
-const PURCHASE_DOMAINS = [
-  'beatport.com',
-  'bandcamp.com',
-  'traxsource.com',
-  'junodownload.com',
-  'amazon.com',
-  'itunes.apple.com',
-  'music.apple.com',
-  'spotify.com',
-  'deezer.com'
-]
-
-// Odesli API for finding purchase links across platforms
-const ODESLI_API_URL = 'https://api.song.link/v1-alpha.1/links'
-
-// Priority order for purchase platforms (prefer dedicated music stores)
-const PURCHASE_PLATFORM_PRIORITY = [
-  'beatport',
-  'bandcamp',
-  'traxsource',
-  'itunes',
-  'appleMusic',
-  'amazon',
-  'deezer',
-  'spotify',
-  'tidal',
-  'youtube',
-  'youtubeMusic'
-] as const
+// Constants imported from ~/server/services/odesli
 
 // ============================================================================
 // Client
@@ -101,10 +58,11 @@ function createSoundcloudClient(): SoundcloudInstance {
   let clientId: string | undefined
   try {
     const config = useRuntimeConfig()
-    clientId = config.soundcloudClientId as string
+    // Use public client ID for searches (works with old API), OAuth client ID is for auth only
+    clientId = (config.soundcloudPublicClientId || config.soundcloudClientId) as string
   } catch {
     // Outside Nuxt context (scripts), use env directly
-    clientId = process.env.SOUNDCLOUD_CLIENT_ID
+    clientId = process.env.SOUNDCLOUD_PUBLIC_CLIENT_ID || process.env.SOUNDCLOUD_CLIENT_ID
   }
 
   const isDev = process.env.NODE_ENV === 'development'
@@ -121,43 +79,11 @@ function createSoundcloudClient(): SoundcloudInstance {
 // Helpers
 // ============================================================================
 
-function extractUrlsFromText(text: string): string[] {
-  const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi
-  return text.match(urlRegex) || []
-}
-
 function hasFreeDownloadLink(text: string): boolean {
   const urls = extractUrlsFromText(text)
   return urls.some(url =>
     FREE_DOWNLOAD_DOMAINS.some(domain => url.toLowerCase().includes(domain))
   )
-}
-
-const BUY_KEYWORDS = ['buy', 'purchase', 'acheter', 'get it', 'stream', 'out now', 'available']
-
-function hasPurchaseLink(text: string): string | null {
-  const urls = extractUrlsFromText(text)
-
-  // First check for known purchase domains
-  const purchaseUrl = urls.find(url =>
-    PURCHASE_DOMAINS.some(domain => url.toLowerCase().includes(domain))
-  )
-  if (purchaseUrl) return purchaseUrl
-
-  // Check for smart link domains (streaming/purchase aggregators)
-  const smartLinkUrl = urls.find(url =>
-    SMART_LINK_DOMAINS.some(domain => url.toLowerCase().includes(domain))
-  )
-  if (smartLinkUrl) return smartLinkUrl
-
-  // Then check for "Buy" or similar keywords near a URL
-  const textLower = text.toLowerCase()
-  if (BUY_KEYWORDS.some(keyword => textLower.includes(keyword)) && urls.length > 0) {
-    // Return the first URL found near a buy keyword
-    return urls[0]
-  }
-
-  return null
 }
 
 function getDownloadStatus(track: SoundcloudTrack): DownloadStatus {
@@ -189,60 +115,10 @@ function extractPurchaseUrl(track: SoundcloudTrack): string | null {
   }
 
   if (track.description) {
-    return hasPurchaseLink(track.description)
+    return odesli_findPurchaseLink(track.description)
   }
 
   return null
-}
-
-// Odesli API response types
-interface OdesliPlatformLink {
-  url: string
-  entityUniqueId: string
-}
-
-interface OdesliResponse {
-  entityUniqueId: string
-  pageUrl: string
-  linksByPlatform: Record<string, OdesliPlatformLink>
-}
-
-/**
- * Fetch purchase links from Odesli API using SoundCloud URL
- * Returns the best purchase link based on platform priority
- */
-async function fetchOdesliPurchaseLink(soundcloudUrl: string): Promise<string | null> {
-  try {
-    const url = `${ODESLI_API_URL}?url=${encodeURIComponent(soundcloudUrl)}`
-    const response = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(5000) // 5 second timeout
-    })
-
-    if (!response.ok) {
-      return null
-    }
-
-    const data = await response.json() as OdesliResponse
-
-    if (!data.linksByPlatform) {
-      return null
-    }
-
-    // Find best purchase link based on priority
-    for (const platform of PURCHASE_PLATFORM_PRIORITY) {
-      const link = data.linksByPlatform[platform]
-      if (link?.url) {
-        return link.url
-      }
-    }
-
-    // Fallback: return the Odesli page URL which aggregates all links
-    return data.pageUrl || null
-  } catch {
-    // Silently fail - Odesli is optional
-    return null
-  }
 }
 
 /**
@@ -253,12 +129,12 @@ export async function enrichTrackWithPurchaseLink(track: TrackEntry): Promise<Tr
     return track
   }
 
-  const odesliLink = await fetchOdesliPurchaseLink(track.permalink_url)
-  if (odesliLink) {
+  const result = await fetchOdesliPurchaseLink(track.permalink_url)
+  if (result.url) {
     return {
       ...track,
-      purchase_url: odesliLink,
-      purchase_title: 'Buy / Stream'
+      purchase_url: result.url,
+      purchase_title: result.title
     }
   }
 
@@ -315,30 +191,11 @@ function mapToTrackEntry(track: SoundcloudTrack): TrackEntry {
     label: track.label_name || null,
     tags: parseTags(track.tag_list),
     // Audio analysis fields (populated by musaic-analyzer)
-    // Rhythm
     bpm_detected: null,
     bpm_confidence: null,
-    // Tonal
     key_detected: null,
     key_confidence: null,
-    // Dynamics
-    energy: null,
-    loudness: null,
-    dynamic_complexity: null,
-    // Timbre
-    spectral_centroid: null,
-    dissonance: null,
-    // High-level
-    danceability: null,
-    speechiness: null,
-    instrumentalness: null,
-    acousticness: null,
-    valence: null,
-    liveness: null,
-    // Beat offset for DJ
-    beat_offset: null,
     highlight_time: null,
-    // Status
     analysis_status: null,
     analysis_error: null,
     analyzed_at: null,

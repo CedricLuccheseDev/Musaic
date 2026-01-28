@@ -16,6 +16,14 @@
 import { createClient } from '@supabase/supabase-js'
 import SoundcloudModule from 'soundcloud.ts'
 import * as dotenv from 'dotenv'
+import {
+  fetchOdesliPurchaseLink,
+  FREE_KEYWORDS,
+  FREE_DOWNLOAD_DOMAINS,
+  PURCHASE_DOMAINS,
+  SMART_LINK_DOMAINS,
+  extractUrlsFromText
+} from '../server/services/odesli'
 
 dotenv.config()
 
@@ -42,71 +50,6 @@ function createSoundcloudClient() {
   return new Soundcloud()
 }
 
-// Odesli API
-const ODESLI_API_URL = 'https://api.song.link/v1-alpha.1/links'
-
-// Priority order for purchase platforms
-const PURCHASE_PLATFORM_PRIORITY = [
-  'beatport',
-  'bandcamp',
-  'traxsource',
-  'itunes',
-  'appleMusic',
-  'amazon',
-  'deezer',
-  'spotify',
-  'tidal',
-  'youtube',
-  'youtubeMusic'
-] as const
-
-// Free download domains
-const FREE_DOWNLOAD_DOMAINS = [
-  'hypeddit.com',
-  'toneden.io',
-  'fanlink.to',
-  'gate.fm',
-  'bfrnd.link',
-  'edmdisc.com'
-]
-
-const FREE_KEYWORDS = ['free download', 'free dl', 'freedl', 'free']
-
-// Purchase domains
-const PURCHASE_DOMAINS = [
-  'beatport.com',
-  'bandcamp.com',
-  'traxsource.com',
-  'junodownload.com',
-  'amazon.com',
-  'itunes.apple.com',
-  'music.apple.com',
-  'spotify.com',
-  'deezer.com'
-]
-
-const SMART_LINK_DOMAINS = [
-  'smarturl.it',
-  'ffm.to',
-  'linktr.ee',
-  'distrokid.com',
-  'lnk.to',
-  'found.ee',
-  'song.link',
-  'odesli.co'
-]
-
-interface OdesliPlatformLink {
-  url: string
-  entityUniqueId: string
-}
-
-interface OdesliResponse {
-  entityUniqueId: string
-  pageUrl: string
-  linksByPlatform: Record<string, OdesliPlatformLink>
-}
-
 interface TrackRow {
   soundcloud_id: number
   title: string
@@ -127,20 +70,14 @@ interface EnrichResult {
   platform?: string
 }
 
-function extractUrlsFromText(text: string): string[] {
-  const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi
-  return text.match(urlRegex) || []
-}
-
-function hasFreeDownloadLink(text: string): string | null {
+function findFreeDownloadLink(text: string): string | null {
   const urls = extractUrlsFromText(text)
-  const freeUrl = urls.find(url =>
+  return urls.find(url =>
     FREE_DOWNLOAD_DOMAINS.some(domain => url.toLowerCase().includes(domain))
-  )
-  return freeUrl || null
+  ) || null
 }
 
-function hasPurchaseLink(text: string): string | null {
+function findPurchaseLink(text: string): string | null {
   const urls = extractUrlsFromText(text)
 
   // Check for known purchase domains
@@ -219,7 +156,7 @@ async function checkSoundCloud(soundcloudId: number): Promise<EnrichResult> {
 
     // Check description for free download links
     if (track.description) {
-      const freeLink = hasFreeDownloadLink(track.description)
+      const freeLink = findFreeDownloadLink(track.description)
       if (freeLink) {
         return {
           source: 'soundcloud',
@@ -231,7 +168,7 @@ async function checkSoundCloud(soundcloudId: number): Promise<EnrichResult> {
       }
 
       // Check description for purchase links
-      const purchaseLink = hasPurchaseLink(track.description)
+      const purchaseLink = findPurchaseLink(track.description)
       if (purchaseLink) {
         return {
           source: 'soundcloud',
@@ -250,57 +187,23 @@ async function checkSoundCloud(soundcloudId: number): Promise<EnrichResult> {
 }
 
 /**
- * Fetch purchase link from Odesli API
+ * Fetch purchase link from Odesli API (uses centralized service with caching)
  */
-async function fetchOdesliPurchaseLink(soundcloudUrl: string): Promise<EnrichResult> {
-  try {
-    const url = `${ODESLI_API_URL}?url=${encodeURIComponent(soundcloudUrl)}`
-    const response = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(10000)
-    })
+async function getOdesliEnrichResult(soundcloudUrl: string): Promise<EnrichResult> {
+  const result = await fetchOdesliPurchaseLink(soundcloudUrl, { timeout: 10000 })
 
-    if (!response.ok) {
-      return { source: 'none', url: null, title: null }
+  if (result.url) {
+    return {
+      source: 'odesli',
+      url: result.url,
+      title: result.title,
+      platform: result.platform || 'odesli',
+      downloadStatus: 'No',
+      downloadable: false
     }
-
-    const data = await response.json() as OdesliResponse
-
-    if (!data.linksByPlatform) {
-      return { source: 'none', url: null, title: null }
-    }
-
-    // Find best purchase link based on priority
-    for (const platform of PURCHASE_PLATFORM_PRIORITY) {
-      const link = data.linksByPlatform[platform]
-      if (link?.url) {
-        return {
-          source: 'odesli',
-          url: link.url,
-          title: 'Buy / Stream',
-          platform,
-          downloadStatus: 'No',
-          downloadable: false
-        }
-      }
-    }
-
-    // Fallback: return the Odesli page URL
-    if (data.pageUrl) {
-      return {
-        source: 'odesli',
-        url: data.pageUrl,
-        title: 'Buy / Stream',
-        platform: 'odesli',
-        downloadStatus: 'No',
-        downloadable: false
-      }
-    }
-
-    return { source: 'none', url: null, title: null }
-  } catch {
-    return { source: 'none', url: null, title: null }
   }
+
+  return { source: 'none', url: null, title: null }
 }
 
 /**
@@ -313,8 +216,8 @@ async function enrichTrack(track: TrackRow): Promise<EnrichResult> {
     return scResult
   }
 
-  // Step 2: Fallback to Odesli
-  const odesliResult = await fetchOdesliPurchaseLink(track.permalink_url)
+  // Step 2: Fallback to Odesli (uses centralized service with caching)
+  const odesliResult = await getOdesliEnrichResult(track.permalink_url)
   return odesliResult
 }
 

@@ -81,23 +81,6 @@ cd apps/web && bun scripts/cleanupLowQualityTracks.ts -y
 This removes tracks with quality score < 40 (mixes, too short/long, low engagement).
 Use `-y` or `--force` to skip confirmation prompt.
 
-## Beat Grid Reanalysis
-
-When user says "réanalyse les beatgrids", "recalcule les beat offset", "fix beatgrid" or similar:
-
-### All tracks
-```bash
-curl -X POST http://localhost:9000/analyze/batch/beat-offset
-```
-
-### Specific track (by soundcloud_id)
-```bash
-curl -X POST "http://localhost:9000/analyze/batch/beat-offset?soundcloud_id=<ID>"
-```
-
-This reanalyzes only the beat_offset using the existing BPM. Useful after algorithm improvements.
-The analyzer must be running (`docker-compose up analyzer` or local uvicorn).
-
 ## Full Reanalysis
 
 When user says "réanalyse tout", "full reanalysis", "recalcule tout" or similar:
@@ -106,7 +89,8 @@ When user says "réanalyse tout", "full reanalysis", "recalcule tout" or similar
 curl -X POST http://localhost:9000/analyze/batch/full-reanalysis
 ```
 
-This fully reanalyzes all completed tracks (BPM + beat_offset). Use after major algorithm changes.
+This fully reanalyzes all completed tracks. Use after major algorithm changes.
+The analyzer must be running (`docker-compose up analyzer` or local uvicorn).
 
 ## Analysis Status Check
 

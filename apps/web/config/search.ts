@@ -25,58 +25,6 @@ export const placeholderPhrases = [
 // Ad display interval (show ad every N tracks)
 export const AD_INTERVAL = 10
 
-// Search tag definitions
-export interface SearchTag {
-  id: string
-  label: string
-  category: 'mood'
-  icon?: string
-  filter?: {
-    field: string
-    operator: 'gt' | 'lt'
-    value: number
-  }
-}
-
-// Mood tags - mapped to audio analysis features
-export const moodTags: SearchTag[] = [
-  {
-    id: 'energetic',
-    label: 'Energetic',
-    category: 'mood',
-    icon: 'i-heroicons-bolt',
-    filter: { field: 'energy', operator: 'gt', value: 0.7 }
-  },
-  {
-    id: 'chill',
-    label: 'Chill',
-    category: 'mood',
-    icon: 'i-heroicons-moon',
-    filter: { field: 'energy', operator: 'lt', value: 0.4 }
-  },
-  {
-    id: 'dark',
-    label: 'Dark',
-    category: 'mood',
-    icon: 'i-heroicons-eye-slash',
-    filter: { field: 'spectral_centroid', operator: 'lt', value: 1500 }
-  },
-  {
-    id: 'bright',
-    label: 'Bright',
-    category: 'mood',
-    icon: 'i-heroicons-sun',
-    filter: { field: 'spectral_centroid', operator: 'gt', value: 3000 }
-  },
-  {
-    id: 'happy',
-    label: 'Happy',
-    category: 'mood',
-    icon: 'i-heroicons-face-smile',
-    filter: { field: 'valence', operator: 'gt', value: 0.7 }
-  }
-]
-
 // Natural language prompt suggestions (ChatGPT-style)
 export const naturalPrompts = [
   // House & Techno

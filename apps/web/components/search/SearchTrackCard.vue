@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<{
 const { t } = useI18n()
 const config = useRuntimeConfig()
 const { formatKey, getKeyColor } = useKeyNotation()
-const { loadToDeck, deckA, deckB, getTargetDeck, togglePlay, ejectDeck } = useDjPlayer()
+const { play, isTrackPlaying, isCurrentTrack, isLoading } = useAudioPlayer()
 const isVisible = ref(props.skipAnimation)
 const showDetails = ref(false)
 const showSimilar = ref(false)
@@ -40,11 +40,9 @@ const isFromDetectedArtist = computed(() => {
 
 const isFreeDownload = computed(() => props.track.downloadStatus !== DownloadStatus.No)
 const isDirectDownload = computed(() => props.track.downloadStatus === DownloadStatus.FreeDirectLink)
-const isOnDeckA = computed(() => deckA.value.track?.id === props.track.id)
-const isOnDeckB = computed(() => deckB.value.track?.id === props.track.id)
-const isPlaying = computed(() => (isOnDeckA.value && deckA.value.isPlaying) || (isOnDeckB.value && deckB.value.isPlaying))
-const isCurrentlyLoading = computed(() => (isOnDeckA.value && deckA.value.isLoading) || (isOnDeckB.value && deckB.value.isLoading))
-const isOnAnyDeck = computed(() => isOnDeckA.value || isOnDeckB.value)
+const isPlaying = computed(() => isTrackPlaying(props.track.id))
+const isCurrentlyLoading = computed(() => isCurrentTrack(props.track.id) && isLoading.value)
+const isCurrentlyActive = computed(() => isCurrentTrack(props.track.id))
 
 const artistUrl = computed(() => {
   const url = props.track.permalink_url
@@ -58,7 +56,7 @@ const mp3DownloadUrl = computed(() => {
 })
 
 const cardClass = computed(() => {
-  if (isOnAnyDeck.value) {
+  if (isCurrentlyActive.value) {
     return 'bg-violet-950/50 hover:bg-violet-950/70 border-violet-500/50 ring-1 ring-violet-500/30'
   }
   if (props.track.downloadStatus === DownloadStatus.FreeDirectLink) {
@@ -72,16 +70,7 @@ const cardClass = computed(() => {
 
 /* --- Methods --- */
 function handleCardClick() {
-  if (isOnDeckA.value) {
-    togglePlay('A')
-    return
-  }
-  if (isOnDeckB.value) {
-    togglePlay('B')
-    return
-  }
-  const targetDeck = getTargetDeck()
-  loadToDeck(props.track, targetDeck)
+  play(props.track)
 }
 
 function getDownloadUrl(): string | null {
@@ -131,25 +120,6 @@ function formatTimeAgo(dateString: string): string {
     return `${diffMinutes}m`
   }
   return 'now'
-}
-
-function handleDeckClick(deck: 'A' | 'B') {
-  if (!hasAnalysis.value) return
-
-  const isOnThisDeck = deck === 'A' ? isOnDeckA.value : isOnDeckB.value
-  const isOnOtherDeck = deck === 'A' ? isOnDeckB.value : isOnDeckA.value
-  const otherDeck = deck === 'A' ? 'B' : 'A'
-
-  if (isOnThisDeck) {
-    ejectDeck(deck)
-  }
-  else if (isOnOtherDeck) {
-    ejectDeck(otherDeck)
-    loadToDeck(props.track, deck)
-  }
-  else {
-    loadToDeck(props.track, deck)
-  }
 }
 
 async function reanalyzeTrack() {
@@ -263,46 +233,10 @@ onMounted(() => {
             </div>
           </div>
 
-          <!-- Duration + Deck buttons -->
-          <div class="flex shrink-0 items-center gap-2" @click.stop>
-            <span class="text-xs tabular-nums text-neutral-500">
-              {{ formatDuration(track.duration) }}
-            </span>
-
-            <!-- Deck A -->
-            <button
-              type="button"
-              class="rounded-md px-2 py-1 text-xs font-bold transition-colors"
-              :class="[
-                isOnDeckA
-                  ? 'bg-cyan-500 text-white cursor-pointer'
-                  : hasAnalysis
-                    ? 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 cursor-pointer'
-                    : 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
-              ]"
-              :disabled="!hasAnalysis"
-              @click.stop="handleDeckClick('A')"
-            >
-              A
-            </button>
-
-            <!-- Deck B -->
-            <button
-              type="button"
-              class="rounded-md px-2 py-1 text-xs font-bold transition-colors"
-              :class="[
-                isOnDeckB
-                  ? 'bg-orange-500 text-white cursor-pointer'
-                  : hasAnalysis
-                    ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 cursor-pointer'
-                    : 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
-              ]"
-              :disabled="!hasAnalysis"
-              @click.stop="handleDeckClick('B')"
-            >
-              B
-            </button>
-          </div>
+          <!-- Duration -->
+          <span class="shrink-0 text-xs tabular-nums text-neutral-500">
+            {{ formatDuration(track.duration) }}
+          </span>
         </div>
 
         <!-- Tags row -->

@@ -5,9 +5,6 @@
 // Re-export SoundCloud types
 export * from './soundcloud'
 
-// Re-export Set Builder types
-export * from './set-builder'
-
 // =============================================================================
 // Enums
 // =============================================================================
@@ -54,18 +51,6 @@ export interface DbTrack {
   bpm_confidence: number | null
   key_detected: string | null
   key_confidence: number | null
-  energy: number | null
-  loudness: number | null
-  dynamic_complexity: number | null
-  spectral_centroid: number | null
-  dissonance: number | null
-  danceability: number | null
-  speechiness: number | null
-  instrumentalness: number | null
-  acousticness: number | null
-  valence: number | null
-  liveness: number | null
-  beat_offset: number | null
   highlight_time: number | null
   analysis_status: string | null
   analysis_error: string | null
@@ -101,18 +86,6 @@ export interface DbTrackInsert {
   bpm_confidence?: number | null
   key_detected?: string | null
   key_confidence?: number | null
-  energy?: number | null
-  loudness?: number | null
-  dynamic_complexity?: number | null
-  spectral_centroid?: number | null
-  dissonance?: number | null
-  danceability?: number | null
-  speechiness?: number | null
-  instrumentalness?: number | null
-  acousticness?: number | null
-  valence?: number | null
-  liveness?: number | null
-  beat_offset?: number | null
   highlight_time?: number | null
   analysis_status?: string | null
   analysis_error?: string | null
@@ -146,18 +119,6 @@ export interface DbTrackUpdate {
   bpm_confidence?: number | null
   key_detected?: string | null
   key_confidence?: number | null
-  energy?: number | null
-  loudness?: number | null
-  dynamic_complexity?: number | null
-  spectral_centroid?: number | null
-  dissonance?: number | null
-  danceability?: number | null
-  speechiness?: number | null
-  instrumentalness?: number | null
-  acousticness?: number | null
-  valence?: number | null
-  liveness?: number | null
-  beat_offset?: number | null
   highlight_time?: number | null
   analysis_status?: string | null
   analysis_error?: string | null
@@ -188,17 +149,6 @@ export interface AnalysisData {
   bpm_confidence: number | null
   key_detected: string | null
   key_confidence: number | null
-  energy: number | null
-  loudness: number | null
-  dynamic_complexity: number | null
-  danceability: number | null
-  speechiness: number | null
-  instrumentalness: number | null
-  acousticness: number | null
-  valence: number | null
-  liveness: number | null
-  spectral_centroid: number | null
-  dissonance: number | null
   analysis_status: string | null
 }
 
@@ -226,18 +176,6 @@ export interface TrackEntry {
   bpm_confidence: number | null
   key_detected: string | null
   key_confidence: number | null
-  energy: number | null
-  loudness: number | null
-  dynamic_complexity: number | null
-  spectral_centroid: number | null
-  dissonance: number | null
-  danceability: number | null
-  speechiness: number | null
-  instrumentalness: number | null
-  acousticness: number | null
-  valence: number | null
-  liveness: number | null
-  beat_offset: number | null
   highlight_time: number | null
   analysis_status: AnalysisStatus | null
   analysis_error: string | null
@@ -312,18 +250,6 @@ export function dbTrackToTrackEntry(db: DbTrack): TrackEntry {
     bpm_confidence: db.bpm_confidence,
     key_detected: db.key_detected,
     key_confidence: db.key_confidence,
-    energy: db.energy,
-    loudness: db.loudness,
-    dynamic_complexity: db.dynamic_complexity,
-    spectral_centroid: db.spectral_centroid,
-    dissonance: db.dissonance,
-    danceability: db.danceability,
-    speechiness: db.speechiness,
-    instrumentalness: db.instrumentalness,
-    acousticness: db.acousticness,
-    valence: db.valence,
-    liveness: db.liveness,
-    beat_offset: db.beat_offset,
     highlight_time: db.highlight_time,
     analysis_status: db.analysis_status as AnalysisStatus | null,
     analysis_error: db.analysis_error,

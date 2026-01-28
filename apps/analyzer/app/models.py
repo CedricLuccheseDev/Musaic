@@ -26,31 +26,13 @@ class AnalysisResult(BaseModel):
     # Rhythm
     bpm_detected: float  # BPM with precision (e.g., 174.5)
     bpm_confidence: float
-    beat_offset: float | None = None  # First beat position in seconds (phase offset)
 
     # Tonal
     key_detected: str
     key_confidence: float
 
-    # Dynamics
-    energy: float
-    loudness: float  # dB
-    dynamic_complexity: float  # Volume variation
-
-    # Timbre
-    spectral_centroid: float  # Brightness (Hz)
-    dissonance: float  # Dissonance level (0-1)
-
-    # High-level descriptors
-    danceability: float
-    speechiness: float  # Voice presence (0-1)
-    instrumentalness: float  # Instrumental vs vocal (0-1)
-    acousticness: float  # Acoustic vs electronic (0-1)
-    valence: float  # Mood/positivity (0-1)
-    liveness: float  # Live recording probability (0-1)
-
     # Highlight
-    highlight_time: float  # Timestamp of the highlight (seconds)
+    highlight_time: float  # Timestamp of the highlight/drop (seconds)
 
     # Embedding (for similarity search)
     embedding: list[float] | None = None  # 1280-dim vector from Discogs-Effnet
@@ -62,31 +44,13 @@ class TrackUpdate(BaseModel):
     # Rhythm
     bpm_detected: float | None = None
     bpm_confidence: float | None = None
-    beat_offset: float | None = None  # First beat position in seconds (phase offset)
 
     # Tonal
     key_detected: str | None = None
     key_confidence: float | None = None
 
-    # Dynamics
-    energy: float | None = None
-    loudness: float | None = None
-    dynamic_complexity: float | None = None
-
-    # Timbre
-    spectral_centroid: float | None = None
-    dissonance: float | None = None
-
-    # High-level descriptors
-    danceability: float | None = None
-    speechiness: float | None = None
-    instrumentalness: float | None = None
-    acousticness: float | None = None
-    valence: float | None = None
-    liveness: float | None = None
-
     # Highlight
-    highlight_time: float | None = None  # Timestamp of the highlight (seconds)
+    highlight_time: float | None = None  # Timestamp of the highlight/drop (seconds)
 
     # Embedding (for similarity search)
     embedding: list[float] | None = None  # 1280-dim vector

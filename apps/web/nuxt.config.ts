@@ -14,8 +14,7 @@ export default defineNuxtConfig({
     { path: '~/components/common', pathPrefix: false },
     { path: '~/components/home', pathPrefix: false },
     { path: '~/components/search', pathPrefix: false },
-    { path: '~/components/auth', pathPrefix: false },
-    { path: '~/components/dj', prefix: 'Dj' }
+    { path: '~/components/auth', pathPrefix: false }
   ],
   app: {
     pageTransition: { name: 'page', mode: 'out-in' }
@@ -26,6 +25,8 @@ export default defineNuxtConfig({
     supabaseKey: process.env.SUPABASE_KEY || '',
     supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY || '',
     soundcloudClientId: process.env.SOUNDCLOUD_CLIENT_ID || '',
+    soundcloudClientSecret: process.env.SOUNDCLOUD_CLIENT_SECRET || '',
+    soundcloudPublicClientId: process.env.SOUNDCLOUD_PUBLIC_CLIENT_ID || '',
     analyzerUrl: process.env.ANALYZER_URL || '',
     analyzerApiKey: process.env.ANALYZER_API_KEY || '',
     public: {

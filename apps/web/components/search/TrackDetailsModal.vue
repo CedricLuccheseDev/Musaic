@@ -22,17 +22,6 @@ const isAnalyzed = computed(() => props.track.analysis_status === AnalysisStatus
 const isPending = computed(() => props.track.analysis_status === AnalysisStatus.Pending)
 const isProcessing = computed(() => props.track.analysis_status === AnalysisStatus.Processing)
 const isFailed = computed(() => props.track.analysis_status === AnalysisStatus.Failed)
-
-/* --- Methods --- */
-function formatPercent(value: number | null): string {
-  if (value === null || value === undefined) return '-'
-  return `${Math.round(value * 100)}%`
-}
-
-function getBarWidth(value: number | null): string {
-  if (value === null || value === undefined) return '0%'
-  return `${Math.round(value * 100)}%`
-}
 </script>
 
 <template>
@@ -119,78 +108,6 @@ function getBarWidth(value: number | null): string {
             </div>
           </div>
 
-          <!-- Audio characteristics - Clean bars -->
-          <div class="space-y-3">
-            <!-- Energy -->
-            <div v-if="track.energy !== null" class="group">
-              <div class="mb-1 flex items-center justify-between text-xs">
-                <span class="text-neutral-400">{{ t.analysisEnergy }}</span>
-                <span class="font-medium text-white">{{ formatPercent(track.energy) }}</span>
-              </div>
-              <div class="h-1.5 overflow-hidden rounded-full bg-neutral-800">
-                <div
-                  class="h-full rounded-full bg-gradient-to-r from-blue-500 to-red-500 transition-all"
-                  :style="{ width: getBarWidth(track.energy) }"
-                />
-              </div>
-            </div>
-
-            <!-- Danceability -->
-            <div v-if="track.danceability !== null" class="group">
-              <div class="mb-1 flex items-center justify-between text-xs">
-                <span class="text-neutral-400">{{ t.analysisDanceability }}</span>
-                <span class="font-medium text-white">{{ formatPercent(track.danceability) }}</span>
-              </div>
-              <div class="h-1.5 overflow-hidden rounded-full bg-neutral-800">
-                <div
-                  class="h-full rounded-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all"
-                  :style="{ width: getBarWidth(track.danceability) }"
-                />
-              </div>
-            </div>
-
-            <!-- Valence (Mood) -->
-            <div v-if="track.valence !== null" class="group">
-              <div class="mb-1 flex items-center justify-between text-xs">
-                <span class="text-neutral-400">{{ t.analysisValence }}</span>
-                <span class="font-medium text-white">{{ formatPercent(track.valence) }}</span>
-              </div>
-              <div class="h-1.5 overflow-hidden rounded-full bg-neutral-800">
-                <div
-                  class="h-full rounded-full bg-gradient-to-r from-blue-400 to-yellow-400 transition-all"
-                  :style="{ width: getBarWidth(track.valence) }"
-                />
-              </div>
-            </div>
-
-            <!-- Instrumentalness -->
-            <div v-if="track.instrumentalness !== null" class="group">
-              <div class="mb-1 flex items-center justify-between text-xs">
-                <span class="text-neutral-400">{{ t.analysisInstrumentalness }}</span>
-                <span class="font-medium text-white">{{ formatPercent(track.instrumentalness) }}</span>
-              </div>
-              <div class="h-1.5 overflow-hidden rounded-full bg-neutral-800">
-                <div
-                  class="h-full rounded-full bg-cyan-500 transition-all"
-                  :style="{ width: getBarWidth(track.instrumentalness) }"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- Additional info - Small chips -->
-          <div class="mt-4 flex flex-wrap gap-2">
-            <div v-if="track.loudness !== null" class="rounded-full bg-neutral-800 px-3 py-1 text-xs">
-              <span class="text-neutral-400">{{ t.analysisLoudness }}:</span>
-              <span class="ml-1 font-medium text-white">{{ track.loudness?.toFixed(1) }} dB</span>
-            </div>
-            <div v-if="track.liveness !== null && track.liveness > 0.7" class="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-medium text-emerald-400">
-              {{ t.analysisLive }}
-            </div>
-            <div v-if="track.speechiness !== null && track.speechiness > 0.5" class="rounded-full bg-violet-500/20 px-3 py-1 text-xs font-medium text-violet-400">
-              {{ t.analysisVocal }}
-            </div>
-          </div>
         </div>
       </div>
     </template>
