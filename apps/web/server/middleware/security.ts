@@ -46,6 +46,11 @@ export default defineEventHandler((event) => {
     return
   }
 
+  // Skip security checks for OAuth callbacks (external redirects)
+  if (path.startsWith('/api/auth/')) {
+    return
+  }
+
   // Skip rate limiting in development
   const isDev = process.env.DEV === 'true'
 

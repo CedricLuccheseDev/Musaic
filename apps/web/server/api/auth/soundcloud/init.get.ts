@@ -34,14 +34,12 @@ export default defineEventHandler(async (event) => {
     path: '/'
   })
 
-  // Build authorization URL
+  // Build authorization URL (without PKCE - SoundCloud may not support it)
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: REDIRECT_URI,
     response_type: 'code',
-    state,
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256'
+    state
   })
 
   const authUrl = `${SOUNDCLOUD_AUTHORIZE_URL}?${params.toString()}`

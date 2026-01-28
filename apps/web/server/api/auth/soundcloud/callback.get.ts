@@ -81,7 +81,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    // Exchange code for tokens
+    // Exchange code for tokens (without PKCE)
     const tokenResponse = await $fetch<SoundCloudTokenResponse>(SOUNDCLOUD_TOKEN_URL, {
       method: 'POST',
       headers: {
@@ -92,8 +92,7 @@ export default defineEventHandler(async (event) => {
         client_id: clientId,
         client_secret: clientSecret,
         code,
-        redirect_uri: REDIRECT_URI,
-        code_verifier: storedData.verifier
+        redirect_uri: REDIRECT_URI
       }).toString()
     })
 
