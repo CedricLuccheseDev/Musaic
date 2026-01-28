@@ -46,10 +46,6 @@ const sessionStats: SessionStats = {
   haiku: { inputTokens: 0, outputTokens: 0, cacheRead: 0, cacheCreation: 0, requests: 0 }
 }
 
-function time(): string {
-  return '' // Disabled - Docker adds timestamps
-}
-
 function log(level: LogLevel, tag: string, message: string, data?: unknown): void {
   const cfg = levelConfig[level]
   const tagColors: Record<string, string> = {
