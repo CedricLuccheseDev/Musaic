@@ -40,14 +40,14 @@ export default defineEventHandler(async (event) => {
     return sendRedirect(event, `${baseUrl}/login?error=Missing%20authorization%20parameters`)
   }
 
-  // Parse state
-  const stateData = parseState(state)
+  // Parse and verify signed state (HMAC signature + timestamp check)
+  const clientSecret = config.soundcloudClientSecret as string
+  const stateData = parseState(state, clientSecret)
   if (!stateData) {
-    return sendRedirect(event, '/login?error=Invalid%20state%20parameter')
+    return sendRedirect(event, `${baseUrl}/login?error=Invalid%20or%20expired%20state`)
   }
 
   // If dev environment and we're on production, redirect to localhost
-  // This must happen BEFORE cookie check since cookie is on localhost domain
   if (stateData.env === 'dev' && !isDev) {
     const localUrl = new URL('http://localhost:3000/api/auth/soundcloud/callback')
     localUrl.searchParams.set('code', code)
@@ -55,29 +55,7 @@ export default defineEventHandler(async (event) => {
     return sendRedirect(event, localUrl.toString())
   }
 
-  // Get stored nonce from cookie
-  const cookieData = getCookie(event, 'sc_oauth')
-  if (!cookieData) {
-    return sendRedirect(event, `${baseUrl}/login?error=Session%20expired`)
-  }
-
-  let storedData: { nonce: string }
-  try {
-    storedData = JSON.parse(cookieData)
-  } catch {
-    return sendRedirect(event, `${baseUrl}/login?error=Invalid%20session%20data`)
-  }
-
-  // Verify nonce to prevent CSRF
-  if (stateData.nonce !== storedData.nonce) {
-    return sendRedirect(event, `${baseUrl}/login?error=Invalid%20state`)
-  }
-
-  // Clear the OAuth cookie
-  deleteCookie(event, 'sc_oauth')
-
   const clientId = config.soundcloudClientId as string
-  const clientSecret = config.soundcloudClientSecret as string
 
   if (!clientId || !clientSecret) {
     return sendRedirect(event, '/login?error=SoundCloud%20not%20configured')

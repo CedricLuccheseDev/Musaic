@@ -30,19 +30,42 @@ export function generateNonce(): string {
 }
 
 /**
- * Create state parameter with environment info
+ * Create signed state parameter with environment info
+ * Uses HMAC-SHA256 to prevent tampering
  */
-export function createState(env: 'dev' | 'prod', nonce: string): string {
-  return Buffer.from(JSON.stringify({ env, nonce })).toString('base64url')
+export function createState(env: 'dev' | 'prod', nonce: string, secret: string): string {
+  const payload = JSON.stringify({ env, nonce, ts: Date.now() })
+  const payloadB64 = Buffer.from(payload).toString('base64url')
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(payloadB64)
+    .digest('base64url')
+  return `${payloadB64}.${signature}`
 }
 
 /**
- * Parse state parameter
+ * Parse and verify signed state parameter
+ * Returns null if signature is invalid or state is too old (10 min)
  */
-export function parseState(state: string): { env: 'dev' | 'prod'; nonce: string } | null {
+export function parseState(state: string, secret: string): { env: 'dev' | 'prod'; nonce: string } | null {
   try {
-    const decoded = Buffer.from(state, 'base64url').toString('utf-8')
-    return JSON.parse(decoded)
+    const [payloadB64, signature] = state.split('.')
+    if (!payloadB64 || !signature) return null
+
+    // Verify signature
+    const expectedSig = crypto
+      .createHmac('sha256', secret)
+      .update(payloadB64)
+      .digest('base64url')
+    if (signature !== expectedSig) return null
+
+    // Parse payload
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf-8'))
+
+    // Check timestamp (10 minute expiry)
+    if (Date.now() - payload.ts > 10 * 60 * 1000) return null
+
+    return { env: payload.env, nonce: payload.nonce }
   } catch {
     return null
   }
