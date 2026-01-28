@@ -277,7 +277,7 @@ async function handleAiSearch(query: string, offset: number): Promise<CascadeSea
 
   // Step 3: Log final results
   const stats = groupTracksBySource(mergedTracks)
-  logger.ai.result(reqId, mergedTracks.length, { db: stats.counts.database, sc: stats.counts.soundcloud })
+  logger.ai.result(reqId, mergedTracks.length)
 
   // If no results from both sources, try SoundCloud with relaxed query
   if (mergedTracks.length === 0) {
