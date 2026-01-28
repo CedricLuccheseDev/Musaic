@@ -1,5 +1,6 @@
 import { parseState } from '~/server/utils/pkce'
 import { getSupabaseAdminClient } from '~/server/utils/supabase'
+import { syncUserLikes } from '~/server/services/soundcloudSync'
 
 const SOUNDCLOUD_TOKEN_URL = 'https://secure.soundcloud.com/oauth/token'
 const SOUNDCLOUD_ME_URL = 'https://api.soundcloud.com/me'
@@ -154,6 +155,12 @@ export default defineEventHandler(async (event) => {
       console.error('[SC Callback] Failed to generate link:', linkError)
       return sendRedirect(event, `${baseUrl}/auth/callback?error=${encodeURIComponent('Failed to create session')}`)
     }
+
+    // Trigger likes sync in background (fire & forget)
+    // Don't await - user shouldn't wait for sync to complete
+    syncUserLikes(tokenResponse.access_token).catch((err) => {
+      console.error('[SC Callback] Background likes sync failed:', err)
+    })
 
     // Redirect to the client callback page with the token
     // The client will verify the token and establish the session
