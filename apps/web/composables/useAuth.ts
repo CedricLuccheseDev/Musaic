@@ -57,23 +57,12 @@ export const useAuth = () => {
           resolve({ error: { message: 'Authentication timeout' } })
         }, 5 * 60 * 1000) // 5 minute timeout
 
-        channel.onmessage = async (event) => {
+        channel.onmessage = (event) => {
           if (event.data?.type === 'auth-success') {
             clearTimeout(timeout)
             channel.close()
-
-            // Small delay to ensure localStorage is synced across tabs
-            await new Promise(r => setTimeout(r, 100))
-
-            // Force refresh session from storage (not cache)
-            const { data: { session } } = await supabase!.auth.refreshSession()
-
-            if (session?.user) {
-              user.value = session.user
-              await fetchProfile(session.user.id)
-            }
-
-            resolve({ error: null })
+            // Reload page to pick up the new session from localStorage
+            window.location.reload()
           } else if (event.data?.type === 'auth-error') {
             clearTimeout(timeout)
             channel.close()
