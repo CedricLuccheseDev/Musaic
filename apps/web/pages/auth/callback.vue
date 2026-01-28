@@ -42,9 +42,9 @@ onMounted(async () => {
 
   try {
     // Verify the OTP token to establish the session
+    // The token is a hashed_token from generateLink, so use token_hash
     const { error: verifyError } = await supabase.auth.verifyOtp({
-      email,
-      token,
+      token_hash: token,
       type: 'magiclink'
     })
 
