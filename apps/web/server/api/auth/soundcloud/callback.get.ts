@@ -89,61 +89,55 @@ export default defineEventHandler(async (event) => {
     const userEmail = `sc_${scUser.id}@musaic.fr`
     const tokenExpiresAt = new Date(Date.now() + tokenResponse.expires_in * 1000)
 
-    // Check if user already exists
-    const { data: existingUsers } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('soundcloud_id', scUser.id)
-      .limit(1)
-
+    // Try to create user, handle if already exists
     let userId: string
 
-    if (existingUsers && existingUsers.length > 0) {
-      // Existing user - update tokens
-      userId = existingUsers[0].id
+    const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+      email: userEmail,
+      email_confirm: true,
+      user_metadata: {
+        soundcloud_id: scUser.id,
+        soundcloud_username: scUser.username,
+        avatar_url: scUser.avatar_url
+      }
+    })
 
-      await supabase
-        .from('profiles')
-        .update({
-          soundcloud_username: scUser.username,
-          soundcloud_avatar_url: scUser.avatar_url,
-          soundcloud_access_token: tokenResponse.access_token,
-          soundcloud_refresh_token: tokenResponse.refresh_token,
-          soundcloud_token_expires_at: tokenExpiresAt.toISOString()
-        })
-        .eq('id', userId)
-    } else {
-      // New user - create via admin API
-      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-        email: userEmail,
-        email_confirm: true,
+    if (createError) {
+      // User already exists - find by email in users list
+      const { data: usersList } = await supabase.auth.admin.listUsers()
+      const existingUser = usersList?.users?.find(u => u.email === userEmail)
+
+      if (!existingUser) {
+        console.error('[SC Callback] Failed to create or find user:', createError)
+        return sendRedirect(event, '/login?error=Failed%20to%20create%20account')
+      }
+
+      userId = existingUser.id
+
+      // Update user metadata
+      await supabase.auth.admin.updateUserById(userId, {
         user_metadata: {
           soundcloud_id: scUser.id,
           soundcloud_username: scUser.username,
           avatar_url: scUser.avatar_url
         }
       })
-
-      if (createError || !newUser.user) {
-        console.error('[SC Callback] Failed to create user:', createError)
-        return sendRedirect(event, '/login?error=Failed%20to%20create%20account')
-      }
-
-      userId = newUser.user.id
-
-      // Update profile with SoundCloud data (profile is auto-created by trigger)
-      await supabase
-        .from('profiles')
-        .update({
-          soundcloud_id: scUser.id,
-          soundcloud_username: scUser.username,
-          soundcloud_avatar_url: scUser.avatar_url,
-          soundcloud_access_token: tokenResponse.access_token,
-          soundcloud_refresh_token: tokenResponse.refresh_token,
-          soundcloud_token_expires_at: tokenExpiresAt.toISOString()
-        })
-        .eq('id', userId)
+    } else {
+      userId = newUser.user!.id
     }
+
+    // Upsert profile with SoundCloud data
+    await supabase
+      .from('profiles')
+      .upsert({
+        id: userId,
+        soundcloud_id: scUser.id,
+        soundcloud_username: scUser.username,
+        soundcloud_avatar_url: scUser.avatar_url,
+        soundcloud_access_token: tokenResponse.access_token,
+        soundcloud_refresh_token: tokenResponse.refresh_token,
+        soundcloud_token_expires_at: tokenExpiresAt.toISOString()
+      })
 
     // Generate magic link to get the OTP token
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
