@@ -17,6 +17,10 @@ const showTerms = ref(false)
 type Tab = 'profile' | 'preferences' | 'subscription' | 'contact'
 const activeTab = ref<Tab>('profile')
 
+// SoundCloud Likes Sync
+const syncingLikes = ref(false)
+const syncResult = ref<{ success: boolean; message: string } | null>(null)
+
 /* --- Computed --- */
 const memberSince = computed(() => {
   if (!user.value?.created_at) return ''
@@ -38,6 +42,43 @@ const premiumUntil = computed(() => {
 async function handleSignOut() {
   await signOut()
   router.push('/')
+}
+
+async function syncSoundCloudLikes() {
+  if (syncingLikes.value) return
+
+  syncingLikes.value = true
+  syncResult.value = null
+
+  try {
+    const supabase = useSupabase()
+    if (!supabase) {
+      syncResult.value = { success: false, message: t.value.syncNoToken }
+      return
+    }
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (!session?.access_token) {
+      syncResult.value = { success: false, message: t.value.syncNoToken }
+      return
+    }
+
+    const response = await $fetch<{ synced: number; total: number }>('/api/sync/soundcloud-likes', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`
+      }
+    })
+
+    syncResult.value = {
+      success: true,
+      message: t.value.syncSuccess.replace('{count}', String(response.synced))
+    }
+  } catch {
+    syncResult.value = { success: false, message: t.value.syncError }
+  } finally {
+    syncingLikes.value = false
+  }
 }
 
 /* --- Watchers --- */
@@ -193,6 +234,38 @@ watch(user, (u) => {
               <div class="flex items-center justify-between rounded-xl bg-neutral-800/30 px-4 py-3">
                 <span class="text-sm text-neutral-400">{{ t.profileMemberSince }}</span>
                 <span class="text-sm font-medium text-white">{{ memberSince }}</span>
+              </div>
+            </div>
+
+            <!-- Sync SoundCloud Likes (SoundCloud users only) -->
+            <div v-if="provider === 'soundcloud'" class="mb-6">
+              <button
+                type="button"
+                :disabled="syncingLikes"
+                class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 text-sm font-medium text-violet-400 transition-all duration-200 hover:border-violet-500/50 hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                @click="syncSoundCloudLikes"
+              >
+                <UIcon
+                  :name="syncingLikes ? 'i-heroicons-arrow-path' : 'i-heroicons-heart'"
+                  class="h-5 w-5"
+                  :class="{ 'animate-spin': syncingLikes }"
+                />
+                <span>{{ syncingLikes ? t.syncingLikes : t.syncLikes }}</span>
+              </button>
+
+              <!-- Result feedback -->
+              <div
+                v-if="syncResult"
+                class="mt-3 rounded-xl px-4 py-3 text-sm"
+                :class="syncResult.success ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'"
+              >
+                <div class="flex items-center gap-2">
+                  <UIcon
+                    :name="syncResult.success ? 'i-heroicons-check-circle' : 'i-heroicons-x-circle'"
+                    class="h-5 w-5"
+                  />
+                  <span>{{ syncResult.message }}</span>
+                </div>
               </div>
             </div>
 

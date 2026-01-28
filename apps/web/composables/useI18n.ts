@@ -113,6 +113,14 @@ const translations = {
     profileCancelSubscription: 'Annuler l\'abonnement',
     profileManageSubscription: 'Gérer l\'abonnement',
 
+    // SoundCloud Sync
+    syncLikes: 'Synchroniser mes likes SoundCloud',
+    syncingLikes: 'Synchronisation en cours...',
+    syncSuccess: '{count} tracks importés',
+    syncError: 'Erreur lors de la synchronisation',
+    syncNoToken: 'Reconnexion SoundCloud requise',
+    tracksImported: 'tracks ajoutés',
+
     // Contact
     contactTitle: 'Nous contacter',
     contactEmail: 'Ton email',
@@ -297,6 +305,14 @@ const translations = {
     profileNoHistory: 'No subscription history',
     profileCancelSubscription: 'Cancel subscription',
     profileManageSubscription: 'Manage subscription',
+
+    // SoundCloud Sync
+    syncLikes: 'Sync my SoundCloud likes',
+    syncingLikes: 'Syncing...',
+    syncSuccess: '{count} tracks imported',
+    syncError: 'Sync error',
+    syncNoToken: 'SoundCloud reconnection required',
+    tracksImported: 'tracks added',
 
     // Contact
     contactTitle: 'Contact us',
