@@ -2,6 +2,7 @@
 
 import os
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import essentia.standard as es
@@ -33,6 +34,10 @@ _embedding_model = None
 _embedding_model_available = None
 _tempo_cnn_model = None
 _tempo_cnn_available = None
+_resampler_16k = None  # Cached resampler for embedding extraction
+
+# Maximum audio duration to load (3 minutes = 180 seconds)
+MAX_AUDIO_DURATION = 180
 
 # Sample rate (44100 Hz = CD quality for better BPM/beat detection accuracy)
 SAMPLE_RATE = 44100
@@ -96,6 +101,17 @@ def _get_tempo_cnn_model():
         return None
 
 
+def _get_resampler_16k():
+    """Get or create cached resampler for 16kHz (embedding model)."""
+    global _resampler_16k
+    if _resampler_16k is None:
+        _resampler_16k = es.Resample(
+            inputSampleRate=SAMPLE_RATE,
+            outputSampleRate=EMBEDDING_SAMPLE_RATE
+        )
+    return _resampler_16k
+
+
 def _extract_embedding(audio: np.ndarray) -> list[float] | None:
     """
     Extract 200-dimensional audio embedding using Discogs-Effnet.
@@ -114,12 +130,9 @@ def _extract_embedding(audio: np.ndarray) -> list[float] | None:
         return None
 
     try:
-        # Resample to 16kHz (what Discogs-Effnet expects)
+        # Resample to 16kHz (what Discogs-Effnet expects) using cached resampler
         if SAMPLE_RATE != EMBEDDING_SAMPLE_RATE:
-            resampler = es.Resample(
-                inputSampleRate=SAMPLE_RATE,
-                outputSampleRate=EMBEDDING_SAMPLE_RATE
-            )
+            resampler = _get_resampler_16k()
             audio_16k = resampler(audio)
         else:
             audio_16k = audio
@@ -146,10 +159,15 @@ def _extract_embedding(audio: np.ndarray) -> list[float] | None:
 
 
 def _load_audio(file_path: Path) -> np.ndarray:
-    """Load audio file once at optimized sample rate."""
+    """Load audio file once at optimized sample rate, limited to MAX_AUDIO_DURATION."""
     try:
         loader = es.MonoLoader(filename=str(file_path), sampleRate=SAMPLE_RATE)
-        return loader()
+        audio = loader()
+        # Limit to MAX_AUDIO_DURATION seconds (3 minutes) - enough for analysis
+        max_samples = int(SAMPLE_RATE * MAX_AUDIO_DURATION)
+        if len(audio) > max_samples:
+            audio = audio[:max_samples]
+        return audio
     except RuntimeError as e:
         raise AnalysisError(f"Cannot load audio file: {e}") from e
 
@@ -172,7 +190,12 @@ def _load_audio_from_bytes(audio_bytes: bytes) -> np.ndarray:
             tmp.write(audio_bytes)
             tmp.flush()
             loader = es.MonoLoader(filename=tmp.name, sampleRate=SAMPLE_RATE)
-            return loader()
+            audio = loader()
+            # Limit to MAX_AUDIO_DURATION seconds (3 minutes)
+            max_samples = int(SAMPLE_RATE * MAX_AUDIO_DURATION)
+            if len(audio) > max_samples:
+                audio = audio[:max_samples]
+            return audio
     except RuntimeError as e:
         # More helpful error message
         if "End of file" in str(e) or "Could not find stream" in str(e):
@@ -411,17 +434,21 @@ def analyze_audio(file_path: str | Path, progress_callback=None) -> AnalysisResu
         if len(audio) < FRAME_SIZE * 2:
             raise AnalysisError(f"Audio segment too short for analysis ({duration:.1f}s)")
 
-        # === RHYTHM ANALYSIS ===
-        _progress("Rhythm", 20)
-        bpm, bpm_confidence = _extract_rhythm(audio)
+        # === PARALLEL FEATURE EXTRACTION ===
+        # BPM, Key, and Embedding are independent - run in parallel
+        _progress("Analyzing", 20)
 
-        # === TONAL ANALYSIS ===
-        _progress("Key detection", 50)
-        key_detected, key_confidence = _extract_key(audio)
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            rhythm_future = executor.submit(_extract_rhythm, audio)
+            key_future = executor.submit(_extract_key, audio)
+            embedding_future = executor.submit(_extract_embedding, full_audio)
 
-        # === EMBEDDING EXTRACTION (on full audio for better representation) ===
-        _progress("Embedding", 80)
-        embedding = _extract_embedding(full_audio)
+            # Collect results (blocks until each completes)
+            bpm, bpm_confidence = rhythm_future.result()
+            _progress("Key", 50)
+            key_detected, key_confidence = key_future.result()
+            _progress("Embedding", 80)
+            embedding = embedding_future.result()
 
         _progress("Done", 100)
 
@@ -483,17 +510,21 @@ def analyze_audio_from_bytes(audio_bytes: bytes, progress_callback=None) -> Anal
         if len(audio) < FRAME_SIZE * 2:
             raise AnalysisError(f"Audio segment too short for analysis ({duration:.1f}s)")
 
-        # === RHYTHM ANALYSIS ===
-        _progress("Rhythm", 20)
-        bpm, bpm_confidence = _extract_rhythm(audio)
+        # === PARALLEL FEATURE EXTRACTION ===
+        # BPM, Key, and Embedding are independent - run in parallel
+        _progress("Analyzing", 20)
 
-        # === TONAL ANALYSIS ===
-        _progress("Key detection", 50)
-        key_detected, key_confidence = _extract_key(audio)
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            rhythm_future = executor.submit(_extract_rhythm, audio)
+            key_future = executor.submit(_extract_key, audio)
+            embedding_future = executor.submit(_extract_embedding, full_audio)
 
-        # === EMBEDDING EXTRACTION (on full audio for better representation) ===
-        _progress("Embedding", 80)
-        embedding = _extract_embedding(full_audio)
+            # Collect results (blocks until each completes)
+            bpm, bpm_confidence = rhythm_future.result()
+            _progress("Key", 50)
+            key_detected, key_confidence = key_future.result()
+            _progress("Embedding", 80)
+            embedding = embedding_future.result()
 
         _progress("Done", 100)
 
@@ -540,9 +571,39 @@ def _extract_bpm_tempocnn(audio: np.ndarray) -> tuple[float, float]:
 
 
 
+def _run_multifeature(audio: np.ndarray) -> tuple[float, float, np.ndarray]:
+    """Run RhythmExtractor2013 multifeature method."""
+    try:
+        rhythm = es.RhythmExtractor2013(method="multifeature")
+        bpm, beats, conf, _, _ = rhythm(audio)
+        return float(bpm), float(conf), beats
+    except Exception:
+        return 0.0, 0.0, np.array([])
+
+
+def _run_degara(audio: np.ndarray) -> tuple[float, float, np.ndarray]:
+    """Run RhythmExtractor2013 degara method."""
+    try:
+        rhythm = es.RhythmExtractor2013(method="degara")
+        bpm, beats, conf, _, _ = rhythm(audio)
+        return float(bpm), float(conf), beats
+    except Exception:
+        return 0.0, 0.0, np.array([])
+
+
+def _run_loop_estimator(audio: np.ndarray) -> tuple[float, float]:
+    """Run LoopBpmEstimator."""
+    try:
+        estimator = es.LoopBpmEstimator()
+        bpm = float(estimator(audio))
+        return bpm, 0.7  # Fixed confidence
+    except Exception:
+        return 0.0, 0.0
+
+
 def _extract_rhythm(audio: np.ndarray) -> tuple[float, float]:
     """
-    Extract BPM and confidence using multiple methods.
+    Extract BPM and confidence using multiple methods IN PARALLEL.
 
     Combines several approaches to improve accuracy:
     1. TempoCNN neural network (most accurate for BPM)
@@ -556,34 +617,18 @@ def _extract_rhythm(audio: np.ndarray) -> tuple[float, float]:
     Returns:
         tuple: (bpm, confidence)
     """
-    # Method 1: TempoCNN (neural network - most accurate for BPM)
-    bpm_cnn, conf_cnn = _extract_bpm_tempocnn(audio)
+    # Run all 4 BPM methods in parallel (Essentia releases GIL)
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        cnn_future = executor.submit(_extract_bpm_tempocnn, audio)
+        multi_future = executor.submit(_run_multifeature, audio)
+        degara_future = executor.submit(_run_degara, audio)
+        loop_future = executor.submit(_run_loop_estimator, audio)
 
-    # Method 2: Multifeature (default, good general purpose)
-    try:
-        rhythm_multi = es.RhythmExtractor2013(method="multifeature")
-        bpm_multi, beats_multi, conf_multi, _, _ = rhythm_multi(audio)
-        bpm_multi = float(bpm_multi)
-        conf_multi = float(conf_multi)
-    except Exception:
-        bpm_multi, conf_multi, beats_multi = 0.0, 0.0, np.array([])
-
-    # Method 3: Degara (better for electronic/dance music)
-    try:
-        rhythm_degara = es.RhythmExtractor2013(method="degara")
-        bpm_degara, beats_degara, conf_degara, _, _ = rhythm_degara(audio)
-        bpm_degara = float(bpm_degara)
-        conf_degara = float(conf_degara)
-    except Exception:
-        bpm_degara, conf_degara, beats_degara = 0.0, 0.0, np.array([])
-
-    # Method 4: LoopBpmEstimator (good for loops, electronic)
-    try:
-        loop_estimator = es.LoopBpmEstimator()
-        bpm_loop = float(loop_estimator(audio))
-        conf_loop = 0.7  # Fixed confidence for this method
-    except Exception:
-        bpm_loop, conf_loop = 0.0, 0.0
+        # Collect results
+        bpm_cnn, conf_cnn = cnn_future.result()
+        bpm_multi, conf_multi, beats_multi = multi_future.result()
+        bpm_degara, conf_degara, beats_degara = degara_future.result()
+        bpm_loop, conf_loop = loop_future.result()
 
     # Method 5: Calculate BPM from beat intervals (ground truth validation)
     bpm_from_beats = 0.0

@@ -47,7 +47,7 @@ const sessionStats: SessionStats = {
 }
 
 function time(): string {
-  return `${c.gray}${new Date().toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris' })}${c.reset}`
+  return '' // Disabled - Docker adds timestamps
 }
 
 function log(level: LogLevel, tag: string, message: string, data?: unknown): void {
@@ -60,7 +60,7 @@ function log(level: LogLevel, tag: string, message: string, data?: unknown): voi
   }
   const tagColor = tagColors[tag] || c.cyan
 
-  const line = `${time()} ${cfg.color}${cfg.icon}${c.reset} ${tagColor}${c.bold}${tag}${c.reset} ${message}`
+  const line = `${cfg.color}${cfg.icon}${c.reset} ${tagColor}${c.bold}${tag}${c.reset} ${message}`
 
   if (level === 'error') {
     console.error(line, data !== undefined ? data : '')
@@ -127,8 +127,8 @@ export const logger = {
       console.log(`${c.dim}      [${id}] └─ SC: "${scQuery}"${c.reset}`)
     },
     // Step 3: Log final results
-    result: (id: string, count: number, stats: { db: number; sc: number }) => {
-      log('success', 'AI', `${c.dim}[${id}]${c.reset} → ${num(count)} tracks ${c.dim}(DB:${stats.db} SC:${stats.sc})${c.reset}`)
+    result: (id: string, count: number) => {
+      log('success', 'AI', `${c.dim}[${id}]${c.reset} → ${num(count)} tracks`)
     },
     // Log when AI needs clarification
     clarify: (id: string, question: string) => {

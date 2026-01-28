@@ -24,7 +24,7 @@ async function testAiConnection() {
   console.log('\n=== CONNECTION TEST ===')
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-latest',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 20,
       messages: [{ role: 'user', content: 'Reply "OK"' }]
     })
@@ -49,7 +49,7 @@ async function testAiConnection() {
   for (const query of testQueries) {
     try {
       const message = await anthropic.messages.create({
-        model: 'claude-3-5-haiku-latest',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 300,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: query }]

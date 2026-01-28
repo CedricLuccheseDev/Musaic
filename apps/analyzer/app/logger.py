@@ -60,9 +60,8 @@ class Logger:
         }
 
     def _get_time(self) -> str:
-        """Get formatted timestamp."""
-        now = datetime.now()
-        return f"{Colors.DIM}{now.strftime('%H:%M:%S')}{Colors.RESET}"
+        """Get formatted timestamp (disabled - Docker adds timestamps)."""
+        return ""
 
     def _format_tag(self, tag: Tags) -> str:
         """Format a tag with its color."""

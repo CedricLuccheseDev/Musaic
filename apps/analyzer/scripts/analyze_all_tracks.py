@@ -478,6 +478,9 @@ async def analyze_track_streaming(
         return False
 
     finally:
+        # Cleanup temp file
+        if audio_file:
+            cleanup_audio_file(audio_file)
         # Unregister task from progress display
         unregister_task(task_id)
 
@@ -520,15 +523,6 @@ async def main(force: bool = False, stream_mode: bool = False):
     download_semaphore = asyncio.Semaphore(max_downloads)
     analyze_semaphore = asyncio.Semaphore(max_analyses)
 
-    # Choose analysis function based on mode
-    analyze_func = analyze_track_streaming if stream_mode else analyze_track
-
-    # Create tasks for all tracks with unique task_id
-    tasks = [
-        analyze_func(track, download_semaphore, analyze_semaphore, settings, task_id=i)
-        for i, track in enumerate(tracks)
-    ]
-
     # Print initial empty lines for the multi-line display
     print(f"  {Colors.DIM}Progress:{Colors.RESET}")
     print_initial_lines()
@@ -539,8 +533,22 @@ async def main(force: bool = False, stream_mode: bool = False):
     _spinner_running = True
     spinner = asyncio.create_task(spinner_task())
 
-    # Process all tracks concurrently (limited by semaphore)
-    await asyncio.gather(*tasks, return_exceptions=True)
+    # Process tracks with shared HTTP client (for streaming mode)
+    if stream_mode:
+        async with create_http_client() as http_client:
+            tasks = [
+                analyze_track_streaming(
+                    track, download_semaphore, analyze_semaphore, settings, task_id=i, http_client=http_client
+                )
+                for i, track in enumerate(tracks)
+            ]
+            await asyncio.gather(*tasks, return_exceptions=True)
+    else:
+        tasks = [
+            analyze_track(track, download_semaphore, analyze_semaphore, settings, task_id=i)
+            for i, track in enumerate(tracks)
+        ]
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     # Stop spinner
     _spinner_running = False

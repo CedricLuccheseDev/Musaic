@@ -57,7 +57,7 @@ export default defineEventHandler(async (event) => {
     // Transform DB results to TrackEntry format
     const results = (data || []).map((row: DbTrackWithAnalysis) => dbTrackToTrackEntry(row))
 
-    logger.ai.result(reqId, results.length, { db: results.length, sc: 0 })
+    logger.ai.result(reqId, results.length)
 
     return {
       sql: isDev ? sql : undefined,

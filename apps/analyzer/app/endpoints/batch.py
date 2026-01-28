@@ -247,12 +247,7 @@ async def process_batch_analysis() -> None:
                 _batch_stats = {"completed": 0, "successful": 0, "failed": 0, "total": len(tracks)}
                 _batch_start_time = time.time()
 
-                log.info("=" * 50)
-                log.info("MusaicAnalyzer - Batch Analysis Started")
-                log.info("=" * 50)
-                log.info(f"Mode: Optimized file streaming (256KB chunks)")
-                log.info(f"Tracks: {len(tracks)} | Streams: {max_downloads} | Analyses: {max_analyses}")
-                log.info("-" * 50)
+                log.info(f"Batch: {len(tracks)} tracks (↓{max_downloads} ⚡{max_analyses})")
 
                 # Create tasks for all tracks (pass shared HTTP client)
                 tasks = [
@@ -281,10 +276,7 @@ async def process_batch_analysis() -> None:
 
                 avg_time = total_elapsed / successful if successful > 0 else 0
 
-                log.info("-" * 50)
-                log.info("=" * 50)
-                log.success(f"BATCH COMPLETE | OK: {successful} | FAIL: {failed} | Time: {_format_duration(total_elapsed)} | Avg: {avg_time:.1f}s/track")
-                log.info("=" * 50)
+                log.success(f"Batch done: {successful} OK, {failed} failed ({_format_duration(total_elapsed)}, {avg_time:.1f}s/track)")
 
                 # Check if new tracks were added during processing
                 if _batch_include_failed:
