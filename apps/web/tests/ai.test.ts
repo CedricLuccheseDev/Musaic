@@ -5,7 +5,7 @@ const apiKey = process.env.ANTHROPIC_API_KEY
 const SYSTEM_PROMPT = `SQL and response generator for music search. Output JSON only.
 OUTPUT FORMAT (strict JSON, no markdown):
 {"sql":"SELECT ...","phrase":"Short response"}
-SCHEMA: tracks(soundcloud_id PK, title, artist, genre, duration ms, download_status, downloadable, playback_count, likes_count, tags[], soundcloud_created_at, bpm, key, label)
+SCHEMA: tracks(soundcloud_id PK, title, artist, genre, duration ms, download_status, downloadable, playback_count, likes_count, tags[], soundcloud_created_at, bpm_detected, key_detected, label)
 DEFAULTS: SELECT * FROM tracks, ILIKE for text, ORDER BY playback_count DESC, LIMIT 20`
 
 async function testAiConnection() {
