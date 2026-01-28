@@ -41,13 +41,9 @@ export const useAuth = () => {
   }
 
   async function signInWithSoundCloud(): Promise<{ error: { message: string } | null }> {
-    console.log('[useAuth] signInWithSoundCloud called')
-
     try {
       // Call the init endpoint to get the authorization URL
       const { authUrl } = await $fetch<{ authUrl: string }>('/api/auth/soundcloud/init')
-
-      console.log('[useAuth] Opening auth tab:', authUrl)
 
       // Open auth in new tab
       window.open(authUrl, '_blank')
@@ -66,10 +62,14 @@ export const useAuth = () => {
             clearTimeout(timeout)
             channel.close()
 
-            // Refresh session
-            const { data: { session } } = await supabase!.auth.getSession()
-            user.value = session?.user ?? null
+            // Small delay to ensure localStorage is synced across tabs
+            await new Promise(r => setTimeout(r, 100))
+
+            // Force refresh session from storage (not cache)
+            const { data: { session } } = await supabase!.auth.refreshSession()
+
             if (session?.user) {
+              user.value = session.user
               await fetchProfile(session.user.id)
             }
 

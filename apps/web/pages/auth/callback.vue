@@ -62,14 +62,14 @@ onMounted(async () => {
     // Notify the main page via BroadcastChannel
     const channel = new BroadcastChannel('musaic-auth')
     channel.postMessage({ type: 'auth-success' })
-    channel.close()
 
-    // Close this tab after a short delay
+    // Close this tab after a short delay (keep channel open briefly for message delivery)
     setTimeout(() => {
+      channel.close()
       window.close()
       // Fallback: if window.close() doesn't work (not opened by script), redirect
       router.push('/')
-    }, 1500)
+    }, 1000)
   } catch (err) {
     status.value = 'error'
     errorMessage.value = String(err)
