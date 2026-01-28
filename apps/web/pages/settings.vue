@@ -24,6 +24,8 @@ const memberSince = computed(() => {
 })
 
 const provider = computed(() => {
+  // Check if it's a SoundCloud user (email starts with sc_)
+  if (user.value?.email?.startsWith('sc_')) return 'soundcloud'
   return user.value?.app_metadata?.provider || 'email'
 })
 
@@ -156,7 +158,7 @@ watch(user, (u) => {
                     v-else
                     class="flex h-full w-full items-center justify-center bg-violet-600 text-3xl font-bold text-white"
                   >
-                    {{ (user.email?.[0] || 'U').toUpperCase() }}
+                    {{ (user.user_metadata?.soundcloud_username?.[0] || user.user_metadata?.full_name?.[0] || user.email?.[0] || 'U').toUpperCase() }}
                   </div>
                 </div>
               </div>
@@ -164,12 +166,12 @@ watch(user, (u) => {
 
             <!-- Name -->
             <h1 class="mb-1 text-xl font-bold text-white">
-              {{ user.user_metadata?.full_name || user.email?.split('@')[0] }}
+              {{ user.user_metadata?.soundcloud_username || user.user_metadata?.full_name || user.email?.split('@')[0] }}
             </h1>
 
-            <!-- Email -->
+            <!-- Email / Provider info -->
             <p class="mb-6 text-sm text-neutral-400">
-              {{ user.email }}
+              {{ user.email?.startsWith('sc_') ? 'SoundCloud' : user.email }}
             </p>
 
             <!-- Info -->
@@ -179,8 +181,9 @@ watch(user, (u) => {
                 <span class="text-sm text-neutral-400">{{ t.profileProvider }}</span>
                 <div class="flex items-center gap-2">
                   <UIcon
-                    :name="provider === 'google' ? 'i-simple-icons-google' : provider === 'apple' ? 'i-simple-icons-apple' : 'i-heroicons-envelope'"
-                    class="h-4 w-4 text-neutral-300"
+                    :name="provider === 'soundcloud' ? 'i-simple-icons-soundcloud' : provider === 'google' ? 'i-simple-icons-google' : provider === 'apple' ? 'i-simple-icons-apple' : 'i-heroicons-envelope'"
+                    class="h-4 w-4"
+                    :class="provider === 'soundcloud' ? 'text-orange-500' : 'text-neutral-300'"
                   />
                   <span class="text-sm font-medium capitalize text-white">{{ provider }}</span>
                 </div>

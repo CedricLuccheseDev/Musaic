@@ -90,7 +90,7 @@ watch(() => user.value?.id, () => {
             v-else
             class="flex h-full w-full items-center justify-center bg-violet-600 text-sm font-medium text-white"
           >
-            {{ (user.email?.[0] || 'U').toUpperCase() }}
+            {{ (user.user_metadata?.soundcloud_username?.[0] || user.user_metadata?.full_name?.[0] || user.email?.[0] || 'U').toUpperCase() }}
           </div>
         </button>
       </UDropdownMenu>
