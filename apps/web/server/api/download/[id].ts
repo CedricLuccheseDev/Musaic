@@ -39,7 +39,8 @@ const PROXY_URL = 'https://corsproxy.io/?'
 
 function createSoundcloudClient(): SoundcloudInstance {
   const config = useRuntimeConfig()
-  const clientId = config.soundcloudClientId as string
+  // Use public client ID for API calls (works with old API), OAuth client ID is for auth only
+  const clientId = (config.soundcloudPublicClientId || config.soundcloudClientId) as string
   const isDev = process.env.NODE_ENV === 'development'
   const useProxy = !!clientId && !isDev
 

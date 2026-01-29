@@ -4,7 +4,7 @@
  */
 
 import { requireAuth } from '~/server/utils/auth'
-import { getSupabaseClient } from '~/server/utils/supabase'
+import { getSupabaseAdminClient } from '~/server/utils/supabase'
 import { syncUserLikes } from '~/server/services/soundcloudSync'
 import { logger } from '~/server/utils/logger'
 
@@ -20,7 +20,7 @@ export default defineEventHandler(async (event): Promise<SyncResponse> => {
   // Require authentication
   const user = await requireAuth(event)
 
-  const supabase = getSupabaseClient()
+  const supabase = getSupabaseAdminClient()
 
   // Get user's profile with SoundCloud tokens
   const { data: profile, error: profileError } = await supabase
@@ -102,7 +102,7 @@ export default defineEventHandler(async (event): Promise<SyncResponse> => {
  */
 async function refreshToken(userId: string, refreshToken: string): Promise<string> {
   const config = useRuntimeConfig()
-  const supabase = getSupabaseClient()
+  const supabase = getSupabaseAdminClient()
 
   const response = await $fetch<{
     access_token: string

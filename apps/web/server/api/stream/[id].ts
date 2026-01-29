@@ -10,7 +10,8 @@ const PROXY_URL = 'https://corsproxy.io/?'
 
 function createSoundcloudClient(): SoundcloudInstance {
   const config = useRuntimeConfig()
-  const clientId = config.soundcloudClientId as string
+  // Use public client ID for API calls (works with old API), OAuth client ID is for auth only
+  const clientId = (config.soundcloudPublicClientId || config.soundcloudClientId) as string
   const isDev = process.env.NODE_ENV === 'development'
   const useProxy = !!clientId && !isDev
 
@@ -82,10 +83,15 @@ export default defineEventHandler(async (event) => {
     return response.body
   }
   catch (error) {
-    console.error('Stream error:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error(`[Stream] Error for track ${id}:`, errorMessage)
+    if (errorStack) {
+      console.error('[Stream] Stack:', errorStack)
+    }
     throw createError({
       statusCode: 500,
-      message: 'Failed to stream audio'
+      message: `Failed to stream audio: ${errorMessage}`
     })
   }
 })

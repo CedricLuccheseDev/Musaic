@@ -1,6 +1,7 @@
 """Single track analysis endpoint."""
 
 import asyncio
+import time
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
@@ -58,6 +59,7 @@ async def process_track_analysis(
     settings = get_settings()
     audio_path = None
     queue = get_analysis_queue()
+    start_time = time.time()
 
     try:
         # Add to queue
@@ -89,10 +91,12 @@ async def process_track_analysis(
         # Update track with results
         await update_track_analysis(soundcloud_id, result.model_dump())
 
+        elapsed = time.time() - start_time
         log.audio.analyzed(
             f"Track {soundcloud_id}",
             bpm=result.bpm_detected,
-            key=result.key_detected
+            key=result.key_detected,
+            time=f"{elapsed:.1f}s"
         )
 
     except DownloadError as e:

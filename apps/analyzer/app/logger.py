@@ -220,13 +220,21 @@ class AudioLogger:
         """Log analysis start."""
         self._logger.info(f"Analyzing {Colors.BOLD}{title}{Colors.RESET}", Tags.AUDIO)
 
-    def analyzed(self, title: str, bpm: int | None = None, key: str | None = None) -> None:
+    def analyzed(
+        self,
+        title: str,
+        bpm: int | None = None,
+        key: str | None = None,
+        time: str | None = None,
+    ) -> None:
         """Log successful analysis."""
         details = []
         if bpm:
             details.append(f"BPM={bpm}")
         if key:
             details.append(f"Key={key}")
+        if time:
+            details.append(time)
         detail_str = f" ({', '.join(details)})" if details else ""
         self._logger.success(f"Analyzed {Colors.BOLD}{title}{Colors.RESET}{detail_str}", Tags.AUDIO)
 

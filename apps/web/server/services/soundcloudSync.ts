@@ -120,10 +120,12 @@ export async function syncUserLikes(
   logger.info('SYNC', `Starting SoundCloud likes sync (max ${maxTracks} tracks)`)
 
   const allTracks: TrackEntry[] = []
-  let nextUrl: string | null = `${SOUNDCLOUD_API_BASE}/me/likes/tracks?limit=${PAGE_SIZE}`
+  const seenIds = new Set<number>()
+  // Use linked_partitioning for cursor-based pagination (offset is deprecated)
+  let nextUrl: string | null = `${SOUNDCLOUD_API_BASE}/me/likes/tracks?limit=${PAGE_SIZE}&linked_partitioning=1`
 
   try {
-    // Paginate through likes
+    // Paginate through likes using cursor-based pagination
     while (nextUrl && allTracks.length < maxTracks) {
       const likesResponse: SoundCloudLikesResponse = await $fetch(nextUrl, {
         headers: {
@@ -131,27 +133,38 @@ export async function syncUserLikes(
         }
       })
 
-      if (!likesResponse.collection || likesResponse.collection.length === 0) {
+      const collection = likesResponse.collection || []
+
+      if (collection.length === 0) {
         break
       }
 
       // Map liked tracks to TrackEntry format
-      const tracks = likesResponse.collection
-        .filter((item: SoundCloudLikeItem) => item.track && item.track.id) // Filter out deleted tracks
-        .map(mapLikedTrackToTrackEntry)
+      // Handle both formats: { track: ... } wrapper or direct track object
+      const tracks = collection
+        .map((item: SoundCloudLikeItem) => {
+          // If item has .track property, use it; otherwise treat item as the track itself
+          const track = item.track || (item as unknown as SoundcloudTrack)
+          if (!track || !track.id) return null
+          // Skip duplicates (shouldn't happen with cursor pagination, but just in case)
+          if (seenIds.has(track.id)) return null
+          seenIds.add(track.id)
+          return mapLikedTrackToTrackEntry({ track, created_at: item.created_at || '' })
+        })
+        .filter((t): t is TrackEntry => t !== null)
 
       allTracks.push(...tracks)
 
-      // Get next page URL
-      nextUrl = likesResponse.next_href
+      // Get next page URL from response (cursor-based)
+      nextUrl = likesResponse.next_href || null
 
       // Stop if we've reached the limit
       if (allTracks.length >= maxTracks) {
-        allTracks.splice(maxTracks) // Trim to exact limit
+        allTracks.splice(maxTracks)
         break
       }
 
-      // Small delay between pages to be nice to SoundCloud API
+      // Small delay between pages
       if (nextUrl) {
         await new Promise(resolve => setTimeout(resolve, 100))
       }
