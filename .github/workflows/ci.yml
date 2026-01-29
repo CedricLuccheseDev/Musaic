@@ -91,5 +91,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Lint Python
+        run: ruff check app/
+
       - name: Check Python syntax
         run: python -m py_compile app/*.py app/endpoints/*.py
