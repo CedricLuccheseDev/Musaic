@@ -86,10 +86,14 @@ See [STANDARDS.md](STANDARDS.md) for commit conventions and code style.
 
 ## Pull Requests
 
-- Target `dev` branch
+> **Important:** All PRs must target the `dev` branch. PRs to `main` will be closed.
+
+- Target `dev` branch (not `main`)
 - One feature/fix per PR
 - Clear description of changes
 - CI must pass
+
+The `main` branch is protected and only updated by the maintainer via release PRs from `dev`.
 
 ## Security Setup
 
