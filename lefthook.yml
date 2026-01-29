@@ -1,0 +1,22 @@
+# Lefthook - Git hooks manager
+# Runs automatically before push to catch issues early
+# https://lefthook.dev/configuration/
+
+pre-push:
+  parallel: true
+  commands:
+    web-lint:
+      root: apps/web
+      run: bun run lint
+
+    web-typecheck:
+      root: apps/web
+      run: bun run nuxi typecheck
+
+    analyzer-lint:
+      root: apps/analyzer
+      run: pip install ruff -q --break-system-packages 2>/dev/null || pip install ruff -q && ruff check app/
+
+    analyzer-syntax:
+      root: apps/analyzer
+      run: python -m py_compile app/*.py app/endpoints/*.py
