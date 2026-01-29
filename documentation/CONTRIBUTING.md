@@ -76,11 +76,20 @@ python -m app.main
 
 ## Development Workflow
 
-1. Create a branch from `dev`: `git checkout -b feature/your-feature`
-2. Make changes following [STANDARDS.md](STANDARDS.md)
-3. Run validation locally (see commands above)
+1. Install dependencies at root: `bun install` (installs git hooks automatically)
+2. Create a branch from `dev`: `git checkout -b feature/your-feature`
+3. Make changes following [STANDARDS.md](STANDARDS.md)
 4. Commit: `git commit -m "feat(scope): description"`
-5. Push and create a PR to `dev`
+5. Push — **lefthook runs validation automatically before push**
+6. Create a PR to `dev`
+
+### Pre-push Validation
+
+Git hooks (via lefthook) run automatically on `git push`:
+- Web: lint + typecheck
+- Analyzer: ruff lint + syntax check
+
+If validation fails, the push is blocked. Fix the issues and try again.
 
 See [STANDARDS.md](STANDARDS.md) for commit conventions and code style.
 
