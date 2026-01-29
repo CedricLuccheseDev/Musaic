@@ -159,7 +159,7 @@ def _download_from_youtube(url: str, temp_dir: Path, settings: "Settings") -> Pa
         cmd.extend(["--proxy", settings.proxy_url])
 
     try:
-        result = subprocess.run(
+        subprocess.run(
             cmd,
             check=True,
             capture_output=True,
@@ -221,12 +221,12 @@ async def _get_stream_url(
 
     # Check if track is streamable
     if not track_data.get("streamable", True):
-        raise StreamUnavailableError(f"Track not streamable (label restriction)")
+        raise StreamUnavailableError("Track not streamable (label restriction)")
 
     # Check policy (some tracks have "BLOCK" or "SNIP")
     policy = track_data.get("policy", "ALLOW")
     if policy == "BLOCK":
-        raise StreamUnavailableError(f"Track blocked by policy (label/geo restriction)")
+        raise StreamUnavailableError("Track blocked by policy (label/geo restriction)")
 
     # Try to get progressive stream URL (fastest - direct MP3)
     transcodings = track_data.get("media", {}).get("transcodings", [])

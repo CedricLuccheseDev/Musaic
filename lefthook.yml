@@ -1,6 +1,7 @@
 # Lefthook - Git hooks manager
 # Runs automatically before push to catch issues early
 # https://lefthook.dev/configuration/
+# Note: Typecheck is slow, so it's only in CI (not pre-push)
 
 pre-push:
   parallel: true
@@ -8,11 +9,5 @@ pre-push:
     web-lint:
       run: cd apps/web && bun run lint
 
-    web-typecheck:
-      run: cd apps/web && bun run nuxi typecheck
-
     analyzer-lint:
       run: cd apps/analyzer && (pip install ruff -q --break-system-packages 2>/dev/null || pip install ruff -q) && ruff check app/
-
-    analyzer-syntax:
-      run: cd apps/analyzer && python -m py_compile app/*.py app/endpoints/*.py

@@ -13,13 +13,13 @@ warnings.filterwarnings("ignore", message=".*No network created.*")
 warnings.filterwarnings("ignore", category=UserWarning)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # Suppress TensorFlow logs
 
-# Suppress Essentia logging
-import essentia
+# Suppress Essentia logging (must be before other imports)
+import essentia  # noqa: E402
 essentia.log.infoActive = False
 essentia.log.warningActive = False
 
-from app.config import get_settings
-from app.models import AnalysisResult
+from app.config import get_settings  # noqa: E402
+from app.models import AnalysisResult  # noqa: E402
 
 # Embedding model configuration
 EMBEDDING_MODEL_PATH = Path(__file__).parent.parent / "models" / "discogs-effnet-bs64-1.pb"
