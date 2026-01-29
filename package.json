@@ -13,8 +13,7 @@
   },
   "devDependencies": {
     "@evilmartians/lefthook": "^2.0.16",
-    "concurrently": "^9.1.0",
-    "semantic-release": "^25.0.2"
+    "concurrently": "^9.1.0"
   },
   "dependencies": {
     "jszip": "^3.10.1"
