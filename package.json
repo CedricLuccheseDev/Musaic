@@ -8,9 +8,11 @@
     "dev:analyzer": "docker compose up --no-log-prefix analyzer",
     "build": "bun run --cwd apps/web build",
     "lint": "bun run --cwd apps/web lint",
-    "test": "bun run --cwd apps/web test"
+    "test": "bun run --cwd apps/web test",
+    "postinstall": "lefthook install"
   },
   "devDependencies": {
+    "@evilmartians/lefthook": "^2.0.16",
     "concurrently": "^9.1.0"
   },
   "dependencies": {

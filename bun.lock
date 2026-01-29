@@ -8,11 +8,14 @@
         "jszip": "^3.10.1",
       },
       "devDependencies": {
+        "@evilmartians/lefthook": "^2.0.16",
         "concurrently": "^9.1.0",
       },
     },
   },
   "packages": {
+    "@evilmartians/lefthook": ["@evilmartians/lefthook@2.0.16", "", { "os": [ "linux", "win32", "darwin", ], "cpu": [ "x64", "ia32", "arm64", ], "bin": { "lefthook": "bin/index.js" } }, "sha512-TsLvg2Sq/Cm1wgLDMQuAZHPLz82WxVvHvFzv3+deSxXft8/JxMy5IBsuIbDBsLK9ZlrTbaAtBBQU5tbFQoRS0w=="],
+
     "ansi-regex": ["ansi-regex@5.0.1", "", {}, "sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ=="],
 
     "ansi-styles": ["ansi-styles@4.3.0", "", { "dependencies": { "color-convert": "^2.0.1" } }, "sha512-zbB9rCJAT1rbjiVDb2hqKFHNYLxgtk8NURxZ3IZwD3F6NtxbXZQCnnSi1Lkx+IDohdPlFp222wVALIheZJQSEg=="],
