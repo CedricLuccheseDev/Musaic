@@ -8,8 +8,16 @@ definePageMeta({
 const { t } = useI18n()
 const { user, signInWithSoundCloud } = useAuth()
 const router = useRouter()
+const route = useRoute()
 const isLoading = ref(false)
 const showTerms = ref(false)
+
+/* --- Auto-connect if redirected from another domain --- */
+onMounted(() => {
+  if (route.query.autoconnect === '1' && !user.value) {
+    handleSoundCloud()
+  }
+})
 
 /* --- Methods --- */
 async function handleSoundCloud() {

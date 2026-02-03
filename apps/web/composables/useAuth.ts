@@ -42,6 +42,15 @@ export const useAuth = () => {
 
   async function signInWithSoundCloud(): Promise<{ error: { message: string } | null }> {
     try {
+      // If on a different domain than musaic.fr, redirect to musaic.fr for auth
+      // This is needed because SoundCloud OAuth callback is configured for musaic.fr only
+      const currentHost = window.location.hostname
+      if (currentHost !== 'musaic.fr' && currentHost !== 'localhost') {
+        // Redirect to musaic.fr login page
+        window.location.href = 'https://musaic.fr/login?autoconnect=1'
+        return { error: null }
+      }
+
       // Call the init endpoint to get the authorization URL
       const { authUrl } = await $fetch<{ authUrl: string }>('/api/auth/soundcloud/init')
 
