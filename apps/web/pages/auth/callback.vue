@@ -63,12 +63,14 @@ onMounted(async () => {
     const channel = new BroadcastChannel('musaic-auth')
     channel.postMessage({ type: 'auth-success' })
 
-    // Close this tab after a short delay (keep channel open briefly for message delivery)
+    // Close this popup after a short delay (keep channel open briefly for message delivery)
     setTimeout(() => {
       channel.close()
       window.close()
-      // Fallback: if window.close() doesn't work (not opened by script), redirect
-      router.push('/')
+      // Fallback: if window.close() doesn't work, hard redirect to home
+      setTimeout(() => {
+        window.location.href = '/'
+      }, 300)
     }, 1000)
   } catch (err) {
     status.value = 'error'

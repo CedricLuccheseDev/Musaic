@@ -54,8 +54,12 @@ export const useAuth = () => {
       // Call the init endpoint to get the authorization URL
       const { authUrl } = await $fetch<{ authUrl: string }>('/api/auth/soundcloud/init')
 
-      // Open auth in new tab
-      window.open(authUrl, '_blank')
+      // Open auth in a popup window (not a tab) so window.close() works reliably
+      const width = 600
+      const height = 700
+      const left = window.screenX + (window.outerWidth - width) / 2
+      const top = window.screenY + (window.outerHeight - height) / 2
+      window.open(authUrl, 'musaic-auth', `width=${width},height=${height},left=${left},top=${top}`)
 
       // Listen for auth completion via BroadcastChannel
       return new Promise((resolve) => {

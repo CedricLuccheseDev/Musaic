@@ -26,7 +26,7 @@ const filter = defineModel<FilterType>('filter', { default: 'all' })
       @click="filter = 'free'"
     >
       <UIcon name="i-heroicons-arrow-down-tray" class="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-      <span class="hidden sm:inline">{{ t.free }}</span>
+      {{ t.free }}
     </button>
     <button
       type="button"
@@ -37,7 +37,7 @@ const filter = defineModel<FilterType>('filter', { default: 'all' })
       @click="filter = 'paid'"
     >
       <UIcon name="i-heroicons-shopping-cart" class="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-      <span class="hidden sm:inline">{{ t.paid }}</span>
+      {{ t.paid }}
     </button>
   </div>
 </template>

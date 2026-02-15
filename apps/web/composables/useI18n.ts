@@ -11,7 +11,7 @@ const translations = {
     search: 'Rechercher',
 
     // Home
-    tagline: 'Cherche et Télécharge tes tracks facilement, rapidement.',
+    tagline: 'Trouve la musique qui te correspond.',
 
     // Search results
     searching: 'Recherche en cours',
@@ -45,9 +45,9 @@ const translations = {
     showSql: 'Voir la requête SQL',
     exit: 'Quitter',
     aiLimitReached: 'Limite IA atteinte',
-    aiLimitMessage: 'Tu as utilisé tes 5 recherches IA gratuites aujourd\'hui.',
-    aiLimitCta: 'Passe Premium pour des recherches IA illimitées !',
-    aiGenerationsLeft: 'recherches IA restantes',
+    aiLimitMessage: 'Tu as utilisé tes 5 découvertes intelligentes gratuites aujourd\'hui.',
+    aiLimitCta: 'Passe Premium pour des découvertes illimitées !',
+    aiGenerationsLeft: 'découvertes restantes',
 
     // TrackCard
     download: 'Télécharger',
@@ -145,25 +145,25 @@ const translations = {
     featureFreeDl: 'Suivi des Free DL',
     featureAds: 'Sans publicités',
     featureWithAds: 'Avec publicités',
-    featureAiSearch: 'Recherche IA illimitée',
-    featureAiLimited: '5 recherches IA/jour',
+    featureAiSearch: 'Découverte intelligente illimitée',
+    featureAiLimited: '5 découvertes intelligentes/jour',
     included: 'Inclus',
     notIncluded: 'Non inclus',
     compareTitle: 'Comparaison détaillée',
 
     // How it works
     hiwTitle: 'Comment ça marche ?',
-    hiwSubtitle: 'Découvre comment utiliser Musaic pour trouver et télécharger tes tracks préférés',
+    hiwSubtitle: 'Découvre comment Musaic t\'aide à dénicher les tracks qui matchent ton style',
     hiwSearchTitle: 'Recherche classique',
     hiwSearchContent: 'Tape le nom d\'un artiste, d\'un track ou d\'un genre. Musaic interroge SoundCloud et affiche les résultats.',
     hiwSearchFree: 'Téléchargement gratuit activé par l\'artiste',
     hiwSearchLink: 'Lien externe de téléchargement',
     hiwSearchPaid: 'Track disponible à l\'achat',
-    hiwAiTitle: 'Recherche IA',
-    hiwAiContent: 'Notre IA comprend tes demandes en langage naturel et fouille notre base de données.',
-    hiwAiExample1: '"Trouve-moi de la techno mélodique récente"',
-    hiwAiExample2: '"Des tracks de drum and bass énergiques"',
-    hiwAiExample3: '"Musique chill pour travailler"',
+    hiwAiTitle: 'Découverte intelligente',
+    hiwAiContent: 'Décris le son que tu cherches, notre IA fouille la base et te propose des résultats qui matchent.',
+    hiwAiExample1: '"Dark neuro dnb autour de 174 BPM"',
+    hiwAiExample2: '"Deep dubstep avec des sub basses lourdes"',
+    hiwAiExample3: '"Melodic techno dans le style d\'Artbat"',
     hiwFiltersTitle: 'Filtres',
     hiwFiltersContent: 'Affine tes résultats : Tous, Gratuit ou Payant.',
     hiwPremiumTitle: 'Avantages Premium',
@@ -204,7 +204,7 @@ const translations = {
     search: 'Search',
 
     // Home
-    tagline: 'Search and Download your tracks easily, quickly.',
+    tagline: 'Find the music that fits your sound.',
 
     // Search results
     searching: 'Searching',
@@ -238,9 +238,9 @@ const translations = {
     showSql: 'Show SQL query',
     exit: 'Exit',
     aiLimitReached: 'AI limit reached',
-    aiLimitMessage: 'You\'ve used your 5 free AI searches today.',
-    aiLimitCta: 'Go Premium for unlimited AI searches!',
-    aiGenerationsLeft: 'AI searches left',
+    aiLimitMessage: 'You\'ve used your 5 free smart discoveries today.',
+    aiLimitCta: 'Go Premium for unlimited discoveries!',
+    aiGenerationsLeft: 'discoveries left',
 
     // TrackCard
     download: 'Download',
@@ -338,25 +338,25 @@ const translations = {
     featureFreeDl: 'Free DL tracking',
     featureAds: 'Ad-free',
     featureWithAds: 'With ads',
-    featureAiSearch: 'Unlimited AI search',
-    featureAiLimited: '5 AI searches/day',
+    featureAiSearch: 'Unlimited smart discovery',
+    featureAiLimited: '5 smart discoveries/day',
     included: 'Included',
     notIncluded: 'Not included',
     compareTitle: 'Detailed comparison',
 
     // How it works
     hiwTitle: 'How it works?',
-    hiwSubtitle: 'Learn how to use Musaic to find and download your favorite tracks',
+    hiwSubtitle: 'Discover how Musaic helps you find tracks that match your style',
     hiwSearchTitle: 'Classic search',
     hiwSearchContent: 'Type an artist name, track or genre. Musaic queries SoundCloud and displays the results.',
     hiwSearchFree: 'Free download enabled by the artist',
     hiwSearchLink: 'External download link',
     hiwSearchPaid: 'Track available for purchase',
-    hiwAiTitle: 'AI Search',
-    hiwAiContent: 'Our AI understands your natural language requests and searches our database.',
-    hiwAiExample1: '"Find me some recent melodic techno"',
-    hiwAiExample2: '"Energetic drum and bass tracks"',
-    hiwAiExample3: '"Chill music for working"',
+    hiwAiTitle: 'Smart discovery',
+    hiwAiContent: 'Describe the sound you\'re looking for, our AI searches the database and suggests matching results.',
+    hiwAiExample1: '"Dark neuro dnb around 174 BPM"',
+    hiwAiExample2: '"Deep dubstep with heavy sub bass"',
+    hiwAiExample3: '"Melodic techno similar to Artbat"',
     hiwFiltersTitle: 'Filters',
     hiwFiltersContent: 'Refine your results: All, Free or Paid.',
     hiwPremiumTitle: 'Premium benefits',
