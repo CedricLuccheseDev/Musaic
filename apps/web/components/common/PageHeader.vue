@@ -15,7 +15,7 @@ withDefaults(defineProps<{
     :class="sticky ? 'sticky top-0 bg-neutral-950/90 backdrop-blur-xl' : 'relative'"
   >
     <!-- Desktop layout -->
-    <div class="hidden md:grid md:grid-cols-3 md:items-start md:px-6 md:py-4">
+    <div class="hidden md:grid md:grid-cols-3 md:items-center md:px-6 md:py-4">
       <!-- Left -->
       <div class="flex items-center justify-start gap-4">
         <slot name="back" />
@@ -33,7 +33,7 @@ withDefaults(defineProps<{
               <NuxtLink to="/" class="group transition-transform hover:scale-105">
                 <AppLogo size="md" />
               </NuxtLink>
-              <PremiumButton />
+              <!-- <PremiumButton /> -->
             </div>
           </slot>
           <div v-else />
@@ -90,12 +90,9 @@ withDefaults(defineProps<{
           >
             <slot v-if="!hideLogo" name="left-mobile">
               <slot name="left">
-                <div class="flex items-center gap-2">
-                  <NuxtLink to="/">
-                    <AppLogo size="sm" />
-                  </NuxtLink>
-                  <PremiumButton size="sm" />
-                </div>
+                <NuxtLink to="/">
+                  <AppLogo size="sm" />
+                </NuxtLink>
               </slot>
             </slot>
             <div v-else />

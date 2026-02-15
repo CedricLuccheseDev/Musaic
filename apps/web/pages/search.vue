@@ -29,7 +29,7 @@ const MAX_RESULTS = 500
 /* --- Meta --- */
 definePageMeta({
   layoutConfig: {
-    stickyFooter: true
+    showFooter: false
   }
 })
 
@@ -38,7 +38,7 @@ const { t } = useI18n()
 const { canUseAi, aiGenerationsLeft, isPremium, incrementAiUsage } = useProfile()
 const route = useRoute()
 const { watchTracks } = useTrackUpdates()
-const { initHistory, saveSearch, getRecentSearches } = useSearchHistory()
+const { initHistory, saveSearch } = useSearchHistory()
 
 /* --- States --- */
 const headerMounted = ref(false)
@@ -105,9 +105,6 @@ const needsClarification = computed(() =>
 )
 const clarificationQuestion = computed(() => searchResult.value?.clarificationQuestion || '')
 const clarificationOptions = computed(() => searchResult.value?.clarificationOptions || [])
-
-// Recent searches for display
-const recentSearches = computed(() => getRecentSearches(5))
 
 // Search More filtered tracks
 const filteredSearchMoreTracks = computed(() => applyFilter(searchMoreTracks.value))
@@ -291,39 +288,21 @@ onUnmounted(() => {
   <div class="flex flex-1 flex-col">
     <SearchBackground />
 
-    <!-- Teleport SearchBar to header center slots -->
-    <Teleport v-if="headerMounted" to="#header-center-desktop">
-      <div class="w-full max-w-xl">
-        <SearchBar
-          v-model="searchInput"
-          :loading="isLoading"
-          :recent-searches="recentSearches"
-          @search="search"
-        />
+    <!-- Teleport results header to page header (desktop only) -->
+    <Teleport v-if="headerMounted && query" to="#header-center-desktop">
+      <div class="flex items-center gap-3">
+        <UIcon name="i-heroicons-magnifying-glass" class="h-5 w-5 text-violet-400" />
+        <h2 class="truncate text-sm font-semibold text-white">
+          {{ t.resultsFor }} "{{ query }}"
+        </h2>
       </div>
-    </Teleport>
-    <Teleport v-if="headerMounted" to="#header-center-mobile">
-      <SearchBar
-        v-model="searchInput"
-        :loading="isLoading"
-        :recent-searches="recentSearches"
-        @search="search"
-      />
     </Teleport>
 
   <!-- Results -->
-  <main class="relative mx-auto w-full max-w-4xl flex-1 px-4 py-6 pb-32 md:px-6 md:py-10">
+  <main class="relative mx-auto w-full max-w-4xl flex-1 px-4 py-6 pb-52 md:px-6 md:py-10">
     <ClientOnly>
       <!-- Main results container -->
       <template v-if="query && (isLoading || filteredTracks.length || needsClarification || searchMoreLoading || filteredSearchMoreTracks.length)">
-        <!-- Main title with filters -->
-        <div class="flex items-center gap-3 pb-2">
-          <UIcon name="i-heroicons-magnifying-glass" class="h-6 w-6 text-violet-400" />
-          <h2 class="flex-1 text-lg font-semibold text-white">
-            {{ t.resultsFor }} "{{ query }}"
-          </h2>
-          <SearchFilters v-model:filter="activeFilter" />
-        </div>
 
         <!-- AI Limit CTA -->
         <section v-if="aiLimitReached" class="mt-4 rounded-xl border border-amber-500/30 bg-amber-900/10 p-4">
@@ -450,5 +429,23 @@ onUnmounted(() => {
       </template>
     </ClientOnly>
   </main>
+
+    <!-- Sticky bottom: search bar -->
+    <div class="sticky bottom-0 z-30">
+      <div
+        class="pointer-events-none absolute inset-x-0 bottom-0 h-full backdrop-blur-md"
+        style="mask-image: linear-gradient(to top, black 50%, transparent 100%); -webkit-mask-image: linear-gradient(to top, black 50%, transparent 100%)"
+      />
+      <div class="relative z-10 px-3 pb-3 pt-6 sm:px-4 sm:pb-4 sm:pt-8">
+        <div class="mx-auto max-w-2xl">
+          <SearchBar
+            v-model="searchInput"
+            v-model:filter="activeFilter"
+            :loading="isLoading"
+            @search="search"
+          />
+        </div>
+      </div>
+    </div>
   </div>
 </template>

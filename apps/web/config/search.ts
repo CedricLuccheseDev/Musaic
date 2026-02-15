@@ -1,25 +1,25 @@
 // Placeholder phrases for the animated search bar
 export const placeholderPhrases = [
-  'Find me some chill lofi beats',
+  'Neuro dnb similar to Imanu',
   'Melodic dubstep with female vocals',
-  'Dark techno for late night coding',
-  'Uplifting trance from 2024',
+  'Dark halftime around 86 BPM',
+  'Deep dubstep with heavy sub bass',
   'Heavy bass music like Excision',
   'Tracks similar to Subtronics',
-  'Deep house for summer vibes',
+  'Liquid dnb with piano and vocals',
   'Emotional dnb with piano',
   'Hard riddim under 3 minutes',
-  'Ambient music for focus',
-  'Progressive house bangers',
-  'Free download dubstep tracks',
-  'Melodic bass with drops',
-  'Tracks with 140 BPM',
-  'Chill electronic for studying',
-  'Festival trap anthems',
+  'Melodic techno similar to Artbat',
   'Underground techno gems',
-  'Synthwave with retro vibes',
+  'Free download dubstep tracks',
+  'Atmospheric drum and bass',
+  'Tracks around 174 BPM',
+  'Dark techno for late night sets',
+  'Minimal dnb like Alix Perez',
+  'Dancefloor dnb with rolling bass',
+  'Deep house for summer vibes',
   'Bass house party tracks',
-  'Atmospheric drum and bass'
+  'Garage and 2-step vibes'
 ]
 
 // Ad display interval (show ad every N tracks)
